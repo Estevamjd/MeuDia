@@ -4,7 +4,20 @@
       "Bash(where vercel:*)",
       "Bash(where gh:*)",
       "Bash(vercel whoami:*)",
-      "Bash(vercel env:*)"
+      "Bash(vercel env:*)",
+      "Bash(vercel --prod --yes)",
+      "Bash(npx tsc:*)",
+      "Bash(vercel build:*)",
+      "Bash(vercel pull:*)",
+      "Bash(where git:*)",
+      "Bash(winget install:*)",
+      "Bash(export PATH=\"$PATH:/c/Program Files/GitHub CLI\")",
+      "Bash(gh auth:*)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" auth status)",
+      "Bash(\"/c/Program Files \\(x86\\)/GitHub CLI/gh.exe\" auth status)",
+      "Read(//c/Program Files/GitHub CLI//**)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "Bash(/c/Program Files/GitHub CLI/gh.exe repo:*)"
     ]
   }
 }

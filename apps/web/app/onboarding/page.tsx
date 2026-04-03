@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
 import { useAuth } from '../../hooks/useAuth';
@@ -32,21 +32,40 @@ const defaultData: OnboardingData = {
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const supabase = createClient();
   const [step, setStep] = useState(0);
   const [data, setData] = useState<OnboardingData>({
     ...defaultData,
-    nome: user?.user_metadata?.nome as string ?? '',
   });
   const [saving, setSaving] = useState(false);
+
+  // Quando o user carregar, preencher o nome
+  useEffect(() => {
+    if (user?.user_metadata?.nome) {
+      setData((prev) => ({
+        ...prev,
+        nome: user.user_metadata.nome as string,
+      }));
+    }
+  }, [user]);
+
+  // Redirecionar para login se não estiver autenticado
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+  }, [authLoading, user, router]);
 
   const updateData = (partial: Partial<OnboardingData>) => {
     setData((prev) => ({ ...prev, ...partial }));
   };
 
   const handleFinish = async () => {
-    if (!user) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
     setSaving(true);
 
     const { error } = await supabase
@@ -70,7 +89,10 @@ export default function OnboardingPage() {
   };
 
   const handleSkip = async () => {
-    if (!user) return;
+    if (!user) {
+      router.push('/login');
+      return;
+    }
     setSaving(true);
     await supabase
       .from('profiles')
@@ -80,6 +102,20 @@ export default function OnboardingPage() {
     router.push('/inicio');
     router.refresh();
   };
+
+  // Mostrar loading enquanto verifica autenticação
+  if (authLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-bg">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+      </main>
+    );
+  }
+
+  // Se não tem user, não renderizar (redirect em andamento)
+  if (!user) {
+    return null;
+  }
 
   const steps = [
     <StepObjetivo key="obj" data={data} onChange={updateData} />,
