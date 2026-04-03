@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "MeuDia",
+    "slug": "meudia",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "meudia",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "color": "#7c6aff"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "ios": {
+      "bundleIdentifier": "com.meudia.app",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.meudia.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#080810"
+      }
+    }
+  }
+}

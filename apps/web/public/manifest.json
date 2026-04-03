@@ -1,0 +1,66 @@
+{
+  "name": "MeuDia - Assistente Pessoal",
+  "short_name": "MeuDia",
+  "description": "Seu assistente pessoal de produtividade e saude. Treinos, habitos, notas, financas e mais.",
+  "start_url": "/inicio",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#080810",
+  "theme_color": "#7c6aff",
+  "categories": ["health", "fitness", "productivity", "finance"],
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Treinos",
+      "url": "/treinos",
+      "description": "Ver treinos do dia"
+    },
+    {
+      "name": "Habitos",
+      "url": "/habitos",
+      "description": "Marcar habitos de hoje"
+    },
+    {
+      "name": "Notas",
+      "url": "/notas",
+      "description": "Abrir bloco de notas"
+    },
+    {
+      "name": "Financas",
+      "url": "/financas",
+      "description": "Ver financas do mes"
+    },
+    {
+      "name": "Agenda",
+      "url": "/agenda",
+      "description": "Ver compromissos"
+    }
+  ]
+}

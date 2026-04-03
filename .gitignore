@@ -1,0 +1,41 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build
+dist/
+.next/
+.expo/
+out/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# turbo
+.turbo/
+
+# sentry
+.sentryclirc
+
+# testing
+coverage/
+playwright-report/
+test-results/
+
+# misc
+*.tsbuildinfo
+npm-debug.log*
+
+.vercel
