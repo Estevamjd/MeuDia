@@ -51,6 +51,20 @@ export function useAuth() {
   const signOut = useCallback(async () => {
     const supabase = supabaseRef.current;
     if (supabase) {
+      try {
+        if ('serviceWorker' in navigator) {
+          const reg = await navigator.serviceWorker.getRegistration();
+          const sub = await reg?.pushManager?.getSubscription();
+          if (sub) {
+            await fetch('/api/push/subscribe', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ endpoint: sub.endpoint }),
+            });
+            await sub.unsubscribe();
+          }
+        }
+      } catch { /* Falhas no push não impedem o logout. */ }
       await supabase.auth.signOut();
     }
     router.push('/login');

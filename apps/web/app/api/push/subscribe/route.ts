@@ -24,3 +24,16 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error) { return apiError(error); }
 }
+
+export async function GET(request: Request) {
+  try {
+    const client = createServerSupabaseClient();
+    const { data: { user }, error } = await client.auth.getUser();
+    if (error || !user) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+    const endpoint = pushSubscriptionSchema.shape.endpoint.parse(new URL(request.url).searchParams.get('endpoint'));
+    const { data, error: queryError } = await client.from('push_subscriptions')
+      .select('id').eq('user_id', user.id).eq('endpoint', endpoint).maybeSingle();
+    if (queryError) throw queryError;
+    return NextResponse.json({ inscrito: !!data, userId: user.id });
+  } catch (error) { return apiError(error); }
+}

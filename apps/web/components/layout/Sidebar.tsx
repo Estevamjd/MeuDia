@@ -3,12 +3,15 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { clsx } from 'clsx';
+import { useAppMode } from '../AppModeProvider';
+import { rotaInicial } from '../../lib/app-mode';
 
 interface NavItem {
   href: string;
   label: string;
   emoji: string;
   colorClass?: 'green' | 'orange';
+  exato?: boolean;
 }
 
 interface NavSection {
@@ -40,6 +43,19 @@ const navSections: NavSection[] = [
   },
 ];
 
+// Modo Finanças: só finanças (as subrotas ganham item próprio).
+const navSectionsFinancas: NavSection[] = [
+  {
+    label: 'Finanças',
+    items: [
+      { href: '/financas', label: 'Resumo do mês', emoji: '💸', exato: true },
+      { href: '/financas/contas', label: 'Contas', emoji: '🧾' },
+      { href: '/financas/orcamento', label: 'Orçamento', emoji: '📊' },
+      { href: '/assinaturas', label: 'Assinaturas', emoji: '💳' },
+    ],
+  },
+];
+
 interface SidebarProps {
   onSignOut: () => void;
   onNavigate?: () => void;
@@ -50,6 +66,8 @@ interface SidebarProps {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function Sidebar({ onSignOut, onNavigate, onOpenAgent, userName }: SidebarProps) {
   const pathname = usePathname();
+  const mode = useAppMode();
+  const sections = mode === 'financas' ? navSectionsFinancas : navSections;
 
   return (
     <aside
@@ -76,12 +94,12 @@ export function Sidebar({ onSignOut, onNavigate, onOpenAgent, userName }: Sideba
           letterSpacing: -0.5,
         }}
       >
-        <Link href="/inicio">✦ MeuDia</Link>
+        <Link href={rotaInicial(mode)}>✦ MeuDia</Link>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1">
-        {navSections.map((section) => (
+        {sections.map((section) => (
           <div key={section.label}>
             <div
               style={{
@@ -97,7 +115,8 @@ export function Sidebar({ onSignOut, onNavigate, onOpenAgent, userName }: Sideba
             </div>
             <div className="flex flex-col" style={{ gap: 1 }}>
               {section.items.map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+                const isActive =
+                  pathname === item.href || (!item.exato && pathname.startsWith(item.href + '/'));
 
                 const activeStyles = (() => {
                   if (!isActive) return {};

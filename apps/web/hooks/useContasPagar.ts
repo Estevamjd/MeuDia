@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { contasPagarService } from '@meudia/api';
+import { contasPagarRepository, contasPagarService } from '@meudia/api';
 import type { Competencia, ContaPagarInsert } from '@meudia/shared';
 import { useAuth } from './useAuth';
 import { chavesAfetadasPorPagamento, contasKeys } from '../lib/financas-query-keys';
@@ -19,6 +19,17 @@ interface PagarVars extends PagamentoVars {
 function requireUserId(userId: string | undefined): string {
   if (!userId) throw new Error('Não autenticado');
   return userId;
+}
+
+/** Definições de conta ativas (inclui anuais/únicas fora do mês corrente). */
+export function useContas() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: contasKeys.definicoes(user?.id),
+    queryFn: () => contasPagarRepository.findAll(requireUserId(user?.id), { ativo: true }),
+    enabled: !!user?.id,
+  });
 }
 
 export function useContasMes(competencia: Competencia) {
@@ -99,7 +110,8 @@ export function usePagarConta() {
   return useMutation({
     mutationFn: ({ contaId, competencia, pago_em, banco }: PagarVars) =>
       contasPagarService.pagarConta(requireUserId(user?.id), contaId, { competencia, pago_em, banco }),
-    onSuccess: (_data, vars) => invalidar(vars),
+    // Também no erro: 409 "já paga" (outra aba/aparelho) precisa refletir o estado real.
+    onSettled: (_data, _error, vars) => invalidar(vars),
   });
 }
 
@@ -110,6 +122,6 @@ export function useDesfazerPagamento() {
   return useMutation({
     mutationFn: ({ contaId, competencia }: PagamentoVars) =>
       contasPagarService.desfazerPagamento(requireUserId(user?.id), contaId, competencia),
-    onSuccess: (_data, vars) => invalidar(vars),
+    onSettled: (_data, _error, vars) => invalidar(vars),
   });
 }

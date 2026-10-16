@@ -2,12 +2,13 @@ import type * as ApiModule from '@meudia/api';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AppError } from '@meudia/shared';
 import { GET } from '../cron/lembretes/route';
-import { POST, DELETE } from '../push/subscribe/route';
+import { POST, DELETE, GET as consultarPush } from '../push/subscribe/route';
 import { POST as pagar } from '../financas/contas/[id]/pagar/route';
 import { createServerSupabaseClient } from '../../../lib/supabase/server';
 import { createPushSender } from '../../../lib/web-push';
 import { createClient } from '@supabase/supabase-js';
 import { lembretesService, pushSubscriptionsRepository as push, contasPagarService as contas } from '@meudia/api';
+import type * as Api from '@meudia/api';
 vi.mock('../../../lib/supabase/server', () => ({ createServerSupabaseClient: vi.fn() }));
 vi.mock('../../../lib/web-push', () => ({ createPushSender: vi.fn() }));
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
@@ -20,10 +21,16 @@ vi.mock('@meudia/api', async importOriginal => {
   };
 });
 const getUser = vi.fn();
-const client = { auth: { getUser } };
+const maybeSingle = vi.fn();
+const eq = vi.fn();
+const from = vi.fn();
+const client = { auth: { getUser }, from };
 const req = (body: unknown) => new Request('https://example.invalid', { method: 'POST', body: JSON.stringify(body) });
 beforeEach(() => {
-  vi.resetAllMocks(); vi.stubEnv('CRON_SECRET', 'fixture-cron');
+  vi.resetAllMocks();
+  from.mockReturnValue({ select: () => ({ eq }) });
+  eq.mockReturnValue({ eq, maybeSingle });
+  vi.stubEnv('CRON_SECRET', 'fixture-cron');
   vi.mocked(createServerSupabaseClient).mockReturnValue(client as never);
   getUser.mockResolvedValue({ data: { user: { id: 'u' } }, error: null });
 });
@@ -82,4 +89,17 @@ it('cron falha sem reservar quando adapter não está disponível', async () => 
   const response = await GET(new Request('https://example.invalid', { headers: { Authorization: 'Bearer fixture-cron' } }));
   expect(response.status).toBe(500);
   expect(createClient).not.toHaveBeenCalled(); expect(lembretesService.enviarLembretesDoDia).not.toHaveBeenCalled();
+});
+
+it('consulta push filtra usuário autenticado e endpoint', async () => {
+  const request = new Request('https://example.invalid/api/push/subscribe?endpoint=https%3A%2F%2Fexample.invalid%2Fpush');
+  for (const data of [null, { id: 'inscricao' }]) {
+    maybeSingle.mockResolvedValue({ data, error: null });
+    const response = await consultarPush(request);
+    expect(await response.json()).toEqual({ inscrito: !!data, userId: 'u' });
+    expect(eq).toHaveBeenCalledWith('user_id', 'u');
+    expect(eq).toHaveBeenCalledWith('endpoint', 'https://example.invalid/push');
+  }
+  getUser.mockResolvedValue({ data: { user: null }, error: null });
+  expect((await consultarPush(request)).status).toBe(401);
 });

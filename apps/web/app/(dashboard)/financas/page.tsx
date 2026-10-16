@@ -3,8 +3,9 @@
 import { useState, useMemo, useCallback } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Wallet, Plus, TrendingUp, TrendingDown, DollarSign, ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react';
+import { Wallet, Plus, ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react';
 import type { Transacao, TransacaoInsert } from '@meudia/shared';
+import { competenciaDe, hojeSP } from '@meudia/shared';
 import { clsx } from 'clsx';
 
 import {
@@ -12,64 +13,47 @@ import {
   useCriarTransacao,
   useAtualizarTransacao,
   useExcluirTransacao,
-  useResumoMensal,
 } from '../../../hooks';
 
 import {
   Button,
-  StatCard,
   Badge,
   Modal,
   Input,
   Select,
   EmptyState,
   SkeletonList,
-  SkeletonCard,
   ConfirmDialog,
   useToast,
 } from '../../../components/ui';
 import { AgentBannerAuto } from '../../../components/agent';
-
-const formatBRL = (value: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+import { useAppMode } from '../../../components/AppModeProvider';
+import { ContasDoMes } from '../../../components/financas/ContasDoMes';
+import { ResumoMes } from '../../../components/financas/ResumoMes';
+import {
+  deslocarCompetencia,
+  formatBRL,
+  partesCompetencia,
+  rotuloCompetencia,
+} from '../../../lib/financas-ui';
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export default function FinancasPage() {
   const toast = useToast();
+  const mode = useAppMode();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const hoje = useMemo(() => new Date(), []);
 
-  // --- Month selector ---
-  const [ano, setAno] = useState(hoje.getFullYear());
-  const [mes, setMes] = useState(hoje.getMonth() + 1);
-
-  const mesAnterior = useCallback(() => {
-    if (mes === 1) {
-      setAno((a) => a - 1);
-      setMes(12);
-    } else {
-      setMes((m) => m - 1);
-    }
-  }, [mes]);
-
-  const mesProximo = useCallback(() => {
-    if (mes === 12) {
-      setAno((a) => a + 1);
-      setMes(1);
-    } else {
-      setMes((m) => m + 1);
-    }
-  }, [mes]);
-
-  const mesLabel = useMemo(() => {
-    const d = new Date(ano, mes - 1, 1);
-    return capitalize(format(d, 'MMMM yyyy', { locale: ptBR }));
-  }, [ano, mes]);
+  // --- Month selector (competência em SP, igual ao backend) ---
+  const [competencia, setCompetencia] = useState(() => competenciaDe(hojeSP()));
+  const { ano, mes } = partesCompetencia(competencia);
+  const mesAnterior = useCallback(() => setCompetencia((c) => deslocarCompetencia(c, -1)), []);
+  const mesProximo = useCallback(() => setCompetencia((c) => deslocarCompetencia(c, 1)), []);
+  const mesLabel = rotuloCompetencia(competencia);
 
   // --- Data hooks ---
   const { data: transacoes, isLoading: loadingTransacoes } = useTransacoesMes(ano, mes);
-  const { data: resumo, isLoading: loadingResumo } = useResumoMensal(ano, mes);
 
   // --- Mutations ---
   const criarTransacao = useCriarTransacao();
@@ -89,7 +73,6 @@ export default function FinancasPage() {
   const [formData, setFormData] = useState(format(hoje, 'yyyy-MM-dd'));
   const [formBanco, setFormBanco] = useState('');
 
-  const isLoading = loadingTransacoes || loadingResumo;
 
   // --- Group transactions by date ---
   const transacoesAgrupadas = useMemo(() => {
@@ -262,81 +245,11 @@ export default function FinancasPage() {
     </form>
   );
 
-  // --- Loading state ---
-  if (isLoading) {
-    return (
-      <div className="animate-fadeSlide space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="h-8 w-32 animate-pulse rounded bg-card2" />
-          <div className="h-10 w-40 animate-pulse rounded-lg bg-card2" />
-        </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <SkeletonCard />
-          <SkeletonCard />
-          <SkeletonCard />
-        </div>
-        <SkeletonList count={5} />
-      </div>
-    );
-  }
-
-  // --- Empty state ---
-  if (!transacoes || transacoes.length === 0) {
-    return (
-      <div className="animate-fadeSlide space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <h1 className="font-syne text-3xl font-bold text-text">Financas</h1>
-          <Button onClick={openAddModal}>
-            <Plus size={16} />
-            Nova Transacao
-          </Button>
-        </div>
-
-        {/* Month selector */}
-        <div className="flex items-center justify-center gap-4">
-          <button
-            onClick={mesAnterior}
-            className="rounded-lg p-2 text-muted transition-colors hover:bg-card2 hover:text-text"
-            aria-label="Mes anterior"
-          >
-            <ChevronLeft size={20} />
-          </button>
-          <span className="font-syne text-lg font-semibold text-text">{mesLabel}</span>
-          <button
-            onClick={mesProximo}
-            className="rounded-lg p-2 text-muted transition-colors hover:bg-card2 hover:text-text"
-            aria-label="Proximo mes"
-          >
-            <ChevronRight size={20} />
-          </button>
-        </div>
-
-        <EmptyState
-          icon={<Wallet size={48} />}
-          title="Nenhuma transacao neste mes"
-          description="Registre suas receitas e despesas para acompanhar suas financas."
-          actionLabel="Adicionar transacao"
-          onAction={openAddModal}
-        />
-
-        {/* Add Modal */}
-        <Modal
-          isOpen={showAddModal}
-          onClose={() => setShowAddModal(false)}
-          title="Nova Transacao"
-        >
-          {renderForm(handleSubmitAdd, criarTransacao.isPending)}
-        </Modal>
-      </div>
-    );
-  }
-
   return (
     <div className="animate-fadeSlide space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="font-syne text-3xl font-bold text-text">Financas</h1>
+        <h1 className="font-syne text-3xl font-bold text-text">Finanças</h1>
         <Button onClick={openAddModal}>
           <Plus size={16} />
           Nova Transacao
@@ -348,49 +261,42 @@ export default function FinancasPage() {
         <button
           onClick={mesAnterior}
           className="rounded-lg p-2 text-muted transition-colors hover:bg-card2 hover:text-text"
-          aria-label="Mes anterior"
+          aria-label="Mês anterior"
         >
           <ChevronLeft size={20} />
         </button>
-        <span className="font-syne text-lg font-semibold text-text">{mesLabel}</span>
+        <span className="font-syne text-lg font-semibold text-text" aria-live="polite">{mesLabel}</span>
         <button
           onClick={mesProximo}
           className="rounded-lg p-2 text-muted transition-colors hover:bg-card2 hover:text-text"
-          aria-label="Proximo mes"
+          aria-label="Próximo mês"
         >
           <ChevronRight size={20} />
         </button>
       </div>
 
-      {/* Agente IA */}
-      <AgentBannerAuto />
+      {/* Agente IA (fala de todos os módulos; fora do modo Finanças) */}
+      {mode !== 'financas' && <AgentBannerAuto />}
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <StatCard
-          label="Receitas"
-          value={formatBRL(resumo?.totalReceitas ?? 0)}
-          icon={<TrendingUp size={16} />}
-          tag={{ text: 'entradas', color: 'green' }}
-        />
-        <StatCard
-          label="Despesas"
-          value={formatBRL(resumo?.totalDespesas ?? 0)}
-          icon={<TrendingDown size={16} />}
-          tag={{ text: 'saidas', color: 'red' }}
-        />
-        <StatCard
-          label="Saldo"
-          value={formatBRL(resumo?.saldo ?? 0)}
-          icon={<DollarSign size={16} />}
-          tag={{
-            text: (resumo?.saldo ?? 0) >= 0 ? 'positivo' : 'negativo',
-            color: (resumo?.saldo ?? 0) >= 0 ? 'teal' : 'red',
-          }}
-        />
-      </div>
+      {/* Selo, renda × gasto, sobra, % comprometida, pagas no prazo, mês anterior */}
+      <ResumoMes ano={ano} mes={mes} />
 
-      {/* Transaction list grouped by date */}
+      <ContasDoMes competencia={competencia} />
+
+      <h2 className="font-syne text-lg font-semibold text-text">Transações</h2>
+
+      {loadingTransacoes ? (
+        <SkeletonList count={5} />
+      ) : !transacoes || transacoes.length === 0 ? (
+        <EmptyState
+          icon={<Wallet size={48} />}
+          title="Nenhuma transacao neste mes"
+          description="Registre suas receitas e despesas para acompanhar suas financas."
+          actionLabel="Adicionar transacao"
+          onAction={openAddModal}
+        />
+      ) : (
+      /* Transaction list grouped by date */
       <div className="space-y-6">
         {transacoesAgrupadas.map(([data, items]) => {
           const dataFormatada = format(new Date(data + 'T12:00:00'), "dd 'de' MMMM", { locale: ptBR });
@@ -452,6 +358,7 @@ export default function FinancasPage() {
           );
         })}
       </div>
+      )}
 
       {/* Add Modal */}
       <Modal

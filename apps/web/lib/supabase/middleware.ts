@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { getAppMode, redirecionamentoModo, rotaInicial } from '../app-mode';
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -35,6 +36,12 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const redirect = (url: URL) => {
+    const response = NextResponse.redirect(url);
+    supabaseResponse.cookies.getAll().forEach(cookie => response.cookies.set(cookie));
+    return response;
+  };
+
   const isPublicRoute =
     request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/registro') ||
@@ -47,8 +54,10 @@ export async function updateSession(request: NextRequest) {
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
-    return NextResponse.redirect(url);
+    return redirect(url);
   }
+
+  const mode = getAppMode();
 
   if (
     user &&
@@ -57,8 +66,17 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith('/onboarding')
   ) {
     const url = request.nextUrl.clone();
-    url.pathname = '/inicio';
-    return NextResponse.redirect(url);
+    url.pathname = rotaInicial(mode);
+    return redirect(url);
+  }
+
+  // Modo Finanças: rotas de módulos ocultos redirecionam para /financas.
+  const destino = redirecionamentoModo(request.nextUrl.pathname, mode);
+  if (user && destino) {
+    const url = request.nextUrl.clone();
+    url.pathname = destino;
+    url.search = '';
+    return redirect(url);
   }
 
   return supabaseResponse;

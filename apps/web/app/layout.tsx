@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import { DM_Sans, Syne } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
+import { AppModeProvider } from '../components/AppModeProvider';
+import { getAppMode } from '../lib/app-mode';
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -29,7 +31,8 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: 'MeuDia — Assistente Pessoal',
   description: 'Seu assistente pessoal de produtividade e saude. Treinos, habitos, notas, financas e mais.',
-  manifest: '/manifest.json',
+  // Gerado no servidor (app/manifest.webmanifest/route.ts) para filtrar atalhos pelo APP_MODE.
+  manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -73,7 +76,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body className="bg-bg font-dm text-text antialiased">
-        <Providers>{children}</Providers>
+        <AppModeProvider mode={getAppMode()} vapidPublicKey={process.env.VAPID_PUBLIC_KEY || null}>
+          <Providers>{children}</Providers>
+        </AppModeProvider>
         <script
           dangerouslySetInnerHTML={{
             __html: `

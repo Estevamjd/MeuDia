@@ -524,8 +524,8 @@ function AssinaturaCard({ assinatura, situacao, highlight, onEdit, onDelete }: A
       <span className="text-sm font-bold text-text">{formatBRL(assinatura.valor)}</span>
 
       {/* Actions */}
-      {/* Visível também no foco por teclado */}
-      <div className="flex gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+      {/* Mobile (sem hover): sempre visível. Desktop: hover ou foco por teclado. */}
+      <div className="flex gap-1 transition-opacity md:opacity-0 md:focus-within:opacity-100 md:group-hover:opacity-100">
         <Button variant="icon" onClick={onEdit} aria-label={`Editar assinatura ${assinatura.nome}`}>
           <Pencil size={14} />
         </Button>

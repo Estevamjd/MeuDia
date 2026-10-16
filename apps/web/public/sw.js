@@ -1,8 +1,7 @@
-const CACHE_NAME = 'meudia-v5';
+const CACHE_NAME = 'meudia-v6';
 const STATIC_ASSETS = [
   '/',
   '/login',
-  '/manifest.json',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
   '/apple-touch-icon.png',
@@ -39,6 +38,44 @@ self.addEventListener('message', (event) => {
       Promise.all(keys.map((k) => caches.delete(k)))
     );
   }
+});
+
+// Push — lembrete de conta: { title, body, url, tag }
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch (e) {
+    payload = { body: event.data ? event.data.text() : '' };
+  }
+  event.waitUntil(
+    self.registration.showNotification(payload.title || 'MeuDia', {
+      body: payload.body || '',
+      tag: payload.tag,
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      data: { url: payload.url || '/financas' },
+    })
+  );
+});
+
+// Clique na notificação — usa a URL do payload (sem reconstruir); só caminhos do próprio app.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const raw = (event.notification.data && event.notification.data.url) || '/financas';
+  const target = new URL(raw, self.location.origin);
+  const url = target.origin === self.location.origin ? target.href : self.location.origin + '/financas';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (new URL(client.url).origin === self.location.origin && 'focus' in client) {
+          return client.focus().then((focused) => (focused && 'navigate' in focused ? focused.navigate(url) : focused));
+        }
+      }
+      return self.clients.openWindow(url);
+    })
+  );
 });
 
 // Fetch — network-first for pages, cache-first for static assets

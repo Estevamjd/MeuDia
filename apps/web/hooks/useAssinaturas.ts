@@ -15,40 +15,46 @@ export function useAssinaturas() {
   });
 }
 
+/**
+ * Assinatura espelha uma conta (contas_pagar): criar/editar/excluir muda contas do mês,
+ * resumo e selo. Invalida em `onSettled` porque o espelho pode ter mudado mesmo se a
+ * mutação falhar no meio (R5-5).
+ */
+function useInvalidarAssinaturas() {
+  const queryClient = useQueryClient();
+  return () => {
+    for (const queryKey of assinaturasService.ASSINATURA_INVALIDACOES) void queryClient.invalidateQueries({ queryKey });
+  };
+}
+
 export function useCriarAssinatura() {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
+  const invalidar = useInvalidarAssinaturas();
 
   return useMutation({
     mutationFn: (data: AssinaturaInsert) => assinaturasService.criarAssinatura(user!.id, data),
-    onSuccess: () => {
-      for (const queryKey of assinaturasService.ASSINATURA_INVALIDACOES) void queryClient.invalidateQueries({ queryKey });
-    },
+    onSettled: invalidar,
   });
 }
 
 export function useAtualizarAssinatura() {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
+  const invalidar = useInvalidarAssinaturas();
 
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<AssinaturaInsert> }) =>
       assinaturasService.atualizarAssinatura(user!.id, id, data),
-    onSuccess: () => {
-      for (const queryKey of assinaturasService.ASSINATURA_INVALIDACOES) void queryClient.invalidateQueries({ queryKey });
-    },
+    onSettled: invalidar,
   });
 }
 
 export function useExcluirAssinatura() {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
+  const invalidar = useInvalidarAssinaturas();
 
   return useMutation({
     mutationFn: (id: string) => assinaturasService.excluirAssinatura(user!.id, id),
-    onSuccess: () => {
-      for (const queryKey of assinaturasService.ASSINATURA_INVALIDACOES) void queryClient.invalidateQueries({ queryKey });
-    },
+    onSettled: invalidar,
   });
 }
 

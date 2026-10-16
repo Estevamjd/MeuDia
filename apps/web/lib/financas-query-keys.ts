@@ -5,11 +5,35 @@ export const contasKeys = {
   todas: ['contas-mes'] as const,
   mes: (userId: string | undefined, competencia: Competencia) =>
     ['contas-mes', userId, competencia] as const,
+  /** Definições ativas (tela de contas); sob o prefixo `contas-mes` para herdar as invalidações. */
+  definicoes: (userId: string | undefined) => ['contas-mes', userId, 'definicoes'] as const,
   contaTodas: ['conta-mes'] as const,
   conta: (userId: string | undefined, id: string) => ['conta-mes', userId, id] as const,
   contaDoMes: (userId: string | undefined, id: string, competencia: Competencia) =>
     ['conta-mes', userId, id, competencia] as const,
 };
+
+/** Resumo do mês (inclui o selo): prefixo igual ao de `ASSINATURA_INVALIDACOES`. */
+export const resumoKeys = {
+  todas: ['resumo-financeiro-mes'] as const,
+  mes: (userId: string | undefined, ano: number, mes: number) =>
+    ['resumo-financeiro-mes', userId, ano, mes] as const,
+};
+
+export const rendasKeys = {
+  todas: ['rendas'] as const,
+  lista: (userId: string | undefined) => ['rendas', userId] as const,
+};
+
+export const orcamentoKeys = {
+  todas: ['orcamento-categorias'] as const,
+  lista: (userId: string | undefined) => ['orcamento-categorias', userId] as const,
+};
+
+/** Rendas e orçamento mudam a sobra prevista, % comprometida e o selo. */
+export function chavesAfetadasPorOrcamento(): QueryKey[] {
+  return [rendasKeys.todas, orcamentoKeys.todas, resumoKeys.todas];
+}
 
 /** Chaves afetadas ao pagar/desfazer uma conta numa competência. */
 export function chavesAfetadasPorPagamento(
