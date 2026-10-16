@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Plus, Receipt, Pencil, Trash2 } from 'lucide-react';
 import type { ContaPagar, Recorrencia } from '@meudia/shared';
 import { competenciaDe, hojeSP } from '@meudia/shared';
@@ -29,7 +30,18 @@ import {
 import { formatBRL } from '../../../../lib/financas-ui';
 
 export default function ContasPage() {
+  return (
+    <Suspense fallback={<SkeletonList count={4} />}>
+      <ContasConteudo />
+    </Suspense>
+  );
+}
+
+function ContasConteudo() {
   const toast = useToast();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { data: contas, isLoading, isError, refetch } = useContas();
   const criar = useCriarConta();
   const atualizar = useAtualizarConta();
@@ -52,6 +64,15 @@ export default function ContasPage() {
     setForm(contaParaForm(conta));
   };
   const fechar = () => setForm(null);
+
+  // `?nova=1` (botão "+" da BottomNav) abre o mesmo modal de "Nova conta"; o param sai da URL.
+  const pedeNova = searchParams.get('nova') === '1';
+  useEffect(() => {
+    if (!pedeNova) return;
+    abrirNova();
+    router.replace(pathname, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedeNova]);
 
   const salvar = (e: React.FormEvent) => {
     e.preventDefault();

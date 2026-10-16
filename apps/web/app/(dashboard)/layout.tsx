@@ -15,6 +15,8 @@ import { handleOfflineAction } from '../../lib/offline-handlers';
 import { AgentFAB } from '../../components/agent/AgentFAB';
 import { AgentPanel } from '../../components/agent/AgentPanel';
 import { BottomNav } from '../../components/layout/BottomNav';
+import { useAppMode } from '../../components/AppModeProvider';
+import { clsx } from 'clsx';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, signOut } = useAuth();
@@ -23,6 +25,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { isOnline, isSyncing, pendingCount, lastSyncError, forceSync } =
     useOfflineSync(handleOfflineAction);
   const [agentOpen, setAgentOpen] = useState(false);
+  const financas = useAppMode() === 'financas';
 
   // Redirect to onboarding if user hasn't completed it
   useEffect(() => {
@@ -64,10 +67,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Sidebar onSignOut={signOut} userName={userName} onOpenAgent={() => setAgentOpen(true)} />
         </div>
 
-        <div className="relative z-10 flex flex-1 flex-col">
-          <Topbar />
+        <div className={clsx('relative z-10 flex flex-1 flex-col', financas && 'min-w-0')}>
+          <Topbar onSignOut={signOut} />
           <main
-            className="flex-1 overflow-y-auto p-8 pb-24 md:pb-8"
+            className={clsx(
+              'flex-1 overflow-y-auto p-8 md:pb-8',
+              // Modo Finanças: espaço da BottomNav + safe-area; sem overflow horizontal em 375px.
+              financas ? 'min-w-0 overflow-x-hidden pb-[calc(6rem+env(safe-area-inset-bottom))]' : 'pb-24',
+            )}
             style={{
               paddingLeft: 'max(2rem, env(safe-area-inset-left))',
               paddingRight: 'max(2rem, env(safe-area-inset-right))',
@@ -78,11 +85,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </div>
 
-      {/* Agente IA */}
-      <AgentFAB onClick={() => setAgentOpen(true)} />
+      {/* Modo Finanças: BottomNav antes do painel, para o painel do agente cobri-la no mobile. */}
+      {financas && <BottomNav onOpenChat={() => setAgentOpen(true)} chatAberto={agentOpen} />}
+
+      {/* Agente IA (no modo Finanças o "Chat" da BottomNav substitui o FAB no mobile) */}
+      <AgentFAB onClick={() => setAgentOpen(true)} className={financas ? 'hidden md:flex' : undefined} />
       <AgentPanel isOpen={agentOpen} onClose={() => setAgentOpen(false)} />
 
-      <BottomNav />
+      {!financas && <BottomNav />}
       <InstallPrompt />
       <OfflineIndicator
         isOnline={isOnline}
