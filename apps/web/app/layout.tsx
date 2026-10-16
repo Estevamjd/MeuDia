@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { unstable_noStore as noStore } from 'next/cache';
 import { DM_Sans, Syne } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
@@ -66,6 +67,8 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // Força render por request: sem isso o layout é pré-renderizado no build e o APP_MODE congela no valor do build.
+  noStore();
   return (
     <html lang="pt-BR" className={`${dmSans.variable} ${syne.variable}`}>
       <head>
