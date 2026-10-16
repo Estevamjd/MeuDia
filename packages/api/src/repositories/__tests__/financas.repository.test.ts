@@ -6,7 +6,7 @@ import * as pagamentos from '../pagamentos-conta.repository';
 import * as rendas from '../rendas.repository';
 import * as orcamento from '../orcamento.repository';
 import * as push from '../push-subscriptions.repository';
-import { reservarLembreteParaCron } from '../lembretes-enviados.repository';
+import { reservarLembreteParaCron, liberarLembreteParaCron } from '../lembretes-enviados.repository';
 
 const { getSupabase } = vi.hoisted(() => ({ getSupabase: vi.fn() }));
 vi.mock('../supabase', () => ({ getSupabase }));
@@ -68,6 +68,15 @@ describe('BE-03: repositories (sem banco)', () => {
     expect(await reservarLembreteParaCron(admin, row)).toBe(esperado);
     expect(query.upsert).toHaveBeenCalledWith({ ...row, canal: 'push' }, { onConflict: 'conta_id,competencia,etapa,canal', ignoreDuplicates: true });
   });
+  it('libera somente a reserva indicada pelo cron', async () => {
+    const { admin, client, query } = mockClient();
+    const row = { user_id: 'user', conta_id: 'conta', competencia: '2026-10', etapa: 'D0' as const };
+    await liberarLembreteParaCron(admin, row);
+    expect(client.from).toHaveBeenCalledWith('lembretes_enviados');
+    expect(query.delete).toHaveBeenCalledTimes(1);
+    expect(query.eq.mock.calls).toEqual([['user_id', 'user'], ['conta_id', 'conta'], ['competencia', '2026-10'], ['etapa', 'D0'], ['canal', 'push']]);
+    expect(getSupabase).not.toHaveBeenCalled();
+  });
   it('carrega apenas contas ativas de usuários inscritos, sem consultar assinaturas', async () => {
     const { admin, client, query } = mockClient([{ user_id: 'user' }]);
     await contas.contasAtivasComInscricaoParaCron(admin);
@@ -98,6 +107,7 @@ describe('BE-03: repositories (sem banco)', () => {
     query.then = resolve => Promise.resolve({ data: null, error: { message: 'Falha simulada' } }).then(resolve);
     getSupabase.mockReturnValue(client);
     for (const operation of operations) await expect(operation()).rejects.toMatchObject({ code: 'DB_ERROR' });
+    await expect(liberarLembreteParaCron(admin, { user_id: 'user', conta_id: 'conta', competencia: '2026-10', etapa: 'D0' })).rejects.toMatchObject({ code: 'DB_ERROR' });
     await expect(reservarLembreteParaCron(admin, { user_id: 'user', conta_id: 'conta', competencia: '2026-10', etapa: 'D0' })).rejects.toMatchObject({ code: 'DB_ERROR' });
   });
 });

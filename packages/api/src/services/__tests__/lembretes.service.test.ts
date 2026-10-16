@@ -6,7 +6,7 @@ vi.mock('../../repositories', () => ({
   contasPagarRepository: { contasAtivasComInscricaoParaCron: vi.fn() },
   pagamentosContaRepository: { pagamentosDasCompetenciasParaCron: vi.fn() },
   pushSubscriptionsRepository: { inscricoesDoUsuarioParaCron: vi.fn(), removerInscricaoParaCron: vi.fn() },
-  lembretesEnviadosRepository: { reservarLembreteParaCron: vi.fn() },
+  lembretesEnviadosRepository: { reservarLembreteParaCron: vi.fn(), liberarLembreteParaCron: vi.fn() },
 }));
 const client = {} as SupabaseClient;
 const conta = { id: 'c', user_id: 'u', descricao: 'Fixture', valor: 1234.5, recorrencia: 'mensal', dia_vencimento: 15, ativo: true, created_at: '2026-01-01T03:00:00Z' };
@@ -22,6 +22,7 @@ beforeEach(() => {
   vi.mocked(lembretes.reservarLembreteParaCron).mockImplementation(async (_, row) => {
     const key = JSON.stringify(row); if (reservas.has(key)) return false; reservas.add(key); return true;
   });
+  vi.mocked(lembretes.liberarLembreteParaCron).mockImplementation(async (_, row) => { reservas.delete(JSON.stringify(row)); });
   send.mockResolvedValue({ statusCode: 201 });
 });
 it.each([
@@ -35,6 +36,7 @@ it.each([
   expect(vi.mocked(lembretes.reservarLembreteParaCron).mock.invocationCallOrder[0]).toBeLessThan(send.mock.invocationCallOrder[0]!);
   expect(await run(hoje)).toMatchObject({ enviados: 0 });
   expect(send).toHaveBeenCalledTimes(1);
+  expect(lembretes.liberarLembreteParaCron).not.toHaveBeenCalled();
 });
 it.each(['2026-10-12', '2026-10-16'])('sem retroativo nem antecipação extra %s', async hoje => {
   expect(await run(hoje)).toMatchObject({ enviados: 0 });
@@ -78,16 +80,49 @@ it.each([404, 410])('remove inscrição expirada %s e envia nas demais', async s
   expect(await run()).toMatchObject({ enviados: 1, inscricoesRemovidas: 1 });
   expect(push.removerInscricaoParaCron).toHaveBeenCalledWith(client, 's');
 });
-it('erro 500 não libera reserva nem vaza dados no log', async () => {
+it.each([undefined, 429, 500, 503, 599])('falha transitória %s libera reserva e permite nova tentativa', async statusCode => {
   const log = vi.spyOn(console, 'error').mockImplementation(() => {});
   try {
-    send.mockRejectedValue({ statusCode: 500, message: sub.endpoint });
+    send.mockRejectedValueOnce(statusCode === undefined ? new Error(sub.endpoint) : { statusCode, message: sub.endpoint });
     expect(await run()).toMatchObject({ enviados: 0 });
+    expect(lembretes.liberarLembreteParaCron).toHaveBeenCalledWith(client, { user_id: 'u', conta_id: 'c', competencia: '2026-10', etapa: 'D-2', canal: 'push' });
+    expect(await run()).toMatchObject({ enviados: 1 });
     expect(await run()).toMatchObject({ enviados: 0 });
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(log).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledTimes(2);
     expect(log).toHaveBeenCalledWith('Falha no envio de lembrete push');
     expect(push.removerInscricaoParaCron).not.toHaveBeenCalled();
+  } finally { log.mockRestore(); }
+});
+it.each([404, 410])('expirada %s mantém reserva mesmo sem sucesso', async statusCode => {
+  send.mockRejectedValue({ statusCode });
+  expect(await run()).toMatchObject({ enviados: 0, inscricoesRemovidas: 1 });
+  await run();
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(push.removerInscricaoParaCron).toHaveBeenCalledWith(client, sub.id);
+  expect(lembretes.liberarLembreteParaCron).not.toHaveBeenCalled();
+});
+it.each([true, false])('sucesso parcial mantém reserva (falha primeiro: %s)', async falhaPrimeiro => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    vi.mocked(push.inscricoesDoUsuarioParaCron).mockResolvedValue([sub, { ...sub, id: 's2' }] as never);
+    if (falhaPrimeiro) send.mockRejectedValueOnce({ statusCode: 503 });
+    else send.mockResolvedValueOnce({ statusCode: 201 }).mockRejectedValueOnce({ statusCode: 429 });
+    expect(await run()).toMatchObject({ enviados: 1 });
+    await run();
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(lembretes.liberarLembreteParaCron).not.toHaveBeenCalled();
+  } finally { log.mockRestore(); }
+});
+it('libera após todas as inscrições falharem, inclusive expirada junto de transitória', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    vi.mocked(push.inscricoesDoUsuarioParaCron).mockResolvedValue([sub, { ...sub, id: 's2' }] as never);
+    send.mockRejectedValueOnce({ statusCode: 410 }).mockRejectedValueOnce({ statusCode: 500 });
+    await run();
+    expect(lembretes.liberarLembreteParaCron).toHaveBeenCalledTimes(1);
+    vi.mocked(push.inscricoesDoUsuarioParaCron).mockResolvedValue([{ ...sub, id: 's2' }] as never);
+    expect(await run()).toMatchObject({ enviados: 1 });
+    expect(send).toHaveBeenCalledTimes(3);
   } finally { log.mockRestore(); }
 });
 it('sem inscrição não reserva; falha na reserva impede envio', async () => {

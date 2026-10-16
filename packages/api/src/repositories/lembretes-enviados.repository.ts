@@ -12,3 +12,10 @@ export async function reservarLembreteParaCron(client: SupabaseClient, row: Rese
   if (error) throw new AppError(error.message, 'DB_ERROR');
   return (data?.length ?? 0) > 0;
 }
+
+export async function liberarLembreteParaCron(client: SupabaseClient, row: Reserva): Promise<void> {
+  const { error } = await client.from('lembretes_enviados').delete()
+    .eq('user_id', row.user_id).eq('conta_id', row.conta_id)
+    .eq('competencia', row.competencia).eq('etapa', row.etapa).eq('canal', row.canal ?? 'push');
+  if (error) throw new AppError(error.message, 'DB_ERROR');
+}

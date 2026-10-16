@@ -1,3 +1,4 @@
+import type * as ApiModule from '@meudia/api';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { AppError } from '@meudia/shared';
 import { GET } from '../cron/lembretes/route';
@@ -11,7 +12,7 @@ vi.mock('../../../lib/supabase/server', () => ({ createServerSupabaseClient: vi.
 vi.mock('../../../lib/web-push', () => ({ createPushSender: vi.fn() }));
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
 vi.mock('@meudia/api', async importOriginal => {
-  const original = await importOriginal<typeof import('@meudia/api')>();
+  const original = await importOriginal<typeof ApiModule>();
   return { ...original,
     lembretesService: { enviarLembretesDoDia: vi.fn() },
     pushSubscriptionsRepository: { upsertByEndpoint: vi.fn(), removeByEndpoint: vi.fn() },

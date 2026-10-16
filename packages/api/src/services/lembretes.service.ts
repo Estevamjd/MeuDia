@@ -24,7 +24,8 @@ export async function enviarLembretesDoDia({ client, sender, hojeISO = hojeSP() 
       if (!inscricoes.has(conta.user_id)) inscricoes.set(conta.user_id, await pushSubscriptionsRepository.inscricoesDoUsuarioParaCron(client, conta.user_id));
       const subs = inscricoes.get(conta.user_id)!;
       if (!subs.length) { resultado.ignorados++; continue; }
-      const reservou = await lembretesEnviadosRepository.reservarLembreteParaCron(client, { user_id: conta.user_id, conta_id: conta.id, competencia, etapa, canal: 'push' });
+      const reserva = { user_id: conta.user_id, conta_id: conta.id, competencia, etapa, canal: 'push' as const };
+      const reservou = await lembretesEnviadosRepository.reservarLembreteParaCron(client, reserva);
       if (!reservou) { resultado.ignorados++; continue; }
       const texto = LEMBRETE_TEXTOS[etapa];
       const payload: PushPayload = {
@@ -34,6 +35,8 @@ export async function enviarLembretesDoDia({ client, sender, hojeISO = hojeSP() 
           .replace('<dd/MM>', `${ocorrencia.vencimento.slice(8, 10)}/${ocorrencia.vencimento.slice(5, 7)}`),
         url: `/financas/contas/${conta.id}?competencia=${competencia}`, tag: `conta-${conta.id}-${competencia}`,
       };
+      let teveSucesso = false;
+      let falhaTransitoria = false;
       for (const sub of [...subs]) {
         let status: number | undefined;
         try { status = (await sender.send(sub, payload)).statusCode; }
@@ -44,9 +47,15 @@ export async function enviarLembretesDoDia({ client, sender, hojeISO = hojeSP() 
             await pushSubscriptionsRepository.removerInscricaoParaCron(client, sub.id);
             resultado.inscricoesRemovidas++;
           } catch { console.error('Falha ao remover inscrição push expirada'); }
-        } else if (status !== undefined && status >= 200 && status < 300) resultado.enviados++;
-        else console.error('Falha no envio de lembrete push');
+        } else if (status !== undefined && status >= 200 && status < 300) {
+          teveSucesso = true;
+          resultado.enviados++;
+        } else {
+          if (status === undefined || !Number.isFinite(status) || status === 429 || (status >= 500 && status < 600)) falhaTransitoria = true;
+          console.error('Falha no envio de lembrete push');
+        }
       }
+      if (falhaTransitoria && !teveSucesso) await lembretesEnviadosRepository.liberarLembreteParaCron(client, reserva);
     }
   }
   return resultado;

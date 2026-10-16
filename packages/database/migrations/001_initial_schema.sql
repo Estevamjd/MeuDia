@@ -361,7 +361,15 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies
     WHERE schemaname = 'public' AND tablename = 'profiles' AND policyname = 'users_own_profile'
-  ) THEN
+  ) AND (
+    SELECT count(*) FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE']) AS c
+    WHERE EXISTS (
+      SELECT 1 FROM pg_policies p
+      WHERE p.schemaname = 'public' AND p.tablename = 'profiles'
+        AND p.permissive = 'PERMISSIVE' AND p.cmd IN (c, 'ALL')
+        AND COALESCE(p.qual, p.with_check) LIKE '%auth.uid()%'
+    )
+  ) < 4 THEN
     CREATE POLICY "users_own_profile" ON profiles
       FOR ALL USING (auth.uid() = id);
   END IF;
@@ -381,7 +389,15 @@ BEGIN
     IF NOT EXISTS (
       SELECT 1 FROM pg_policies
       WHERE schemaname = 'public' AND tablename = t AND policyname = 'users_own_data'
-    ) THEN
+    ) AND (
+      SELECT count(*) FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE']) AS c
+      WHERE EXISTS (
+        SELECT 1 FROM pg_policies p
+        WHERE p.schemaname = 'public' AND p.tablename = t
+          AND p.permissive = 'PERMISSIVE' AND p.cmd IN (c, 'ALL')
+          AND COALESCE(p.qual, p.with_check) LIKE '%auth.uid()%'
+      )
+    ) < 4 THEN
       EXECUTE format('CREATE POLICY "users_own_data" ON public.%I FOR ALL USING (auth.uid() = user_id)', t);
     END IF;
   END LOOP;
@@ -406,7 +422,15 @@ BEGIN
     IF NOT EXISTS (
       SELECT 1 FROM pg_policies
       WHERE schemaname = 'public' AND tablename = p[1] AND policyname = p[2]
-    ) THEN
+    ) AND (
+      SELECT count(*) FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE']) AS c
+      WHERE EXISTS (
+        SELECT 1 FROM pg_policies pp
+        WHERE pp.schemaname = 'public' AND pp.tablename = p[1]
+          AND pp.permissive = 'PERMISSIVE' AND pp.cmd IN (c, 'ALL')
+          AND COALESCE(pp.qual, pp.with_check) LIKE '%auth.uid()%'
+      )
+    ) < 4 THEN
       EXECUTE format('CREATE POLICY %I ON public.%I FOR ALL USING (%s)', p[2], p[1], p[3]);
     END IF;
   END LOOP;

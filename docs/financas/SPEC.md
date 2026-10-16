@@ -185,10 +185,10 @@ Ambas `plpgsql`, `SECURITY INVOKER` (RLS vale), `SET search_path = public`.
 ### 5.3 Lembretes (cron diário)
 
 `enviarLembretesDoDia(hoje = hojeSP())`, executado pela rota de cron com cliente service role:
-1. carrega contas ativas de usuários com `push_subscriptions` e os `pagamentos_conta` das competências de `hoje` e `hoje+2` (podem ser duas, na virada);
+1. carrega contas ativas de usuários com `push_subscriptions` e os `pagamentos_conta` das competências atual e próxima;
 2. para cada conta, calcula a ocorrência das datas em `[hoje, hoje+2]` sem pagamento na competência; `etapa = etapaLembrete(vencimento, hoje)`;
 3. **reserva antes de enviar**: `INSERT INTO lembretes_enviados (conta_id, competencia, etapa, canal) ... ON CONFLICT DO NOTHING RETURNING id`. Sem linha retornada → já enviado, pula. Isso garante "no máximo uma vez" por competência mesmo com cron duplicado/concorrente;
-4. envia para todas as inscrições do usuário (payload abaixo); 404/410 → `DELETE` da inscrição; outros erros são logados (sem endpoint/chaves) e **não** liberam a reserva;
+4. envia para todas as inscrições do usuário (payload abaixo); 404/410 → `DELETE` da inscrição; falhas transitórias (sem status, 429 ou 5xx) são logadas sem endpoint/chaves e liberam a reserva somente se nenhuma inscrição recebeu com sucesso; sucesso e 404/410 mantêm a reserva;
 5. retorna `{ contas, enviados, ignorados, inscricoesRemovidas }`.
 
 Conta com pagamento na competência ou inativa não entra no passo 2 → "Paguei" interrompe a sequência daquela competência (a do mês seguinte segue normal). Dia perdido (cron não rodou) não é enviado retroativamente.
@@ -248,7 +248,7 @@ Reaproveita `packages/ai/src/agent` (`intencao.ts`, `chat.ts`). Em modo finança
 ## 7. Agendador
 
 - **Vercel Cron (Hobby, 1x/dia)**: `GET /api/cron/lembretes` às `0 12 * * *` (12:00 UTC = 09h em SP; Brasil sem horário de verão). Rota exige `Authorization: Bearer ${CRON_SECRET}` (401 caso contrário), `runtime = 'nodejs'`, `dynamic = 'force-dynamic'`. Toda lógica de data usa `hojeSP()`, nunca a hora do servidor.
-- **Sem criar job real neste ciclo**: o PR traz a rota e o trecho `crons` do `vercel.json` documentado no PR; o Estevam habilita o cron (e cria `CRON_SECRET`) quando aprovar.
+- **Sem criar job real neste ciclo**: o PR traz a rota e o trecho `crons` do `vercel.json` da raiz do repositório; o Estevam habilita o cron (e cria `CRON_SECRET`) quando aprovar.
 - **Alternativa documentada** (não criar): Supabase `pg_cron` + `pg_net` chamando a mesma rota com o mesmo header, caso o cron da Vercel não sirva.
 - Teste manual: `curl` local com o header contra `next dev`, com `hoje` injetável só em teste (não por query string em produção).
 
