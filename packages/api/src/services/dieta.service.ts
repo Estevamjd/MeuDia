@@ -1,4 +1,4 @@
-import { AppError } from '@meudia/shared';
+import { AGUA, AppError } from '@meudia/shared';
 import { format } from 'date-fns';
 import { dietaRepository } from '../repositories';
 import { refeicaoInsertSchema, registroPesoInsertSchema, registroAguaSchema } from '../validators';
@@ -38,13 +38,13 @@ export async function registrarAgua(userId: string, date?: string) {
   const targetDate = date ?? format(new Date(), 'yyyy-MM-dd');
 
   const atual = await dietaRepository.findRegistroAguaByDate(userId, targetDate);
-  const coposAtual = atual?.copos_bebidos ?? 0;
-  const metaCopos = atual?.meta_copos ?? 8;
+  const quantidadeAtual = atual?.quantidade_ml ?? 0;
+  const metaMl = atual?.meta_ml ?? AGUA.META_ML_PADRAO;
 
   return dietaRepository.upsertRegistroAgua(userId, {
     data: targetDate,
-    copos_bebidos: coposAtual + 1,
-    meta_copos: metaCopos,
+    quantidade_ml: quantidadeAtual + AGUA.ML_POR_COPO,
+    meta_ml: metaMl,
   });
 }
 

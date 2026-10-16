@@ -52,8 +52,8 @@ export async function removeRefeicao(refeicaoId: string): Promise<void> {
 
 export async function findRegistroAguaByDate(userId: string, date: string): Promise<RegistroAgua | null> {
   const { data, error } = await getSupabase()
-    .from('registro_agua')
-    .select('id, user_id, data, copos_bebidos, meta_copos')
+    .from('registros_agua')
+    .select('id, user_id, data, quantidade_ml, meta_ml, created_at, updated_at')
     .eq('user_id', userId)
     .eq('data', date)
     .maybeSingle();
@@ -64,12 +64,12 @@ export async function findRegistroAguaByDate(userId: string, date: string): Prom
 
 export async function upsertRegistroAgua(userId: string, input: RegistroAguaInsert & { data: string }): Promise<RegistroAgua> {
   const { data, error } = await getSupabase()
-    .from('registro_agua')
+    .from('registros_agua')
     .upsert(
       { ...input, user_id: userId },
       { onConflict: 'user_id,data' },
     )
-    .select('id, user_id, data, copos_bebidos, meta_copos')
+    .select('id, user_id, data, quantidade_ml, meta_ml, created_at, updated_at')
     .single();
 
   if (error) throw new AppError(error.message, 'DB_ERROR');

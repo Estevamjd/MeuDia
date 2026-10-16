@@ -8,7 +8,7 @@
 -- NOTIFICAÇÕES DO AGENTE
 -- ══════════════════════════════════════════════════════════════════════════════
 
-CREATE TABLE notificacoes_agente (
+CREATE TABLE IF NOT EXISTS public.notificacoes_agente (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   tipo        TEXT CHECK (tipo IN ('alerta','aviso','sucesso','info')) NOT NULL,
@@ -25,7 +25,7 @@ CREATE TABLE notificacoes_agente (
 -- HISTÓRICO DE CHAT COM O AGENTE
 -- ══════════════════════════════════════════════════════════════════════════════
 
-CREATE TABLE chat_agente (
+CREATE TABLE IF NOT EXISTS public.chat_agente (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   role        TEXT CHECK (role IN ('user','agent')) NOT NULL,
@@ -39,7 +39,7 @@ CREATE TABLE chat_agente (
 -- AÇÕES EXECUTADAS PELO AGENTE
 -- ══════════════════════════════════════════════════════════════════════════════
 
-CREATE TABLE acoes_agente (
+CREATE TABLE IF NOT EXISTS public.acoes_agente (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   tipo        TEXT NOT NULL,
@@ -53,7 +53,7 @@ CREATE TABLE acoes_agente (
 -- PREFERÊNCIAS DO AGENTE POR USUÁRIO
 -- ══════════════════════════════════════════════════════════════════════════════
 
-CREATE TABLE preferencias_agente (
+CREATE TABLE IF NOT EXISTS public.preferencias_agente (
   user_id               UUID PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
   notif_faltou_treino   BOOLEAN DEFAULT TRUE,
   notif_habito_pendente BOOLEAN DEFAULT TRUE,
@@ -68,10 +68,10 @@ CREATE TABLE preferencias_agente (
 -- ÍNDICES
 -- ══════════════════════════════════════════════════════════════════════════════
 
-CREATE INDEX idx_notif_user_lida    ON notificacoes_agente(user_id, lida);
-CREATE INDEX idx_notif_user_created ON notificacoes_agente(user_id, created_at);
-CREATE INDEX idx_chat_user_created  ON chat_agente(user_id, created_at);
-CREATE INDEX idx_acoes_user_status  ON acoes_agente(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_notif_user_lida    ON notificacoes_agente(user_id, lida);
+CREATE INDEX IF NOT EXISTS idx_notif_user_created ON notificacoes_agente(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_chat_user_created  ON chat_agente(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_acoes_user_status  ON acoes_agente(user_id, status);
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- ROW LEVEL SECURITY
@@ -82,14 +82,21 @@ ALTER TABLE chat_agente          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE acoes_agente         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE preferencias_agente  ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "users_own_data" ON notificacoes_agente
-  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "users_own_data" ON chat_agente
-  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "users_own_data" ON acoes_agente
-  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "users_own_data" ON preferencias_agente
-  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+DO $$
+DECLARE
+  t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'notificacoes_agente', 'chat_agente', 'acoes_agente', 'preferencias_agente'
+  ] LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = t AND policyname = 'users_own_data'
+    ) THEN
+      EXECUTE format(
+        'CREATE POLICY "users_own_data" ON public.%I FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id)',
+        t
+      );
+    END IF;
+  END LOOP;
+END $$;

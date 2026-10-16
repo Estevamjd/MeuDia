@@ -27,6 +27,6 @@ export const registroPesoInsertSchema = z.object({
 
 export const registroAguaSchema = z.object({
   data: z.string().optional(),
-  copos_bebidos: z.number().min(0).optional(),
-  meta_copos: z.number().min(1).optional(),
+  quantidade_ml: z.number().int().min(0).optional(),
+  meta_ml: z.number().int().min(1).optional(),
 });

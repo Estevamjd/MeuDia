@@ -51,12 +51,14 @@ export interface RegistroAgua {
   id: UUID;
   user_id: UUID;
   data: string;
-  copos_bebidos: number;
-  meta_copos: number;
+  quantidade_ml: number;
+  meta_ml: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface RegistroAguaInsert {
   data?: string;
-  copos_bebidos?: number;
-  meta_copos?: number;
+  quantidade_ml?: number;
+  meta_ml?: number;
 }

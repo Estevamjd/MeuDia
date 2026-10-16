@@ -13,6 +13,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { clsx } from 'clsx';
+import { AGUA } from '@meudia/shared';
 import type { TipoRefeicao, ItemRefeicao, RefeicaoInsert } from '@meudia/shared';
 
 import {
@@ -98,8 +99,8 @@ export default function DietaPage() {
   const [pesoValue, setPesoValue] = useState('');
 
   const metaCalorias = profile?.meta_calorias ?? 2200;
-  const coposBebidos = agua?.copos_bebidos ?? 0;
-  const metaCopos = agua?.meta_copos ?? 8;
+  const coposBebidos = Math.floor((agua?.quantidade_ml ?? 0) / AGUA.ML_POR_COPO);
+  const metaCopos = Math.ceil((agua?.meta_ml ?? AGUA.META_ML_PADRAO) / AGUA.ML_POR_COPO);
   const caloriasConsumidas = resumo?.calorias ?? 0;
   const percentualCalorias = metaCalorias > 0 ? Math.min(Math.round((caloriasConsumidas / metaCalorias) * 100), 100) : 0;
   const percentualAgua = metaCopos > 0 ? Math.min(Math.round((coposBebidos / metaCopos) * 100), 100) : 0;

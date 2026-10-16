@@ -38,4 +38,10 @@ export const CACHE = {
   CACHE_TIME: 1000 * 60 * 30,
 } as const;
 
+// Água: o banco guarda ml (registros_agua.quantidade_ml / meta_ml); a UI conta copos.
+export const AGUA = {
+  ML_POR_COPO: 250,
+  META_ML_PADRAO: 2500,
+} as const;
+
 export const APP_NAME = 'MeuDia';

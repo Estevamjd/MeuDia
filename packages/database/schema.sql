@@ -88,7 +88,7 @@ CREATE TABLE habitos (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE registro_habitos (
+CREATE TABLE registros_habito (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   habito_id  UUID NOT NULL REFERENCES habitos(id) ON DELETE CASCADE,
   user_id    UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
@@ -170,12 +170,14 @@ CREATE TABLE refeicoes (
   total_gordura    DECIMAL(6,2) DEFAULT 0
 );
 
-CREATE TABLE registro_agua (
+CREATE TABLE registros_agua (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id       UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   data          DATE NOT NULL DEFAULT CURRENT_DATE,
-  copos_bebidos INTEGER DEFAULT 0,
-  meta_copos    INTEGER DEFAULT 8,
+  quantidade_ml INTEGER NOT NULL DEFAULT 0,
+  meta_ml       INTEGER NOT NULL DEFAULT 2500,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, data)
 );
 
@@ -286,7 +288,7 @@ CREATE INDEX idx_treinos_user          ON treinos(user_id);
 CREATE INDEX idx_exercicios_treino     ON exercicios(treino_id);
 CREATE INDEX idx_sessoes_user_data     ON sessoes_treino(user_id, data);
 CREATE INDEX idx_habitos_user          ON habitos(user_id);
-CREATE INDEX idx_reg_hab_user_data     ON registro_habitos(user_id, data);
+CREATE INDEX idx_reg_hab_user_data     ON registros_habito(user_id, data);
 CREATE INDEX idx_transacoes_user_data  ON transacoes(user_id, data);
 CREATE INDEX idx_refeicoes_user_data   ON refeicoes(user_id, data);
 CREATE INDEX idx_compromissos_user     ON compromissos(user_id, data_inicio);
@@ -300,7 +302,7 @@ CREATE INDEX idx_itens_lista           ON itens_compras(lista_id);
 CREATE INDEX idx_assinaturas_user      ON assinaturas(user_id);
 CREATE INDEX idx_conquistas_user       ON conquistas(user_id);
 CREATE INDEX idx_registros_peso_user   ON registros_peso(user_id, data);
-CREATE INDEX idx_registro_agua_user    ON registro_agua(user_id, data);
+CREATE INDEX idx_registros_agua_user   ON registros_agua(user_id, data);
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- ROW LEVEL SECURITY
@@ -312,13 +314,13 @@ ALTER TABLE exercicios             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sessoes_treino         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE series_realizadas      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE habitos                ENABLE ROW LEVEL SECURITY;
-ALTER TABLE registro_habitos       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE registros_habito       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transacoes             ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assinaturas            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE compromissos           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE registros_peso         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE refeicoes              ENABLE ROW LEVEL SECURITY;
-ALTER TABLE registro_agua          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE registros_agua         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE medicamentos           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE registro_medicamentos  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE listas_compras         ENABLE ROW LEVEL SECURITY;
@@ -346,7 +348,7 @@ CREATE POLICY "users_own_data" ON sessoes_treino
 CREATE POLICY "users_own_data" ON habitos
   FOR ALL USING (auth.uid() = user_id);
 
-CREATE POLICY "users_own_data" ON registro_habitos
+CREATE POLICY "users_own_data" ON registros_habito
   FOR ALL USING (auth.uid() = user_id);
 
 CREATE POLICY "users_own_data" ON transacoes
@@ -364,7 +366,7 @@ CREATE POLICY "users_own_data" ON registros_peso
 CREATE POLICY "users_own_data" ON refeicoes
   FOR ALL USING (auth.uid() = user_id);
 
-CREATE POLICY "users_own_data" ON registro_agua
+CREATE POLICY "users_own_data" ON registros_agua
   FOR ALL USING (auth.uid() = user_id);
 
 CREATE POLICY "users_own_data" ON medicamentos
