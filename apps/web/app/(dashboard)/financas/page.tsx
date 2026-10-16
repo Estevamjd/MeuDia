@@ -2,14 +2,11 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { Wallet, Plus, ChevronLeft, ChevronRight, Pencil, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Transacao, TransacaoInsert } from '@meudia/shared';
 import { competenciaDe, hojeSP } from '@meudia/shared';
-import { clsx } from 'clsx';
 
 import {
-  useTransacoesMes,
   useCriarTransacao,
   useAtualizarTransacao,
   useExcluirTransacao,
@@ -17,43 +14,30 @@ import {
 
 import {
   Button,
-  Badge,
   Modal,
   Input,
   Select,
-  EmptyState,
-  SkeletonList,
   ConfirmDialog,
   useToast,
 } from '../../../components/ui';
 import { AgentBannerAuto } from '../../../components/agent';
 import { useAppMode } from '../../../components/AppModeProvider';
-import { ContasDoMes } from '../../../components/financas/ContasDoMes';
-import { ResumoMes } from '../../../components/financas/ResumoMes';
-import {
-  deslocarCompetencia,
-  formatBRL,
-  partesCompetencia,
-  rotuloCompetencia,
-} from '../../../lib/financas-ui';
-
-const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+import { FinancasHomeView } from '../../../components/financas/home/FinancasHomeView';
+import { useFinancasHome } from '../../../components/financas/home/useFinancasHome';
+import { deslocarCompetencia, rotuloCompetencia } from '../../../lib/financas-ui';
 
 export default function FinancasPage() {
   const toast = useToast();
   const mode = useAppMode();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const hoje = useMemo(() => new Date(), []);
+  const hojeISO = useMemo(() => hojeSP(hoje), [hoje]);
 
   // --- Month selector (competência em SP, igual ao backend) ---
-  const [competencia, setCompetencia] = useState(() => competenciaDe(hojeSP()));
-  const { ano, mes } = partesCompetencia(competencia);
+  const [competencia, setCompetencia] = useState(() => competenciaDe(hojeISO));
   const mesAnterior = useCallback(() => setCompetencia((c) => deslocarCompetencia(c, -1)), []);
   const mesProximo = useCallback(() => setCompetencia((c) => deslocarCompetencia(c, 1)), []);
   const mesLabel = rotuloCompetencia(competencia);
-
-  // --- Data hooks ---
-  const { data: transacoes, isLoading: loadingTransacoes } = useTransacoesMes(ano, mes);
 
   // --- Mutations ---
   const criarTransacao = useCriarTransacao();
@@ -72,19 +56,6 @@ export default function FinancasPage() {
   const [formValor, setFormValor] = useState('');
   const [formData, setFormData] = useState(format(hoje, 'yyyy-MM-dd'));
   const [formBanco, setFormBanco] = useState('');
-
-
-  // --- Group transactions by date ---
-  const transacoesAgrupadas = useMemo(() => {
-    if (!transacoes) return [];
-    const groups = new Map<string, Transacao[]>();
-    for (const t of transacoes) {
-      const key = t.data;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(t);
-    }
-    return Array.from(groups.entries()).sort(([a], [b]) => b.localeCompare(a));
-  }, [transacoes]);
 
   // --- Reset form ---
   const resetForm = useCallback(() => {
@@ -111,6 +82,13 @@ export default function FinancasPage() {
     setEditingTransacao(t);
   }, []);
 
+  // --- Home (hooks → props da view pura) ---
+  const home = useFinancasHome(competencia, hojeISO, {
+    onNovo: openAddModal,
+    onEditar: openEditModal,
+    onExcluir: setDeletingTransacao,
+  });
+
   // --- Handlers ---
   const handleSubmitAdd = useCallback(
     (e: React.FormEvent) => {
@@ -125,12 +103,12 @@ export default function FinancasPage() {
       };
       criarTransacao.mutate(payload, {
         onSuccess: () => {
-          toast.success('Transacao criada com sucesso!');
+          toast.success('Lançamento criado!');
           setShowAddModal(false);
           resetForm();
         },
         onError: () => {
-          toast.error('Erro ao criar transacao');
+          toast.error('Erro ao criar lançamento');
         },
       });
     },
@@ -153,12 +131,12 @@ export default function FinancasPage() {
         { id: editingTransacao.id, data: payload },
         {
           onSuccess: () => {
-            toast.success('Transacao atualizada!');
+            toast.success('Lançamento atualizado!');
             setEditingTransacao(null);
             resetForm();
           },
           onError: () => {
-            toast.error('Erro ao atualizar transacao');
+            toast.error('Erro ao atualizar lançamento');
           },
         },
       );
@@ -170,11 +148,11 @@ export default function FinancasPage() {
     if (!deletingTransacao) return;
     excluirTransacao.mutate(deletingTransacao.id, {
       onSuccess: () => {
-        toast.success('Transacao excluida');
+        toast.success('Lançamento excluído');
         setDeletingTransacao(null);
       },
       onError: () => {
-        toast.error('Erro ao excluir transacao');
+        toast.error('Erro ao excluir lançamento');
       },
     });
   }, [excluirTransacao, deletingTransacao, toast]);
@@ -193,14 +171,14 @@ export default function FinancasPage() {
       />
       <Input
         label="Categoria"
-        placeholder="Ex: Alimentacao, Transporte..."
+        placeholder="Ex.: Alimentação, Transporte…"
         value={formCategoria}
         onChange={(e) => setFormCategoria(e.target.value)}
         required
       />
       <Input
-        label="Descricao"
-        placeholder="Descricao da transacao"
+        label="Descrição"
+        placeholder="Descrição do lançamento"
         value={formDescricao}
         onChange={(e) => setFormDescricao(e.target.value)}
         required
@@ -223,7 +201,7 @@ export default function FinancasPage() {
       />
       <Input
         label="Banco (opcional)"
-        placeholder="Ex: Nubank, Itau..."
+        placeholder="Ex.: Nubank, Itaú…"
         value={formBanco}
         onChange={(e) => setFormBanco(e.target.value)}
       />
@@ -246,125 +224,41 @@ export default function FinancasPage() {
   );
 
   return (
-    <div className="animate-fadeSlide space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="animate-fadeSlide space-y-5">
+      {/* Cabeçalho: título + seletor de mês compacto */}
+      <div className="flex items-center justify-between gap-2">
         <h1 className="font-syne text-3xl font-bold text-text">Finanças</h1>
-        <Button onClick={openAddModal}>
-          <Plus size={16} />
-          Nova Transacao
-        </Button>
-      </div>
-
-      {/* Month selector */}
-      <div className="flex items-center justify-center gap-4">
-        <button
-          onClick={mesAnterior}
-          className="rounded-lg p-2 text-muted transition-colors hover:bg-card2 hover:text-text"
-          aria-label="Mês anterior"
-        >
-          <ChevronLeft size={20} />
-        </button>
-        <span className="font-syne text-lg font-semibold text-text" aria-live="polite">{mesLabel}</span>
-        <button
-          onClick={mesProximo}
-          className="rounded-lg p-2 text-muted transition-colors hover:bg-card2 hover:text-text"
-          aria-label="Próximo mês"
-        >
-          <ChevronRight size={20} />
-        </button>
+        <div className="flex items-center">
+          <button
+            onClick={mesAnterior}
+            className="rounded-lg p-2 text-muted transition-colors hover:bg-card2 hover:text-text"
+            aria-label="Mês anterior"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <span className="whitespace-nowrap text-[15px] font-medium text-text" aria-live="polite">
+            {mesLabel}
+          </span>
+          <button
+            onClick={mesProximo}
+            className="rounded-lg p-2 text-muted transition-colors hover:bg-card2 hover:text-text"
+            aria-label="Próximo mês"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
       </div>
 
       {/* Agente IA (fala de todos os módulos; fora do modo Finanças) */}
       {mode !== 'financas' && <AgentBannerAuto />}
 
-      {/* Selo, renda × gasto, sobra, % comprometida, pagas no prazo, mês anterior */}
-      <ResumoMes ano={ano} mes={mes} />
-
-      <ContasDoMes competencia={competencia} />
-
-      <h2 className="font-syne text-lg font-semibold text-text">Transações</h2>
-
-      {loadingTransacoes ? (
-        <SkeletonList count={5} />
-      ) : !transacoes || transacoes.length === 0 ? (
-        <EmptyState
-          icon={<Wallet size={48} />}
-          title="Nenhuma transacao neste mes"
-          description="Registre suas receitas e despesas para acompanhar suas financas."
-          actionLabel="Adicionar transacao"
-          onAction={openAddModal}
-        />
-      ) : (
-      /* Transaction list grouped by date */
-      <div className="space-y-6">
-        {transacoesAgrupadas.map(([data, items]) => {
-          const dataFormatada = format(new Date(data + 'T12:00:00'), "dd 'de' MMMM", { locale: ptBR });
-          return (
-            <div key={data}>
-              <h3 className="mb-3 font-syne text-sm font-semibold text-muted">
-                {capitalize(dataFormatada)}
-              </h3>
-              <div className="space-y-2">
-                {items.map((t) => (
-                  <div
-                    key={t.id}
-                    className="flex items-center gap-4 rounded-card border border-border bg-card p-4 transition-colors hover:border-accent/30"
-                  >
-                    {/* Category badge */}
-                    <Badge color={t.tipo === 'receita' ? 'green' : 'red'}>
-                      {t.categoria}
-                    </Badge>
-
-                    {/* Description + banco */}
-                    <div className="flex-1 min-w-0">
-                      <p className="truncate text-sm font-medium text-text">{t.descricao}</p>
-                      {t.banco && (
-                        <p className="text-xs text-muted">{t.banco}</p>
-                      )}
-                    </div>
-
-                    {/* Valor */}
-                    <span
-                      className={clsx(
-                        'whitespace-nowrap text-sm font-bold',
-                        t.tipo === 'receita' ? 'text-green' : 'text-red',
-                      )}
-                    >
-                      {t.tipo === 'receita' ? '+' : '-'} {formatBRL(Number(t.valor))}
-                    </span>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => openEditModal(t)}
-                        className="rounded-lg p-1.5 text-muted transition-colors hover:bg-card2 hover:text-text"
-                        aria-label="Editar transacao"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                      <button
-                        onClick={() => setDeletingTransacao(t)}
-                        className="rounded-lg p-1.5 text-muted transition-colors hover:bg-red/[0.14] hover:text-red"
-                        aria-label="Excluir transacao"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      )}
+      <FinancasHomeView {...home} />
 
       {/* Add Modal */}
       <Modal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
-        title="Nova Transacao"
+        title="Novo lançamento"
       >
         {renderForm(handleSubmitAdd, criarTransacao.isPending)}
       </Modal>
@@ -373,7 +267,7 @@ export default function FinancasPage() {
       <Modal
         isOpen={!!editingTransacao}
         onClose={() => setEditingTransacao(null)}
-        title="Editar Transacao"
+        title="Editar lançamento"
       >
         {renderForm(handleSubmitEdit, atualizarTransacao.isPending)}
       </Modal>
@@ -383,8 +277,8 @@ export default function FinancasPage() {
         isOpen={!!deletingTransacao}
         onClose={() => setDeletingTransacao(null)}
         onConfirm={handleExcluir}
-        title="Excluir transacao"
-        message={`Tem certeza que deseja excluir "${deletingTransacao?.descricao}"? Esta acao nao pode ser desfeita.`}
+        title="Excluir lançamento"
+        message={`Tem certeza que deseja excluir "${deletingTransacao?.descricao}"? Esta ação não pode ser desfeita.`}
         confirmLabel="Excluir"
         isLoading={excluirTransacao.isPending}
       />
