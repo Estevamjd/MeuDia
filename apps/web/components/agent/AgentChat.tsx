@@ -12,6 +12,8 @@ interface AgentChatProps {
   onEnviar: (mensagem: string) => void;
   onAcao: (acao: string, payload?: Record<string, unknown>) => void;
   sugestoesIniciais?: AcaoRapida[];
+  /** Texto do estado vazio (o modo Finanças não cita módulos ocultos). */
+  dicaInicial?: string;
 }
 
 export function AgentChat({
@@ -21,6 +23,7 @@ export function AgentChat({
   onEnviar,
   onAcao,
   sugestoesIniciais,
+  dicaInicial = 'Pergunte sobre treinos, hábitos, agenda ou finanças. Estou aqui para ajudar!',
 }: AgentChatProps) {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -56,7 +59,7 @@ export function AgentChat({
             </div>
             <p className="text-sm font-medium text-text">Agente MeuDia</p>
             <p className="mt-1 text-xs text-muted max-w-[240px]">
-              Pergunte sobre treinos, hábitos, agenda ou finanças. Estou aqui para ajudar!
+              {dicaInicial}
             </p>
 
             {/* Sugestões iniciais */}

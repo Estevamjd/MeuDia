@@ -23,10 +23,20 @@ import {
 import { useAuth } from '../../hooks/useAuth';
 import { useProfile, useTreinos, useSessoesSemana, useHabitos, useRegistrosHoje, useResumoMensal } from '../../hooks';
 import { useCriarCompromisso } from '../../hooks/useAgenda';
+import { useAppMode } from '../AppModeProvider';
+import {
+  abaInicialAgente,
+  abasAgente,
+  filtrarMensagens,
+  filtrarNotificacoes,
+  isAcaoPermitida,
+  sugestoesAgente,
+  type AbaAgente,
+} from '../../lib/agente-modo';
 import { AgentChat } from './AgentChat';
 import { NotificacaoItem } from './NotificacaoItem';
 
-type Tab = 'resumo' | 'treino' | 'alertas';
+type Tab = AbaAgente;
 
 interface AgentPanelProps {
   isOpen: boolean;
@@ -35,7 +45,8 @@ interface AgentPanelProps {
 
 export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<Tab>('resumo');
+  const mode = useAppMode();
+  const [activeTab, setActiveTab] = useState<Tab>(() => abaInicialAgente(mode));
   const { user } = useAuth();
 
   // Data hooks
@@ -56,6 +67,11 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
   const marcarTodasLidas = useMarcarTodasLidas();
   const dispensar = useDispensarNotificacao();
   const criarCompromisso = useCriarCompromisso();
+
+  // Cada abertura começa na aba inicial do modo (Finanças: Chat).
+  useEffect(() => {
+    if (isOpen) setActiveTab(abaInicialAgente(mode));
+  }, [isOpen, mode]);
 
   // ESC para fechar
   useEffect(() => {
@@ -162,6 +178,8 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
   // Handler de ações (NAVEGAR + COMANDO + CRIAR_COMPROMISSO)
   const handleAcao = useCallback(
     async (acao: string, payload?: Record<string, unknown>) => {
+      // Modo Finanças: ignora ações de módulos ocultos (ex.: respostas antigas do chat).
+      if (!isAcaoPermitida({ acao, payload }, mode)) return;
       if (acao === 'NAVEGAR' && payload?.rota) {
         router.push(payload.rota as string);
         onClose();
@@ -194,16 +212,22 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
         }
       }
     },
-    [router, onClose, handleEnviarChat, criarCompromisso, enviarMensagem],
+    [router, onClose, handleEnviarChat, criarCompromisso, enviarMensagem, mode],
   );
+
+  const notificacoesModo = useMemo(() => filtrarNotificacoes(notificacoes ?? [], mode), [notificacoes, mode]);
+  const mensagensModo = useMemo(() => filtrarMensagens(mensagens ?? [], mode), [mensagens, mode]);
+  // Modo Finanças: o contador do servidor inclui módulos ocultos; conta só as visíveis.
+  const naoLidas = mode === 'padrao' ? (countNaoLidas ?? 0) : notificacoesModo.filter((n) => !n.lida).length;
 
   if (!isOpen) return null;
 
-  const tabs: { id: Tab; label: string; icon: typeof LayoutDashboard; badge?: number }[] = [
+  const todasTabs: { id: Tab; label: string; icon: typeof LayoutDashboard; badge?: number }[] = [
     { id: 'resumo', label: 'Resumo', icon: LayoutDashboard },
     { id: 'treino', label: 'Chat', icon: Bot },
-    { id: 'alertas', label: 'Alertas', icon: Bell, badge: countNaoLidas ?? 0 },
+    { id: 'alertas', label: 'Alertas', icon: Bell, badge: naoLidas },
   ];
+  const tabs = todasTabs.filter((tab) => abasAgente(mode).includes(tab.id));
 
   return (
     <>
@@ -215,7 +239,12 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
       />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 z-40 flex h-screen w-full max-w-[380px] flex-col border-l border-border bg-surface animate-[slideIn_0.3s_ease]">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="agent-panel-titulo"
+        className="fixed right-0 top-0 z-40 flex h-screen w-full max-w-[380px] flex-col border-l border-border bg-surface animate-[slideIn_0.3s_ease]"
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div className="flex items-center gap-2.5">
@@ -223,7 +252,7 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
               <Bot size={16} className="text-white" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-text">Agente MeuDia</p>
+              <h2 id="agent-panel-titulo" className="text-sm font-semibold text-text">Agente MeuDia</h2>
               <p className="text-[11px] text-muted">{obterSaudacao(now.getHours())}</p>
             </div>
           </div>
@@ -270,23 +299,31 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
           )}
           {activeTab === 'treino' && (
             <AgentChat
-              mensagens={mensagens ?? []}
+              mensagens={mensagensModo}
               isLoading={loadingChat}
               isSending={enviarMensagem.isPending}
               onEnviar={handleEnviarChat}
               onAcao={handleAcao}
-              sugestoesIniciais={acoesRapidasPadrao(contexto)}
+              sugestoesIniciais={sugestoesAgente(mode, () => acoesRapidasPadrao(contexto))}
+              dicaInicial={
+                mode === 'financas' ? 'Pergunte sobre gastos, contas, orçamento ou assinaturas.' : undefined
+              }
             />
           )}
           {activeTab === 'alertas' && (
             <AlertasTab
-              notificacoes={notificacoes ?? []}
+              notificacoes={notificacoesModo}
               isLoading={loadingNotif}
               onMarcarLida={(id) => marcarLida.mutate(id)}
-              onMarcarTodasLidas={() => marcarTodasLidas.mutate()}
+              onMarcarTodasLidas={() =>
+                mode === 'padrao'
+                  ? marcarTodasLidas.mutate()
+                  : // Não marca como lidas as notificações ocultas no modo.
+                    notificacoesModo.filter((n) => !n.lida).forEach((n) => marcarLida.mutate(n.id))
+              }
               onDispensar={(id) => dispensar.mutate(id)}
               onAcao={handleAcao}
-              countNaoLidas={countNaoLidas ?? 0}
+              countNaoLidas={naoLidas}
             />
           )}
         </div>

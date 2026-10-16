@@ -1,4 +1,4 @@
-const CACHE_NAME = 'meudia-v7';
+const CACHE_NAME = 'meudia-v8';
 const STATIC_ASSETS = [
   '/icons/icon-192.png', '/icons/icon-512.png',
   '/apple-touch-icon.png', '/favicon.png',
@@ -6,6 +6,7 @@ const STATIC_ASSETS = [
 
 // Pure policy, also exercised directly by Vitest. Fail closed for credentials:
 // Cookie/Set-Cookie may be hidden by the browser, so only anonymous requests qualify.
+// Manifests change per APP_MODE, so they stay network-only (never cached).
 function shouldCache(request, origin, response) {
   const url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== origin ||
@@ -16,8 +17,7 @@ function shouldCache(request, origin, response) {
   const path = url.pathname;
   const staticPath = path.startsWith('/_next/static/') ||
     /^\/(?:icons|fonts|images)\/[^.][^?]*\.(?:png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf)$/i.test(path) ||
-    /^\/(?:apple-touch-icon|favicon(?:-\d+x\d+)?)\.(?:png|ico)$/.test(path) ||
-    path === '/manifest.json' || path === '/manifest.webmanifest';
+    /^\/(?:apple-touch-icon|favicon(?:-\d+x\d+)?)\.(?:png|ico)$/.test(path);
   if (!staticPath) return false;
   if (!response) return true;
   const type = (response.headers.get('content-type') || '').split(';')[0].trim();
@@ -25,8 +25,7 @@ function shouldCache(request, origin, response) {
     !response.headers.has('set-cookie') && !response.headers.has('authorization') &&
     !/\b(?:private|no-store|no-cache)\b/i.test(response.headers.get('cache-control') || '') &&
     !/cookie|authorization|\*/i.test(response.headers.get('vary') || '') &&
-    /^(?:text\/css|(?:text|application)\/javascript|application\/(?:x-javascript|manifest\+json|json|font-woff)|font\/[\w.+-]+|image\/[\w.+-]+)$/.test(type) &&
-    (type !== 'application/json' || path === '/manifest.json');
+    /^(?:text\/css|(?:text|application)\/javascript|application\/(?:x-javascript|font-woff)|font\/[\w.+-]+|image\/[\w.+-]+)$/.test(type);
 }
 
 // Pre-cache anonymous public icons only; never pages or login HTML.

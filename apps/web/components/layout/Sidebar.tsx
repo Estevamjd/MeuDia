@@ -5,56 +5,7 @@ import { usePathname } from 'next/navigation';
 import { clsx } from 'clsx';
 import { useAppMode } from '../AppModeProvider';
 import { rotaInicial } from '../../lib/app-mode';
-
-interface NavItem {
-  href: string;
-  label: string;
-  emoji: string;
-  colorClass?: 'green' | 'orange';
-  exato?: boolean;
-}
-
-interface NavSection {
-  label: string;
-  items: NavItem[];
-}
-
-const navSections: NavSection[] = [
-  {
-    label: 'Geral',
-    items: [
-      { href: '/inicio',   label: 'Início',    emoji: '🏠' },
-      { href: '/notas',    label: 'Notas',     emoji: '📝' },
-      { href: '/agenda',   label: 'Agenda',    emoji: '📅' },
-      { href: '/financas', label: 'Finanças',  emoji: '💸' },
-      { href: '/compras',  label: 'Compras',   emoji: '🛒' },
-      { href: '/habitos',  label: 'Hábitos',   emoji: '🔁' },
-      { href: '/veiculo',      label: 'Veículo',      emoji: '🚗' },
-      { href: '/assinaturas', label: 'Assinaturas', emoji: '💳' },
-    ],
-  },
-  {
-    label: 'Saúde',
-    items: [
-      { href: '/treinos', label: 'Treinos', emoji: '🏋️', colorClass: 'orange' },
-      { href: '/dieta', label: 'Dieta', emoji: '🍽️', colorClass: 'green' },
-      { href: '/medicamentos', label: 'Medicamentos', emoji: '💊' },
-    ],
-  },
-];
-
-// Modo Finanças: só finanças (as subrotas ganham item próprio).
-const navSectionsFinancas: NavSection[] = [
-  {
-    label: 'Finanças',
-    items: [
-      { href: '/financas', label: 'Resumo do mês', emoji: '💸', exato: true },
-      { href: '/financas/contas', label: 'Contas', emoji: '🧾' },
-      { href: '/financas/orcamento', label: 'Orçamento', emoji: '📊' },
-      { href: '/assinaturas', label: 'Assinaturas', emoji: '💳' },
-    ],
-  },
-];
+import { isNavAtivo, secoesSidebar } from '../../lib/navegacao';
 
 interface SidebarProps {
   onSignOut: () => void;
@@ -67,7 +18,7 @@ interface SidebarProps {
 export function Sidebar({ onSignOut, onNavigate, onOpenAgent, userName }: SidebarProps) {
   const pathname = usePathname();
   const mode = useAppMode();
-  const sections = mode === 'financas' ? navSectionsFinancas : navSections;
+  const sections = secoesSidebar(mode);
 
   return (
     <aside
@@ -115,8 +66,7 @@ export function Sidebar({ onSignOut, onNavigate, onOpenAgent, userName }: Sideba
             </div>
             <div className="flex flex-col" style={{ gap: 1 }}>
               {section.items.map((item) => {
-                const isActive =
-                  pathname === item.href || (!item.exato && pathname.startsWith(item.href + '/'));
+                const isActive = isNavAtivo(pathname, item);
 
                 const activeStyles = (() => {
                   if (!isActive) return {};

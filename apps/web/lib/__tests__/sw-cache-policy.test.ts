@@ -7,7 +7,7 @@ const source = readFileSync(new URL('../../public/sw.js', import.meta.url), 'utf
 function worker() {
   const listeners: Record<string, (event: unknown) => void> = {};
   const cache = { match: vi.fn(), put: vi.fn().mockResolvedValue(undefined) };
-  const caches = { open: vi.fn().mockResolvedValue(cache), keys: vi.fn().mockResolvedValue(['meudia-v6', 'meudia-v7']), delete: vi.fn().mockResolvedValue(true) };
+  const caches = { open: vi.fn().mockResolvedValue(cache), keys: vi.fn().mockResolvedValue(['meudia-v7', 'meudia-v8']), delete: vi.fn().mockResolvedValue(true) };
   const fetch = vi.fn().mockResolvedValue(new Response('asset', { headers: { 'content-type': 'image/png' } }));
   const self = { location: { origin }, addEventListener: (name: string, listener: (event: unknown) => void) => { listeners[name] = listener; }, clients: { claim: vi.fn() }, skipWaiting: vi.fn() };
   const policy = runInNewContext(`${source}\nshouldCache`, { URL, Request, self, caches, fetch }) as (request: Request, origin: string, response?: Response) => boolean;
@@ -21,12 +21,23 @@ it.each([
   ['/_next/static/css/app.css', 'text/css'],
   ['/icons/icon-192.png', 'image/png'], ['/fonts/app.woff2', 'font/woff2'],
   ['/images/logo.svg', 'image/svg+xml'], ['/favicon.png', 'image/png'],
-  ['/manifest.json', 'application/json'], ['/manifest.webmanifest', 'application/manifest+json'],
 ])('permite só asset público anônimo %s', (path, type) => {
   expect(worker().policy(request(path), origin, response(type))).toBe(true);
 });
 it.each(['/', '/login', '/financas', '/financas/contas', '/api', '/api/contas', '/api/logo.png', '/_next/data/build/financas.json', '/images/contas.json', '/treinos'])('network-only para %s', path => {
   expect(worker().policy(request(path), origin, response())).toBe(false);
+});
+it.each([
+  ['/manifest.json', 'application/json'], ['/manifest.webmanifest', 'application/manifest+json'],
+])('manifest %s é network-only (muda por APP_MODE) e nunca é servido do cache', async (path, type) => {
+  const { policy, listeners, caches, cache } = worker();
+  expect(policy(request(path), origin)).toBe(false);
+  expect(policy(request(path), origin, response(type))).toBe(false);
+  cache.match.mockResolvedValue(response(type));
+  const respondWith = vi.fn();
+  listeners.fetch!({ request: request(path), respondWith });
+  expect(respondWith).not.toHaveBeenCalled();
+  expect(caches.open).not.toHaveBeenCalled();
 });
 it('rejeita credenciais, navegação, origem externa e métodos de escrita', () => {
   const { policy } = worker();
@@ -69,13 +80,13 @@ it('grava somente resposta de asset permitida; HTML nunca entra no cache', async
   listeners.fetch!(event); await result;
   expect(cache.put).not.toHaveBeenCalled();
 });
-it('activate remove cache antigo contendo HTML e preserva apenas v7; mantém push e clique', async () => {
+it('activate remove cache antigo contendo HTML e preserva apenas v8; mantém push e clique', async () => {
   const { listeners, caches } = worker();
   let done: Promise<unknown> | undefined;
   listeners.activate!({ waitUntil: (value: Promise<unknown>) => { done = value; } });
   await done;
   expect(caches.delete).toHaveBeenCalledTimes(1);
-  expect(caches.delete).toHaveBeenCalledWith('meudia-v6');
+  expect(caches.delete).toHaveBeenCalledWith('meudia-v7');
   expect(listeners.push).toBeTypeOf('function');
   expect(listeners.notificationclick).toBeTypeOf('function');
 });
