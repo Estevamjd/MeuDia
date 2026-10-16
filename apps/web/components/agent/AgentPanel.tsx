@@ -239,7 +239,12 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
       />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 z-40 flex h-screen w-full max-w-[380px] flex-col border-l border-border bg-surface animate-[slideIn_0.3s_ease]">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="agent-panel-titulo"
+        className="fixed right-0 top-0 z-40 flex h-screen w-full max-w-[380px] flex-col border-l border-border bg-surface animate-[slideIn_0.3s_ease]"
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div className="flex items-center gap-2.5">
@@ -247,7 +252,7 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
               <Bot size={16} className="text-white" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-text">Agente MeuDia</p>
+              <h2 id="agent-panel-titulo" className="text-sm font-semibold text-text">Agente MeuDia</h2>
               <p className="text-[11px] text-muted">{obterSaudacao(now.getHours())}</p>
             </div>
           </div>

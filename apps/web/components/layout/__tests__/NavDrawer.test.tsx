@@ -50,6 +50,7 @@ describe('Drawer do Topbar (modo finanças)', () => {
     renderTopbar('financas');
     const botao = screen.getByRole('button', { name: 'Abrir menu' });
     expect(botao.getAttribute('aria-expanded')).toBe('false');
+    expect(botao.hasAttribute('aria-controls')).toBe(false);
     abrir();
     const dialog = screen.getByRole('dialog');
     expect(botao.getAttribute('aria-expanded')).toBe('true');
@@ -72,6 +73,22 @@ describe('Drawer do Topbar (modo finanças)', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(botao);
+  });
+
+  it('aria-controls nunca aponta para id inexistente (fechado/aberto/fechado)', () => {
+    renderTopbar('financas');
+    const botao = screen.getByRole('button', { name: 'Abrir menu' });
+    const alvoValido = () => {
+      const id = botao.getAttribute('aria-controls');
+      return id === null || document.getElementById(id) !== null;
+    };
+    expect(alvoValido()).toBe(true);
+    abrir();
+    expect(botao.getAttribute('aria-controls')).toBeTruthy();
+    expect(alvoValido()).toBe(true);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(botao.hasAttribute('aria-controls')).toBe(false);
+    expect(alvoValido()).toBe(true);
   });
 
   it('clique no overlay fecha', () => {

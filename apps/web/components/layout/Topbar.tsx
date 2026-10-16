@@ -65,7 +65,8 @@ export function Topbar({ onSignOut }: TopbarProps) {
               onClick={() => setDrawerAberto(true)}
               aria-label="Abrir menu"
               aria-expanded={drawerAberto}
-              aria-controls={DRAWER_ID}
+              // O NavDrawer só existe no DOM quando aberto; nunca referenciar id inexistente.
+              aria-controls={drawerAberto ? DRAWER_ID : undefined}
               aria-haspopup="dialog"
               className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-text transition-colors hover:bg-card2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent md:hidden"
             >

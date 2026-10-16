@@ -64,6 +64,16 @@ const renderPanel = (mode: 'financas' | 'padrao') =>
 
 const textoBotoes = () => screen.getAllByRole('button').map((b) => b.textContent ?? '');
 
+describe('AgentPanel acessível', () => {
+  it.each(['financas', 'padrao'] as const)('é um dialog modal rotulado (%s)', (mode) => {
+    renderPanel(mode);
+    const dialog = screen.getByRole('dialog', { name: 'Agente MeuDia' });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    const id = dialog.getAttribute('aria-labelledby');
+    expect(id && document.getElementById(id)?.textContent).toBe('Agente MeuDia');
+  });
+});
+
 describe('AgentPanel por APP_MODE', () => {
   it('financas: abre direto no Chat, sem aba Resumo, com sugestões só de finanças', () => {
     renderPanel('financas');
