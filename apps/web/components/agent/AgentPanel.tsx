@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
 import { X, Bot, Bell, LayoutDashboard, CheckCheck } from 'lucide-react';
@@ -73,11 +73,17 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
     if (isOpen) setActiveTab(abaInicialAgente(mode));
   }, [isOpen, mode]);
 
+  // `onClose` chega inline do layout: em ref, para o efeito abaixo não re-rodar a cada render.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   // ESC para fechar
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
     };
     document.addEventListener('keydown', handler);
     document.body.style.overflow = 'hidden';
@@ -85,7 +91,7 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
       document.removeEventListener('keydown', handler);
       document.body.style.overflow = '';
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   // Contexto do usuário
   const contexto: ContextoUsuario = useMemo(() => {

@@ -16,45 +16,52 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
   const overlayRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-        return;
-      }
+  // Callers costumam passar `onClose` inline: guardado em ref para o efeito de
+  // abertura não re-rodar a cada render do pai (re-focava o 1º campo a cada tecla).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
-      // Focus trap
-      if (e.key === 'Tab' && contentRef.current) {
-        const focusable = contentRef.current.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-        );
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onCloseRef.current();
+      return;
+    }
 
-        if (e.shiftKey) {
-          if (document.activeElement === first) {
-            e.preventDefault();
-            last?.focus();
-          }
-        } else {
-          if (document.activeElement === last) {
-            e.preventDefault();
-            first?.focus();
-          }
+    // Focus trap
+    if (e.key === 'Tab' && contentRef.current) {
+      const focusable = contentRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
         }
       }
-    },
-    [onClose],
-  );
+    }
+  }, []);
 
+  // Só depende de `isOpen`: autofoco roda uma vez por abertura.
   useEffect(() => {
     if (!isOpen) return;
 
+    const anterior = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     document.addEventListener('keydown', handleKeyDown);
     document.body.style.overflow = 'hidden';
 
-    // Focar no primeiro elemento focável
+    // Focar no primeiro elemento focável (se o usuário ainda não focou outro campo)
     const timer = setTimeout(() => {
+      if (contentRef.current?.contains(document.activeElement)) return;
       const first = contentRef.current?.querySelector<HTMLElement>(
         'input, select, textarea, button:not([data-close])',
       );
@@ -65,6 +72,8 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = '';
       clearTimeout(timer);
+      // Devolve o foco a quem abriu o modal (se ainda estiver na página).
+      if (anterior?.isConnected) anterior.focus();
     };
   }, [isOpen, handleKeyDown]);
 
