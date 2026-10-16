@@ -1,9 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Competencia, Transacao } from '@meudia/shared';
 import {
+  useContas,
   useContasMes,
+  useCriarRenda,
   useOrcamento,
   usePushLembretes,
   useRendas,
@@ -13,8 +15,19 @@ import {
 import { useToast } from '../../ui';
 import { partesCompetencia } from '../../../lib/financas-ui';
 import { usePagamentoAcoes } from '../usePagamentoAcoes';
+import { AVISO_LEMBRETES_DISPENSADO_KEY, mostrarAvisoLembretes } from './AvisoLembretes';
 import type { FinancasHomeViewProps } from './FinancasHomeView';
 import { montarHome } from './montarHome';
+
+const RENDA_PADRAO = 'Renda principal';
+
+function lerDispensado(): boolean {
+  try {
+    return localStorage.getItem(AVISO_LEMBRETES_DISPENSADO_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 interface AcoesLancamento {
   onNovo: () => void;
@@ -31,9 +44,15 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
   const orcamento = useOrcamento();
   const transacoes = useTransacoesMes(ano, mes);
   const rendas = useRendas();
+  const contasCadastradas = useContas();
   const push = usePushLembretes();
+  const criarRenda = useCriarRenda();
   const { pagarConta, contaOcupada } = usePagamentoAcoes();
   const [expandido, setExpandido] = useState(false);
+  const [rendaAberta, setRendaAberta] = useState(false);
+  // Começa dispensado até ler o localStorage (no cliente): evita piscar o aviso.
+  const [avisoDispensado, setAvisoDispensado] = useState(true);
+  useEffect(() => setAvisoDispensado(lerDispensado()), []);
 
   const secoes = useMemo(
     () =>
@@ -50,24 +69,64 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
     [competencia, hojeISO, resumo.data, contas.data, orcamento.data, transacoes.data],
   );
 
-  // Falha em qualquer consulta que alimenta as seções vira erro (nada de lista vazia silenciosa).
-  const consultas = [resumo, contas, orcamento, transacoes];
+  // Falha em qualquer consulta que alimenta as seções, o onboarding ou o aviso vira erro (nada de lista vazia silenciosa).
+  const consultas = [resumo, contas, orcamento, transacoes, rendas, contasCadastradas];
   const comErro = consultas.filter((q) => q.isError);
+  const carregando = resumo.isLoading || contas.isLoading || rendas.isLoading || contasCadastradas.isLoading;
+
+  const rendaCadastrada = (rendas.data ?? []).some((r) => r.ativo);
+  // Definições cadastradas (não as ocorrências do mês): conta anual/avulsa de outro mês também conta.
+  const temContas = (contasCadastradas.data ?? []).some((c) => c.ativo);
+  // Sem a lista de rendas carregada, só o resumo vazio garante que falta o passo 1.
+  const mostrarBoasVindas = rendas.isSuccess ? !rendaCadastrada || !temContas : !!secoes?.vazio;
 
   return {
-    estado: resumo.isLoading || contas.isLoading ? 'carregando' : comErro.length > 0 || !secoes ? 'erro' : 'pronto',
+    estado: carregando ? 'carregando' : comErro.length > 0 || !secoes ? 'erro' : 'pronto',
     onTentarDeNovo: () => {
       for (const q of comErro.length > 0 ? comErro : [resumo]) void q.refetch();
     },
     secoes,
     hojeISO,
-    boasVindas: {
-      rendaCadastrada: (rendas.data ?? []).some((r) => r.ativo),
-      contasCadastradas: (contas.data ?? []).length > 0,
-      estadoLembretes: push.estado,
-      ativandoLembretes: push.ocupado,
-      onAtivarLembretes: () =>
-        void push.ativar().catch(() => toast.error('Não foi possível ativar os lembretes. Tente de novo.')),
+    boasVindas: mostrarBoasVindas
+      ? {
+          rendaCadastrada,
+          onCadastrarRenda: () => {
+            criarRenda.reset();
+            setRendaAberta(true);
+          },
+        }
+      : null,
+    avisoLembretes: mostrarAvisoLembretes(temContas, push.estado, avisoDispensado)
+      ? {
+          estado: push.estado,
+          ativando: push.ocupado,
+          onAtivar: () =>
+            void push.ativar().catch(() => toast.error('Não foi possível ativar os lembretes. Tente de novo.')),
+          onDispensar: () => {
+            setAvisoDispensado(true);
+            try {
+              localStorage.setItem(AVISO_LEMBRETES_DISPENSADO_KEY, '1');
+            } catch {
+              // Sem storage (modo privado): dispensa só nesta sessão.
+            }
+          },
+        }
+      : null,
+    rendaSheet: {
+      open: rendaAberta,
+      onClose: () => setRendaAberta(false),
+      salvando: criarRenda.isPending,
+      erro: criarRenda.isError ? 'Não foi possível salvar a renda. Tente de novo.' : undefined,
+      onSalvar: (valor, dia) =>
+        criarRenda.mutate(
+          { descricao: RENDA_PADRAO, valor, dia_recebimento: dia },
+          {
+            onSuccess: () => {
+              setRendaAberta(false);
+              toast.success('Renda salva');
+            },
+          },
+        ),
     },
     contaOcupada,
     onPagar: (c) => pagarConta({ contaId: c.contaId, competencia: c.competencia, descricao: c.descricao }),

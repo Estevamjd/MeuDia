@@ -40,6 +40,7 @@ import {
   partesCompetencia,
   rotuloCompetencia,
   SITUACAO_LIMITE_UI,
+  tagSobraPrevista,
   type LinhaOrcamento,
   type SituacaoLimite,
 } from '../../../../lib/financas-ui';
@@ -348,7 +349,7 @@ export default function OrcamentoPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-syne text-3xl font-bold text-text">Orçamento</h1>
-        <Button onClick={abrirNovoLimite} disabled={!podeCriarLimite}>
+        <Button variant="ghost" onClick={abrirNovoLimite} disabled={!podeCriarLimite}>
           <Plus size={16} />
           Novo limite
         </Button>
@@ -397,16 +398,19 @@ export default function OrcamentoPage() {
             label="Sobra prevista"
             value={formatBRL(resumo.data.sobraPrevista)}
             icon={<PiggyBank size={16} />}
-            tag={{ text: resumo.data.sobraPrevista >= 0 ? 'positiva' : 'negativa', color: resumo.data.sobraPrevista >= 0 ? 'teal' : 'red' }}
+            tag={tagSobraPrevista(resumo.data.sobraPrevista)}
           />
         </section>
       ) : null}
 
       {/* Limites por categoria */}
       <section aria-labelledby="limites-categoria" className="space-y-3">
-        <h2 id="limites-categoria" className="font-syne text-lg font-semibold text-text">
-          Limites por categoria
-        </h2>
+        <div className="space-y-1">
+          <h2 id="limites-categoria" className="font-syne text-lg font-semibold text-text">
+            Limites por categoria (opcional)
+          </h2>
+          <p className="text-sm text-muted">Quer controlar quanto gasta com mercado, lazer etc.? Defina um teto.</p>
+        </div>
 
         {carregandoLimites ? (
           <Carregando texto="Carregando orçamento do mês…" count={3} />
