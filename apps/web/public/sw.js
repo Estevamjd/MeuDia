@@ -1,21 +1,46 @@
-const CACHE_NAME = 'meudia-v6';
+const CACHE_NAME = 'meudia-v7';
 const STATIC_ASSETS = [
-  '/',
-  '/login',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
-  '/apple-touch-icon.png',
-  '/favicon.png',
+  '/icons/icon-192.png', '/icons/icon-512.png',
+  '/apple-touch-icon.png', '/favicon.png',
 ];
 
-// Install — pre-cache only public static assets (NOT authenticated dashboard pages)
+// Pure policy, also exercised directly by Vitest. Fail closed for credentials:
+// Cookie/Set-Cookie may be hidden by the browser, so only anonymous requests qualify.
+function shouldCache(request, origin, response) {
+  const url = new URL(request.url);
+  if (request.method !== 'GET' || url.origin !== origin ||
+      request.mode === 'navigate' || request.destination === 'document' ||
+      request.credentials !== 'omit' ||
+      request.headers.has('authorization') || request.headers.has('cookie')) return false;
+
+  const path = url.pathname;
+  const staticPath = path.startsWith('/_next/static/') ||
+    /^\/(?:icons|fonts|images)\/[^.][^?]*\.(?:png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf)$/i.test(path) ||
+    /^\/(?:apple-touch-icon|favicon(?:-\d+x\d+)?)\.(?:png|ico)$/.test(path) ||
+    path === '/manifest.json' || path === '/manifest.webmanifest';
+  if (!staticPath) return false;
+  if (!response) return true;
+  const type = (response.headers.get('content-type') || '').split(';')[0].trim();
+  return response.status === 200 && response.type !== 'opaque' && !response.redirected &&
+    !response.headers.has('set-cookie') && !response.headers.has('authorization') &&
+    !/\b(?:private|no-store|no-cache)\b/i.test(response.headers.get('cache-control') || '') &&
+    !/cookie|authorization|\*/i.test(response.headers.get('vary') || '') &&
+    /^(?:text\/css|(?:text|application)\/javascript|application\/(?:x-javascript|manifest\+json|json|font-woff)|font\/[\w.+-]+|image\/[\w.+-]+)$/.test(type) &&
+    (type !== 'application/json' || path === '/manifest.json');
+}
+
+// Pre-cache anonymous public icons only; never pages or login HTML.
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) =>
-      cache.addAll(STATIC_ASSETS)
-    )
-  );
-  self.skipWaiting();
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    // Failed icon downloads must not prevent activation and removal of old HTML caches.
+    await Promise.allSettled(STATIC_ASSETS.map(async (path) => {
+      const request = new Request(new URL(path, self.location.origin), { credentials: 'omit' });
+      const response = await fetch(request);
+      if (shouldCache(request, self.location.origin, response)) await cache.put(request, response);
+    }));
+    await self.skipWaiting();
+  })());
 });
 
 // Activate — clean old caches
@@ -23,9 +48,8 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 // Message listener — allows the app to force-update or clear cache on logout
@@ -78,36 +102,19 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-// Fetch — network-first for pages, cache-first for static assets
+// Everything outside the public static allowlist uses the network only.
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  const url = new URL(request.url);
-
-  // Skip non-GET and cross-origin
-  if (request.method !== 'GET' || url.origin !== self.location.origin) return;
-
-  // API routes — network only, never cache
-  if (url.pathname.startsWith('/api/')) return;
-
-  // Next.js data routes — network only
-  if (url.pathname.startsWith('/_next/data')) return;
-
-  // Static assets (_next/static) — cache first
-  if (url.pathname.startsWith('/_next/static')) {
-    event.respondWith(
-      caches.match(request).then((cached) => cached || fetch(request))
-    );
-    return;
-  }
-
-  // Pages — network first, fallback to cache, ultimate fallback to /login
-  event.respondWith(
-    fetch(request)
-      .then((res) => {
-        const clone = res.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-        return res;
-      })
-      .catch(() => caches.match(request).then((cached) => cached || caches.match('/login')))
-  );
+  if (!shouldCache(request, self.location.origin)) return;
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    const cached = await cache.match(request);
+    if (cached && shouldCache(request, self.location.origin, cached)) return cached;
+    const response = await fetch(request);
+    if (shouldCache(request, self.location.origin, response)) {
+      // Keep the worker alive until the write completes, without failing the fetch on quota errors.
+      event.waitUntil(cache.put(request, response.clone()).catch(() => {}));
+    }
+    return response;
+  })());
 });

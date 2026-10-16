@@ -7,7 +7,8 @@
 --   - Tabelas/índices: CREATE ... IF NOT EXISTS
 --   - Policies/trigger: DO blocks que checam pg_policies/pg_trigger antes de criar
 --   - Funções: CREATE OR REPLACE
---   - Nada é dropado, renomeado ou alterado se já existir.
+--   - Exceção: remove apenas as 3 policies duplicadas "own agua" (IF EXISTS).
+--   - Tabelas/colunas existentes não são removidas nem renomeadas.
 --
 -- NÃO APLICADO EM NENHUM BANCO. Validar primeiro em banco local/descartável
 -- (ticket BE-00 em docs/financas/TICKETS.md).
@@ -603,6 +604,11 @@ BEGIN
     END IF;
   END LOOP;
 END $$;
+
+-- Remove só os aliases duplicados; preserva as quatro policies own registros_agua.
+DROP POLICY IF EXISTS "Users can view own agua" ON public.registros_agua;
+DROP POLICY IF EXISTS "Users can insert own agua" ON public.registros_agua;
+DROP POLICY IF EXISTS "Users can update own agua" ON public.registros_agua;
 
 -- notas (003)
 DO $$

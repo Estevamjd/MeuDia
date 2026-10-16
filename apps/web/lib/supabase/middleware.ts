@@ -3,13 +3,22 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getAppMode, redirecionamentoModo, rotaInicial } from '../app-mode';
 
 export async function updateSession(request: NextRequest) {
+  const mode = getAppMode();
+  const destino = redirecionamentoModo(request.nextUrl.pathname, mode);
   let supabaseResponse = NextResponse.next({ request });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // Sem env vars configuradas, apenas passa a request adiante
+  // Sem Supabase configurado, mantém o bloqueio dos módulos ocultos.
   if (!url || !key) {
+    if (destino) {
+      const target = request.nextUrl.clone();
+      target.pathname = destino;
+      target.search = '';
+      return NextResponse.redirect(target);
+    }
+
     return supabaseResponse;
   }
 
@@ -57,8 +66,6 @@ export async function updateSession(request: NextRequest) {
     return redirect(url);
   }
 
-  const mode = getAppMode();
-
   if (
     user &&
     isPublicRoute &&
@@ -70,13 +77,12 @@ export async function updateSession(request: NextRequest) {
     return redirect(url);
   }
 
-  // Modo Finanças: rotas de módulos ocultos redirecionam para /financas.
-  const destino = redirecionamentoModo(request.nextUrl.pathname, mode);
+  // Usuários autenticados também não acessam módulos ocultos por URL direta.
   if (user && destino) {
-    const url = request.nextUrl.clone();
-    url.pathname = destino;
-    url.search = '';
-    return redirect(url);
+    const target = request.nextUrl.clone();
+    target.pathname = destino;
+    target.search = '';
+    return redirect(target);
   }
 
   return supabaseResponse;
