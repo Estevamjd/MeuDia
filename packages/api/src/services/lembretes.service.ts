@@ -55,7 +55,10 @@ export async function enviarLembretesDoDia({ client, sender, hojeISO = hojeSP() 
           console.error('Falha no envio de lembrete push');
         }
       }
-      if (falhaTransitoria && !teveSucesso) await lembretesEnviadosRepository.liberarLembreteParaCron(client, reserva);
+      if (falhaTransitoria && !teveSucesso) {
+        try { await lembretesEnviadosRepository.liberarLembreteParaCron(client, reserva); }
+        catch { console.error('Falha ao liberar reserva de lembrete push'); }
+      }
     }
   }
   return resultado;

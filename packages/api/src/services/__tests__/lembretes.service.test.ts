@@ -93,6 +93,25 @@ it.each([undefined, 429, 500, 503, 599])('falha transitória %s libera reserva e
     expect(push.removerInscricaoParaCron).not.toHaveBeenCalled();
   } finally { log.mockRestore(); }
 });
+it('falha ao liberar reserva da primeira conta é logada e a segunda ainda recebe', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    vi.mocked(contas.contasAtivasComInscricaoParaCron).mockResolvedValue([conta, { ...conta, id: 'c2' }] as never);
+    vi.mocked(lembretes.liberarLembreteParaCron).mockRejectedValueOnce(new Error(sub.endpoint));
+    send.mockRejectedValueOnce({ statusCode: 503 });
+    await expect(run()).resolves.toMatchObject({ contas: 2, enviados: 1 });
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send).toHaveBeenLastCalledWith(sub, expect.objectContaining({ url: '/financas/contas/c2?competencia=2026-10' }));
+    expect(lembretes.liberarLembreteParaCron).toHaveBeenCalledTimes(1);
+    expect(lembretes.liberarLembreteParaCron).toHaveBeenCalledWith(client, expect.objectContaining({ conta_id: 'c' }));
+    expect(log.mock.calls).toEqual([
+      ['Falha no envio de lembrete push'],
+      ['Falha ao liberar reserva de lembrete push'],
+    ]);
+    await expect(run()).resolves.toMatchObject({ enviados: 0 });
+    expect(send).toHaveBeenCalledTimes(2);
+  } finally { log.mockRestore(); }
+});
 it.each([404, 410])('expirada %s mantém reserva mesmo sem sucesso', async statusCode => {
   send.mockRejectedValue({ statusCode });
   expect(await run()).toMatchObject({ enviados: 0, inscricoesRemovidas: 1 });
