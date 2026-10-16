@@ -174,8 +174,10 @@ CREATE TABLE registros_agua (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id       UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   data          DATE NOT NULL DEFAULT CURRENT_DATE,
-  copos_bebidos INTEGER DEFAULT 0,
-  meta_copos    INTEGER DEFAULT 8,
+  quantidade_ml INTEGER NOT NULL DEFAULT 0,
+  meta_ml       INTEGER NOT NULL DEFAULT 2500,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, data)
 );
 

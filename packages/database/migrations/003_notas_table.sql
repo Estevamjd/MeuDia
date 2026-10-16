@@ -1,3 +1,7 @@
+-- Idempotente: pode rodar depois de 000_baseline.sql e ser reexecutada.
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
+
 -- Tabela de notas
 CREATE TABLE IF NOT EXISTS public.notas (
   id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
@@ -16,23 +20,25 @@ CREATE TABLE IF NOT EXISTS public.notas (
 -- RLS
 ALTER TABLE public.notas ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Users can view own notas"
-  ON public.notas FOR SELECT
-  USING (user_id = auth.uid());
-
-CREATE POLICY "Users can insert own notas"
-  ON public.notas FOR INSERT
-  WITH CHECK (user_id = auth.uid());
-
-CREATE POLICY "Users can update own notas"
-  ON public.notas FOR UPDATE
-  USING (user_id = auth.uid())
-  WITH CHECK (user_id = auth.uid());
-
-CREATE POLICY "Users can delete own notas"
-  ON public.notas FOR DELETE
-  USING (user_id = auth.uid());
+DO $$
+DECLARE
+  p TEXT[];
+BEGIN
+  FOREACH p SLICE 1 IN ARRAY ARRAY[
+    ['Users can view own notas',   'FOR SELECT USING (user_id = auth.uid())'],
+    ['Users can insert own notas', 'FOR INSERT WITH CHECK (user_id = auth.uid())'],
+    ['Users can update own notas', 'FOR UPDATE USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid())'],
+    ['Users can delete own notas', 'FOR DELETE USING (user_id = auth.uid())']
+  ] LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = 'notas' AND policyname = p[1]
+    ) THEN
+      EXECUTE format('CREATE POLICY %I ON public.notas %s', p[1], p[2]);
+    END IF;
+  END LOOP;
+END $$;
 
 -- Index para buscas
-CREATE INDEX idx_notas_user_id ON public.notas(user_id);
-CREATE INDEX idx_notas_fixada ON public.notas(user_id, fixada);
+CREATE INDEX IF NOT EXISTS idx_notas_user_id ON public.notas(user_id);
+CREATE INDEX IF NOT EXISTS idx_notas_fixada ON public.notas(user_id, fixada);

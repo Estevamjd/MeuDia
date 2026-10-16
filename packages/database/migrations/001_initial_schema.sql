@@ -8,13 +8,15 @@
 -- ============================================================================
 -- SQL inline equivalente a ../schema.sql (antes carregado via `\i`, meta-comando
 -- do psql que não roda no SQL Editor/CLI). Manter os dois arquivos em sincronia.
+-- IDEMPOTENTE: roda depois de 000_baseline.sql e pode ser reexecutada
+-- (IF NOT EXISTS, policies/trigger via DO block, CREATE OR REPLACE).
 -- ============================================================================
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- PERFIL
 -- ══════════════════════════════════════════════════════════════════════════════
 
-CREATE TABLE profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
   id              UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   nome            TEXT NOT NULL,
   email           TEXT NOT NULL,
@@ -33,7 +35,7 @@ CREATE TABLE profiles (
 -- TREINOS
 -- ══════════════════════════════════════════════════════════════════════════════
 
-CREATE TABLE treinos (
+CREATE TABLE IF NOT EXISTS public.treinos (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   nome        TEXT NOT NULL,
@@ -44,7 +46,7 @@ CREATE TABLE treinos (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE exercicios (
+CREATE TABLE IF NOT EXISTS public.exercicios (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   treino_id       UUID NOT NULL REFERENCES treinos(id) ON DELETE CASCADE,
   nome            TEXT NOT NULL,
@@ -56,7 +58,7 @@ CREATE TABLE exercicios (
   ordem           INTEGER DEFAULT 0
 );
 
-CREATE TABLE sessoes_treino (
+CREATE TABLE IF NOT EXISTS public.sessoes_treino (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   treino_id       UUID REFERENCES treinos(id),
@@ -67,7 +69,7 @@ CREATE TABLE sessoes_treino (
   created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE series_realizadas (
+CREATE TABLE IF NOT EXISTS public.series_realizadas (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sessao_id    UUID NOT NULL REFERENCES sessoes_treino(id) ON DELETE CASCADE,
   exercicio_id UUID NOT NULL REFERENCES exercicios(id),
@@ -81,7 +83,7 @@ CREATE TABLE series_realizadas (
 -- HÁBITOS
 -- ══════════════════════════════════════════════════════════════════════════════
 
-CREATE TABLE habitos (
+CREATE TABLE IF NOT EXISTS public.habitos (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   nome        TEXT NOT NULL,
@@ -94,7 +96,7 @@ CREATE TABLE habitos (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE registros_habito (
+CREATE TABLE IF NOT EXISTS public.registros_habito (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   habito_id  UUID NOT NULL REFERENCES habitos(id) ON DELETE CASCADE,
   user_id    UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
@@ -108,7 +110,7 @@ CREATE TABLE registros_habito (
 -- FINANÇAS
 -- ══════════════════════════════════════════════════════════════════════════════
 
-CREATE TABLE transacoes (
+CREATE TABLE IF NOT EXISTS public.transacoes (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   tipo        TEXT CHECK (tipo IN ('receita','despesa')) NOT NULL,
@@ -121,7 +123,7 @@ CREATE TABLE transacoes (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE assinaturas (
+CREATE TABLE IF NOT EXISTS public.assinaturas (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id          UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   nome             TEXT NOT NULL,
@@ -137,7 +139,7 @@ CREATE TABLE assinaturas (
 -- AGENDA
 -- ══════════════════════════════════════════════════════════════════════════════
 
-CREATE TABLE compromissos (
+CREATE TABLE IF NOT EXISTS public.compromissos (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   titulo      TEXT NOT NULL,
@@ -155,7 +157,7 @@ CREATE TABLE compromissos (
 -- SAÚDE / DIETA
 -- ══════════════════════════════════════════════════════════════════════════════
 
-CREATE TABLE registros_peso (
+CREATE TABLE IF NOT EXISTS public.registros_peso (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   peso        DECIMAL(5,2) NOT NULL,
@@ -164,7 +166,7 @@ CREATE TABLE registros_peso (
   UNIQUE(user_id, data)
 );
 
-CREATE TABLE refeicoes (
+CREATE TABLE IF NOT EXISTS public.refeicoes (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id          UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   tipo             TEXT CHECK (tipo IN ('cafe','lanche_manha','almoco','lanche_tarde','jantar','ceia')) NOT NULL,
@@ -176,12 +178,14 @@ CREATE TABLE refeicoes (
   total_gordura    DECIMAL(6,2) DEFAULT 0
 );
 
-CREATE TABLE registros_agua (
+CREATE TABLE IF NOT EXISTS public.registros_agua (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id       UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   data          DATE NOT NULL DEFAULT CURRENT_DATE,
-  copos_bebidos INTEGER DEFAULT 0,
-  meta_copos    INTEGER DEFAULT 8,
+  quantidade_ml INTEGER NOT NULL DEFAULT 0,
+  meta_ml       INTEGER NOT NULL DEFAULT 2500,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, data)
 );
 
@@ -189,7 +193,7 @@ CREATE TABLE registros_agua (
 -- MEDICAMENTOS
 -- ══════════════════════════════════════════════════════════════════════════════
 
-CREATE TABLE medicamentos (
+CREATE TABLE IF NOT EXISTS public.medicamentos (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id         UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   nome            TEXT NOT NULL,
@@ -202,7 +206,7 @@ CREATE TABLE medicamentos (
   created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE registro_medicamentos (
+CREATE TABLE IF NOT EXISTS public.registro_medicamentos (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   medicamento_id UUID NOT NULL REFERENCES medicamentos(id) ON DELETE CASCADE,
   user_id        UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
@@ -214,14 +218,14 @@ CREATE TABLE registro_medicamentos (
 -- COMPRAS
 -- ══════════════════════════════════════════════════════════════════════════════
 
-CREATE TABLE listas_compras (
+CREATE TABLE IF NOT EXISTS public.listas_compras (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   nome       TEXT NOT NULL DEFAULT 'Lista de Compras',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE itens_compras (
+CREATE TABLE IF NOT EXISTS public.itens_compras (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   lista_id        UUID NOT NULL REFERENCES listas_compras(id) ON DELETE CASCADE,
   nome            TEXT NOT NULL,
@@ -236,7 +240,7 @@ CREATE TABLE itens_compras (
 -- VEÍCULO
 -- ══════════════════════════════════════════════════════════════════════════════
 
-CREATE TABLE veiculos (
+CREATE TABLE IF NOT EXISTS public.veiculos (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   modelo     TEXT NOT NULL,
@@ -246,7 +250,7 @@ CREATE TABLE veiculos (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE manutencoes (
+CREATE TABLE IF NOT EXISTS public.manutencoes (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   veiculo_id          UUID NOT NULL REFERENCES veiculos(id) ON DELETE CASCADE,
   tipo                TEXT NOT NULL,
@@ -261,7 +265,7 @@ CREATE TABLE manutencoes (
 -- GAMIFICAÇÃO
 -- ══════════════════════════════════════════════════════════════════════════════
 
-CREATE TABLE scores_diarios (
+CREATE TABLE IF NOT EXISTS public.scores_diarios (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id             UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   data                DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -274,7 +278,7 @@ CREATE TABLE scores_diarios (
   UNIQUE(user_id, data)
 );
 
-CREATE TABLE conquistas (
+CREATE TABLE IF NOT EXISTS public.conquistas (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id        UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   tipo           TEXT NOT NULL,
@@ -288,25 +292,25 @@ CREATE TABLE conquistas (
 -- ÍNDICES
 -- ══════════════════════════════════════════════════════════════════════════════
 
-CREATE INDEX idx_treinos_user          ON treinos(user_id);
-CREATE INDEX idx_exercicios_treino     ON exercicios(treino_id);
-CREATE INDEX idx_sessoes_user_data     ON sessoes_treino(user_id, data);
-CREATE INDEX idx_habitos_user          ON habitos(user_id);
-CREATE INDEX idx_reg_hab_user_data     ON registros_habito(user_id, data);
-CREATE INDEX idx_transacoes_user_data  ON transacoes(user_id, data);
-CREATE INDEX idx_refeicoes_user_data   ON refeicoes(user_id, data);
-CREATE INDEX idx_compromissos_user     ON compromissos(user_id, data_inicio);
-CREATE INDEX idx_scores_user_data      ON scores_diarios(user_id, data);
-CREATE INDEX idx_series_sessao         ON series_realizadas(sessao_id);
-CREATE INDEX idx_reg_med_user          ON registro_medicamentos(user_id, data_hora);
-CREATE INDEX idx_medicamentos_user     ON medicamentos(user_id);
-CREATE INDEX idx_veiculos_user         ON veiculos(user_id);
-CREATE INDEX idx_listas_compras_user   ON listas_compras(user_id);
-CREATE INDEX idx_itens_lista           ON itens_compras(lista_id);
-CREATE INDEX idx_assinaturas_user      ON assinaturas(user_id);
-CREATE INDEX idx_conquistas_user       ON conquistas(user_id);
-CREATE INDEX idx_registros_peso_user   ON registros_peso(user_id, data);
-CREATE INDEX idx_registros_agua_user   ON registros_agua(user_id, data);
+CREATE INDEX IF NOT EXISTS idx_treinos_user          ON treinos(user_id);
+CREATE INDEX IF NOT EXISTS idx_exercicios_treino     ON exercicios(treino_id);
+CREATE INDEX IF NOT EXISTS idx_sessoes_user_data     ON sessoes_treino(user_id, data);
+CREATE INDEX IF NOT EXISTS idx_habitos_user          ON habitos(user_id);
+CREATE INDEX IF NOT EXISTS idx_reg_hab_user_data     ON registros_habito(user_id, data);
+CREATE INDEX IF NOT EXISTS idx_transacoes_user_data  ON transacoes(user_id, data);
+CREATE INDEX IF NOT EXISTS idx_refeicoes_user_data   ON refeicoes(user_id, data);
+CREATE INDEX IF NOT EXISTS idx_compromissos_user     ON compromissos(user_id, data_inicio);
+CREATE INDEX IF NOT EXISTS idx_scores_user_data      ON scores_diarios(user_id, data);
+CREATE INDEX IF NOT EXISTS idx_series_sessao         ON series_realizadas(sessao_id);
+CREATE INDEX IF NOT EXISTS idx_reg_med_user          ON registro_medicamentos(user_id, data_hora);
+CREATE INDEX IF NOT EXISTS idx_medicamentos_user     ON medicamentos(user_id);
+CREATE INDEX IF NOT EXISTS idx_veiculos_user         ON veiculos(user_id);
+CREATE INDEX IF NOT EXISTS idx_listas_compras_user   ON listas_compras(user_id);
+CREATE INDEX IF NOT EXISTS idx_itens_lista           ON itens_compras(lista_id);
+CREATE INDEX IF NOT EXISTS idx_assinaturas_user      ON assinaturas(user_id);
+CREATE INDEX IF NOT EXISTS idx_conquistas_user       ON conquistas(user_id);
+CREATE INDEX IF NOT EXISTS idx_registros_peso_user   ON registros_peso(user_id, data);
+CREATE INDEX IF NOT EXISTS idx_registros_agua_user   ON registros_agua(user_id, data);
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- ROW LEVEL SECURITY
@@ -339,105 +343,67 @@ ALTER TABLE conquistas             ENABLE ROW LEVEL SECURITY;
 -- ══════════════════════════════════════════════════════════════════════════════
 
 -- Profiles: usuário acessa apenas seu próprio perfil
-CREATE POLICY "users_own_profile" ON profiles
-  FOR ALL USING (auth.uid() = id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'profiles' AND policyname = 'users_own_profile'
+  ) THEN
+    CREATE POLICY "users_own_profile" ON profiles
+      FOR ALL USING (auth.uid() = id);
+  END IF;
+END $$;
 
 -- Tabelas com user_id direto
-CREATE POLICY "users_own_data" ON treinos
-  FOR ALL USING (auth.uid() = user_id);
+DO $$
+DECLARE
+  t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'treinos', 'sessoes_treino', 'habitos', 'registros_habito', 'transacoes',
+    'assinaturas', 'compromissos', 'registros_peso', 'refeicoes', 'registros_agua',
+    'medicamentos', 'registro_medicamentos', 'listas_compras', 'veiculos',
+    'scores_diarios', 'conquistas'
+  ] LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = t AND policyname = 'users_own_data'
+    ) THEN
+      EXECUTE format('CREATE POLICY "users_own_data" ON public.%I FOR ALL USING (auth.uid() = user_id)', t);
+    END IF;
+  END LOOP;
+END $$;
 
-CREATE POLICY "users_own_data" ON sessoes_treino
-  FOR ALL USING (auth.uid() = user_id);
-
-CREATE POLICY "users_own_data" ON habitos
-  FOR ALL USING (auth.uid() = user_id);
-
-CREATE POLICY "users_own_data" ON registros_habito
-  FOR ALL USING (auth.uid() = user_id);
-
-CREATE POLICY "users_own_data" ON transacoes
-  FOR ALL USING (auth.uid() = user_id);
-
-CREATE POLICY "users_own_data" ON assinaturas
-  FOR ALL USING (auth.uid() = user_id);
-
-CREATE POLICY "users_own_data" ON compromissos
-  FOR ALL USING (auth.uid() = user_id);
-
-CREATE POLICY "users_own_data" ON registros_peso
-  FOR ALL USING (auth.uid() = user_id);
-
-CREATE POLICY "users_own_data" ON refeicoes
-  FOR ALL USING (auth.uid() = user_id);
-
-CREATE POLICY "users_own_data" ON registros_agua
-  FOR ALL USING (auth.uid() = user_id);
-
-CREATE POLICY "users_own_data" ON medicamentos
-  FOR ALL USING (auth.uid() = user_id);
-
-CREATE POLICY "users_own_data" ON registro_medicamentos
-  FOR ALL USING (auth.uid() = user_id);
-
-CREATE POLICY "users_own_data" ON listas_compras
-  FOR ALL USING (auth.uid() = user_id);
-
-CREATE POLICY "users_own_data" ON veiculos
-  FOR ALL USING (auth.uid() = user_id);
-
-CREATE POLICY "users_own_data" ON scores_diarios
-  FOR ALL USING (auth.uid() = user_id);
-
-CREATE POLICY "users_own_data" ON conquistas
-  FOR ALL USING (auth.uid() = user_id);
-
--- Tabelas filhas (sem user_id direto — acessam via JOIN com tabela pai)
-
--- Exercícios: acesso via treino do usuário
-CREATE POLICY "users_own_exercicios" ON exercicios
-  FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM treinos
-      WHERE treinos.id = exercicios.treino_id
-        AND treinos.user_id = auth.uid()
-    )
-  );
-
--- Séries realizadas: acesso via sessão do usuário
-CREATE POLICY "users_own_series" ON series_realizadas
-  FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM sessoes_treino
-      WHERE sessoes_treino.id = series_realizadas.sessao_id
-        AND sessoes_treino.user_id = auth.uid()
-    )
-  );
-
--- Itens de compras: acesso via lista do usuário
-CREATE POLICY "users_own_itens_compras" ON itens_compras
-  FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM listas_compras
-      WHERE listas_compras.id = itens_compras.lista_id
-        AND listas_compras.user_id = auth.uid()
-    )
-  );
-
--- Manutenções: acesso via veículo do usuário
-CREATE POLICY "users_own_manutencoes" ON manutencoes
-  FOR ALL USING (
-    EXISTS (
-      SELECT 1 FROM veiculos
-      WHERE veiculos.id = manutencoes.veiculo_id
-        AND veiculos.user_id = auth.uid()
-    )
-  );
+-- Tabelas filhas (sem user_id direto — acessam via JOIN com tabela pai):
+-- exercícios via treino, séries via sessão, itens via lista, manutenções via veículo
+DO $$
+DECLARE
+  p TEXT[];
+BEGIN
+  FOREACH p SLICE 1 IN ARRAY ARRAY[
+    ['exercicios', 'users_own_exercicios',
+     'EXISTS (SELECT 1 FROM public.treinos WHERE treinos.id = exercicios.treino_id AND treinos.user_id = auth.uid())'],
+    ['series_realizadas', 'users_own_series',
+     'EXISTS (SELECT 1 FROM public.sessoes_treino WHERE sessoes_treino.id = series_realizadas.sessao_id AND sessoes_treino.user_id = auth.uid())'],
+    ['itens_compras', 'users_own_itens_compras',
+     'EXISTS (SELECT 1 FROM public.listas_compras WHERE listas_compras.id = itens_compras.lista_id AND listas_compras.user_id = auth.uid())'],
+    ['manutencoes', 'users_own_manutencoes',
+     'EXISTS (SELECT 1 FROM public.veiculos WHERE veiculos.id = manutencoes.veiculo_id AND veiculos.user_id = auth.uid())']
+  ] LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = p[1] AND policyname = p[2]
+    ) THEN
+      EXECUTE format('CREATE POLICY %I ON public.%I FOR ALL USING (%s)', p[2], p[1], p[3]);
+    END IF;
+  END LOOP;
+END $$;
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- AGENTE IA
 -- ══════════════════════════════════════════════════════════════════════════════
 
-CREATE TABLE notificacoes_agente (
+CREATE TABLE IF NOT EXISTS public.notificacoes_agente (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   tipo        TEXT CHECK (tipo IN ('alerta','aviso','sucesso','info')) NOT NULL,
@@ -450,7 +416,7 @@ CREATE TABLE notificacoes_agente (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE chat_agente (
+CREATE TABLE IF NOT EXISTS public.chat_agente (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   role        TEXT CHECK (role IN ('user','agent')) NOT NULL,
@@ -460,7 +426,7 @@ CREATE TABLE chat_agente (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE acoes_agente (
+CREATE TABLE IF NOT EXISTS public.acoes_agente (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   tipo        TEXT NOT NULL,
@@ -470,7 +436,7 @@ CREATE TABLE acoes_agente (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE preferencias_agente (
+CREATE TABLE IF NOT EXISTS public.preferencias_agente (
   user_id               UUID PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
   notif_faltou_treino   BOOLEAN DEFAULT TRUE,
   notif_habito_pendente BOOLEAN DEFAULT TRUE,
@@ -496,8 +462,16 @@ BEGIN
   );
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'on_auth_user_created' AND tgrelid = 'auth.users'::regclass
+  ) THEN
+    CREATE TRIGGER on_auth_user_created
+      AFTER INSERT ON auth.users
+      FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+  END IF;
+END $$;

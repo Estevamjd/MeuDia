@@ -34,8 +34,9 @@
 --         conquistas             | badges
 --
 --         Sem RENAME: só CREATE TABLE IF NOT EXISTS com os nomes canônicos.
---         Pendente: conferir no banco se as colunas de registros_agua batem
---         com a definição abaixo (CREATE IF NOT EXISTS não altera tabela viva).
+--         registros_agua segue as colunas do banco real: quantidade_ml,
+--         meta_ml (2500), created_at, updated_at (copos_bebidos/meta_copos
+--         descartados; a UI converte com AGUA.ML_POR_COPO = 250 em @meudia/shared).
 --
 -- GAP-03  schema.sql repete as tabelas do agente (002), mas sem índices, sem
 --         ENABLE RLS e sem policies -> rodar só o schema.sql deixa essas
@@ -43,21 +44,27 @@
 --
 -- GAP-04  003 (notas): FK para auth.users (as demais apontam para profiles),
 --         default extensions.uuid_generate_v4() (as demais usam
---         gen_random_uuid()), coluna updated_at sem trigger de atualização,
---         policies por comando com nomes próprios (não users_own_data).
+--         gen_random_uuid()), policies por comando com nomes próprios (não
+--         users_own_data). [RESOLVIDO] updated_at agora tem trigger
+--         trg_notas_updated_at -> public.set_updated_at() (seção TRIGGERS).
 --
 -- GAP-05  004 cria policies "Users can insert own <tabela>" (FOR INSERT), que
 --         são redundantes com users_own_data FOR ALL (USING vale como
 --         WITH CHECK). [RESOLVIDO] 004 agora usa os nomes canônicos. Aqui cada
 --         policy só é criada se a tabela (e a coluna) existirem.
 --
--- GAP-06  [RESOLVIDO] Sem tabelas alternativas: RLS e users_own_data são
---         aplicados a todas as tabelas canônicas.
+-- GAP-06  [RESOLVIDO] Sem tabelas alternativas: ENABLE RLS em todas as tabelas
+--         canônicas; users_own_data em todas com user_id direto.
+--         registros_agua (já existe no banco) tem bloco próprio: cria
+--         users_own_data FOR ALL se faltar e, se ainda assim SELECT/UPDATE/
+--         DELETE não estiverem cobertos por policy permissiva com auth.uid() e
+--         user_id, cria users_own_data_<cmd>. Nada existente é alterado.
 --
--- GAP-07  handle_new_user(): SECURITY DEFINER sem `SET search_path`
---         (o advisor do Supabase acusa). Mantido igual ao schema.sql. Atenção:
---         CREATE OR REPLACE sobrescreve o corpo da função se ela já existir no
---         banco com outra definição.
+-- GAP-07  [RESOLVIDO] handle_new_user(): SECURITY DEFINER com
+--         `SET search_path = ''` (nomes qualificados com public.). schema.sql
+--         ainda tem a versão antiga, sem search_path. Atenção: CREATE OR
+--         REPLACE sobrescreve o corpo da função se ela já existir no banco com
+--         outra definição.
 --
 -- GAP-08  Policies que já existem com o mesmo nome NÃO são alteradas, mesmo que
 --         a definição no banco seja outra. Comparar com pg_policies depois.
@@ -239,8 +246,10 @@ CREATE TABLE IF NOT EXISTS public.registros_agua (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id       UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   data          DATE NOT NULL DEFAULT CURRENT_DATE,
-  copos_bebidos INTEGER DEFAULT 0,
-  meta_copos    INTEGER DEFAULT 8,
+  quantidade_ml INTEGER NOT NULL DEFAULT 0,
+  meta_ml       INTEGER NOT NULL DEFAULT 2500,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, data)
 );
 
@@ -491,7 +500,7 @@ DECLARE
 BEGIN
   FOREACH t IN ARRAY ARRAY[
     'treinos', 'sessoes_treino', 'habitos', 'registros_habito', 'transacoes',
-    'assinaturas', 'compromissos', 'registros_peso', 'refeicoes', 'registros_agua',
+    'assinaturas', 'compromissos', 'registros_peso', 'refeicoes',
     'medicamentos', 'registro_medicamentos', 'listas_compras', 'veiculos',
     'scores_diarios', 'conquistas',
     'notificacoes_agente', 'chat_agente', 'acoes_agente', 'preferencias_agente'
@@ -505,6 +514,43 @@ BEGIN
       EXECUTE format(
         'CREATE POLICY "users_own_data" ON public.%I FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id)',
         t
+      );
+    END IF;
+  END LOOP;
+END $$;
+
+-- registros_agua (GAP-06): a tabela já existe no banco real, com policies que
+-- podem não cobrir todos os comandos. Garante users_own_data FOR ALL e, se
+-- SELECT/UPDATE/DELETE seguirem sem policy permissiva por user_id, cria uma
+-- por comando. Idempotente; não altera nem remove policies existentes.
+DO $$
+DECLARE
+  c TEXT;
+BEGIN
+  IF to_regclass('public.registros_agua') IS NULL THEN
+    RAISE NOTICE '[baseline] public.registros_agua ausente — policies puladas';
+    RETURN;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'registros_agua' AND policyname = 'users_own_data'
+  ) THEN
+    CREATE POLICY "users_own_data" ON public.registros_agua
+      FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+  END IF;
+
+  FOREACH c IN ARRAY ARRAY['SELECT', 'UPDATE', 'DELETE'] LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = 'registros_agua'
+        AND permissive = 'PERMISSIVE' AND cmd IN (c, 'ALL')
+        AND qual LIKE '%auth.uid()%' AND qual LIKE '%user_id%'
+    ) THEN
+      EXECUTE format(
+        'CREATE POLICY %I ON public.registros_agua FOR %s USING (auth.uid() = user_id)%s',
+        'users_own_data_' || lower(c), c,
+        CASE WHEN c = 'UPDATE' THEN ' WITH CHECK (auth.uid() = user_id)' ELSE '' END
       );
     END IF;
   END LOOP;
@@ -644,5 +690,31 @@ BEGIN
     CREATE TRIGGER on_auth_user_created
       AFTER INSERT ON auth.users
       FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+  END IF;
+END $$;
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- TRIGGERS: updated_at (GAP-04)
+-- ══════════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SET search_path = '';
+
+DO $$
+BEGIN
+  IF to_regclass('public.notas') IS NULL THEN
+    RAISE NOTICE '[baseline] public.notas ausente — trigger updated_at pulado';
+  ELSIF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'trg_notas_updated_at' AND tgrelid = 'public.notas'::regclass
+  ) THEN
+    CREATE TRIGGER trg_notas_updated_at
+      BEFORE UPDATE ON public.notas
+      FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
   END IF;
 END $$;

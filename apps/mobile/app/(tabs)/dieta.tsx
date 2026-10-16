@@ -2,6 +2,7 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } 
 import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { dietaService } from '@meudia/api';
+import { AGUA } from '@meudia/shared';
 import { format } from 'date-fns';
 import { useAuth } from '../../hooks/useAuth';
 import { ScreenHeader } from '../../components/ui/ScreenHeader';
@@ -41,7 +42,8 @@ export default function DietaScreen() {
     setRefreshing(false);
   }, [refetch]);
 
-  const aguaTotal = (agua as { total?: number })?.total ?? 0;
+  const aguaTotal = agua?.quantidade_ml ?? 0;
+  const aguaMeta = agua?.meta_ml ?? AGUA.META_ML_PADRAO;
 
   return (
     <View style={styles.container}>
@@ -59,18 +61,18 @@ export default function DietaScreen() {
           <View style={styles.aguaRow}>
             <View>
               <Text style={styles.aguaValue}>{aguaTotal}ml</Text>
-              <Text style={styles.aguaMeta}>Meta: 2000ml</Text>
+              <Text style={styles.aguaMeta}>Meta: {aguaMeta}ml</Text>
             </View>
             <TouchableOpacity
               style={styles.aguaButton}
               onPress={() => registrarAgua.mutate()}
               activeOpacity={0.7}
             >
-              <Text style={styles.aguaButtonText}>+250ml</Text>
+              <Text style={styles.aguaButtonText}>+{AGUA.ML_POR_COPO}ml</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${Math.min((aguaTotal / 2000) * 100, 100)}%` }]} />
+            <View style={[styles.progressFill, { width: `${aguaMeta > 0 ? Math.min((aguaTotal / aguaMeta) * 100, 100) : 0}%` }]} />
           </View>
         </Card>
 
