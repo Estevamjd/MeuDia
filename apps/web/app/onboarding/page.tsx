@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { createClient } from '../../lib/supabase/client';
 import { useAuth } from '../../hooks/useAuth';
 import { Button } from '../../components/ui/Button';
@@ -11,7 +12,13 @@ import { StepModulos } from './StepModulos';
 import { StepFinancas } from './StepFinancas';
 import { useAppMode } from '../../components/AppModeProvider';
 import { rotaInicial } from '../../lib/app-mode';
-import type { Objetivo } from '@meudia/shared';
+import {
+  MENSAGEM_ERRO_ONBOARDING,
+  aplicarOnboardingNoCache,
+  montarPerfilOnboarding,
+  profileKey,
+} from '../../lib/onboarding';
+import type { Objetivo, Profile } from '@meudia/shared';
 
 export interface OnboardingData {
   objetivo: Objetivo | null;
@@ -35,6 +42,7 @@ const defaultData: OnboardingData = {
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { user, loading: authLoading } = useAuth();
   const mode = useAppMode();
   const modoFinancas = mode === 'financas';
@@ -44,6 +52,7 @@ export default function OnboardingPage() {
     ...defaultData,
   });
   const [saving, setSaving] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
 
   // Quando o user carregar, preencher o nome
   useEffect(() => {
@@ -58,7 +67,7 @@ export default function OnboardingPage() {
   // Redirecionar para login se não estiver autenticado
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/login');
+      router.replace('/login');
     }
   }, [authLoading, user, router]);
 
@@ -66,52 +75,36 @@ export default function OnboardingPage() {
     setData((prev) => ({ ...prev, ...partial }));
   };
 
-  const handleFinish = async () => {
+  const concluir = async (pular: boolean) => {
     if (!user) {
-      router.push('/login');
+      router.replace('/login');
       return;
     }
+    if (saving) return;
     setSaving(true);
+    setErro(null);
 
-    // Modo Finanças: só nome; sem campos de saúde.
-    const { error } = await supabase
-      .from('profiles')
-      .update(
-        modoFinancas
-          ? { nome: data.nome || undefined, onboarding_feito: true }
-          : {
-              nome: data.nome || undefined,
-              objetivo: data.objetivo,
-              peso_atual: data.peso_atual ? parseFloat(data.peso_atual) : null,
-              altura: data.altura ? parseFloat(data.altura) : null,
-              meta_peso: data.meta_peso ? parseFloat(data.meta_peso) : null,
-              meta_calorias: data.meta_calorias,
-              onboarding_feito: true,
-            },
-      )
-      .eq('id', user.id);
+    // Upsert: cria a linha se o perfil não existir (senão o dashboard voltaria para cá).
+    const perfil = montarPerfilOnboarding(user, data, { modoFinancas, pular });
+    const { error } = await supabase.from('profiles').upsert(perfil, { onConflict: 'id' });
 
-    setSaving(false);
-    if (!error) {
-      router.push(modoFinancas ? '/financas/orcamento' : '/inicio');
-      router.refresh();
-    }
-  };
-
-  const handleSkip = async () => {
-    if (!user) {
-      router.push('/login');
+    if (error) {
+      setSaving(false);
+      setErro(MENSAGEM_ERRO_ONBOARDING);
       return;
     }
-    setSaving(true);
-    await supabase
-      .from('profiles')
-      .update({ onboarding_feito: true })
-      .eq('id', user.id);
-    setSaving(false);
-    router.push(rotaInicial(mode));
+
+    // Atualiza o cache antes de navegar: o layout do dashboard lê ['profile', id].
+    const key = profileKey(user.id);
+    queryClient.setQueryData<Profile | null>(key, (old) => aplicarOnboardingNoCache(old, perfil));
+    void queryClient.invalidateQueries({ queryKey: key });
+    // replace: o "voltar" não retorna ao onboarding. `saving` segue true até a troca de rota.
+    router.replace(rotaInicial(mode));
     router.refresh();
   };
+
+  const handleFinish = () => concluir(false);
+  const handleSkip = () => concluir(true);
 
   // Mostrar loading enquanto verifica autenticação
   if (authLoading) {
@@ -157,7 +150,7 @@ export default function OnboardingPage() {
           <div className="mt-8 flex items-center justify-between">
             <button
               onClick={handleSkip}
-              className="text-sm text-muted transition-colors hover:text-text"
+              className="text-sm text-muted transition-colors hover:text-text disabled:pointer-events-none disabled:opacity-50"
               disabled={saving}
             >
               Pular por agora
@@ -178,6 +171,12 @@ export default function OnboardingPage() {
               )}
             </div>
           </div>
+
+          {erro && (
+            <p role="alert" className="mt-4 text-center text-sm text-red">
+              {erro}
+            </p>
+          )}
 
           {!modoFinancas && step === ultimoPasso && (
             <p className="mt-3 text-center text-xs text-muted">
