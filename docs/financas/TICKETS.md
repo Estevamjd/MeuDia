@@ -30,37 +30,37 @@ Validar o baseline num Postgres/Supabase **local e descartável** e escrever `do
 - [ ] Nenhuma alteração em banco remoto.
 
 ### BE-01 — Utilitário de datas em `@meudia/shared`
-`hojeSP`, `vencimentoNoMes`, `proximoVencimento`, `diasAte`, `competenciaDe`, `etapaLembrete` (SPEC 5.1).
+`hojeSP`, `vencimentoNoMes`, `proximoVencimento`, `diasAte`, `competenciaDe` (`yyyy-MM`), `etapaLembrete` (SPEC 5.1).
 **Aceite**
 - [ ] Funções puras exportadas, com testes: dia 31 em fev (normal e bissexto), dia 30 em abr, vence hoje (=0), virada de mês e de ano, `etapaLembrete` para 3/2/1/0/-1 dias.
 - [ ] `hojeSP()` com relógio fixo em 02:00 UTC devolve o dia anterior.
 - [ ] Nenhum `new Date(ano, mes, dia)` com dia > último dia do mês.
 
 ### BE-02 — Migration `005_financas.sql` + tipos
-`contas_pagar` (ocorrências do mês + contas únicas), colunas novas em `assinaturas` (`categoria`, `recorrencia`, `mes_vencimento`), `rendas`, `orcamento_categorias`, `push_subscriptions`, `lembretes_enviados`, RLS, triggers `updated_at`, RPCs `pagar_conta` e `desfazer_pagamento` (SPEC 4 e 4.1).
+`contas_pagar` (definição recorrente/única, sem status por mês), `pagamentos_conta` (um por competência `YYYY-MM`), `rendas`, `orcamento_categorias`, `push_subscriptions`, `lembretes_enviados` (por competência), RLS, triggers `updated_at`, RPCs `pagar_conta(p_conta_id, p_competencia, ...)` e `desfazer_pagamento(p_conta_id, p_competencia)` (SPEC 4 e 4.1).
 **Aceite**
-- [ ] Idempotente (`IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`, constraints/policies/triggers em DO block, `CREATE OR REPLACE FUNCTION`); roda 2x no banco local.
-- [ ] **FK composta `(id, user_id)`**: `UNIQUE (id, user_id)` em `assinaturas`, `transacoes` e `contas_pagar`; `contas_pagar(assinatura_id, user_id)` e `(transacao_id, user_id)` com `ON DELETE SET NULL (coluna)`; `lembretes_enviados(conta_id, user_id)` com `ON DELETE CASCADE`. Teste: referenciar assinatura/transação de outro usuário falha.
-- [ ] Índice único `lembretes_enviados(conta_id, competencia, etapa, canal)` e parcial `contas_pagar(assinatura_id, competencia)`.
-- [ ] RPCs `SECURITY INVOKER`, `SET search_path = public`, `FOR UPDATE`; `pagar_conta` em conta não pendente e `desfazer_pagamento` em conta não paga → `RAISE EXCEPTION`; pagar + desfazer volta ao estado inicial sem transação órfã.
-- [ ] RLS: A não lê/paga conta de B; usuário só lê `lembretes_enviados`.
+- [ ] Idempotente (`IF NOT EXISTS`, constraints/policies/triggers em DO block, `CREATE OR REPLACE FUNCTION`); roda 2x no banco local.
+- [ ] **FK composta `(id, user_id)`**: `UNIQUE (id, user_id)` em `assinaturas`, `transacoes` e `contas_pagar`; `contas_pagar(assinatura_id, user_id)` e `pagamentos_conta(transacao_id, user_id)` com `ON DELETE SET NULL (coluna)`; `pagamentos_conta(conta_id, user_id)` e `lembretes_enviados(conta_id, user_id)` com `ON DELETE CASCADE`. Teste: referenciar assinatura/conta/transação de outro usuário falha.
+- [ ] `UNIQUE (conta_id, competencia)` em `pagamentos_conta`; único `lembretes_enviados(conta_id, competencia, etapa, canal)`; parcial `contas_pagar(assinatura_id)`; CHECK regex `^[0-9]{4}-(0[1-9]|1[0-2])$` nas duas `competencia`; CHECK de coerência recorrência × campos de vencimento.
+- [ ] RPCs `SECURITY INVOKER`, `SET search_path = public`, `FOR UPDATE`; `pagar_conta` em competência já paga ou inválida para a recorrência e `desfazer_pagamento` em competência sem pagamento → `RAISE EXCEPTION`; pagar + desfazer volta ao estado inicial sem transação órfã; pagar `2026-10` não marca `2026-11`.
+- [ ] RLS: A não lê/paga conta de B nem lê `pagamentos_conta` de B; usuário só lê `lembretes_enviados`.
 - [ ] `005_financas_down.sql` correspondente.
 - [ ] Tipos e constantes de SPEC 8 em `@meudia/shared`. Não aplicada em banco remoto.
 
 ### BE-03 — Validators + repositories
-`contas-pagar`, `rendas`, `orcamento`, `push-subscriptions`, `lembretes-enviados`.
+`contas-pagar`, `pagamentos-conta`, `rendas`, `orcamento`, `push-subscriptions`, `lembretes-enviados`.
 **Aceite**
-- [ ] Validators exportados em `validators/index.ts`, com testes (valor ≤ 0, data inválida, `anual` sem `mes_vencimento`, endpoint não-https).
+- [ ] Validators exportados em `validators/index.ts`, com testes (valor ≤ 0, data inválida, competência `2026-13`/`2026-1` inválida, `anual` sem `mes_vencimento`, `unica` sem `data_vencimento`, endpoint não-https).
 - [ ] Repositories exportados; **toda query filtra `user_id`** (exceto as de uso do cron, explicitamente nomeadas `*ParaCron` e recebendo o client admin); erros → `AppError(..., 'DB_ERROR')`.
-- [ ] `upsertOcorrencias` usa `onConflict: 'assinatura_id,competencia'` + `ignoreDuplicates: true`; `reservarLembrete` usa insert com `ignoreDuplicates` e informa se reservou.
-- [ ] `rpcPagar`/`rpcDesfazer` chamam `supabase.rpc(...)`.
+- [ ] `pagamentosContaRepository.findByCompetencia(userId, competencia)` e `findByConta(userId, contaId)`; `reservarLembrete` usa insert com `ignoreDuplicates` e informa se reservou.
+- [ ] `rpcPagar(contaId, competencia, ...)`/`rpcDesfazer(contaId, competencia)` chamam `supabase.rpc(...)`.
 
 ### BE-04 — Service de contas
-`gerarContasDoMes` (mensal/anual), `listarContasDoMes`, `criarContaUnica`, `atualizarConta`, `cancelarConta`, `pagarConta`, `desfazerPagamento` (SPEC 5.2).
+`listarContasDoMes`, `obterContaDoMes`, `criarConta`, `atualizarConta`, `desativarConta`, `pagarConta`, `desfazerPagamento` (SPEC 5.2), com `ocorrenciaDaConta` pura em `@meudia/shared`.
 **Aceite**
-- [ ] `listarContasDoMes` 2x não duplica; anual só no `mes_vencimento`; nada antes do `created_at`.
-- [ ] Status `vencida` derivado no retorno, sem gravar.
-- [ ] `cancelarConta` em conta paga → `AppError('...', 'VALIDATION_ERROR')`.
+- [ ] Ocorrências derivadas (nada gravado por mês): anual só no `mes_vencimento`; única só na sua competência; nada antes do `created_at`; dia 31 em fev → último dia.
+- [ ] `situacao` (`pendente/vencida/paga`) derivada de `pagamentos_conta` + `hojeSP()`, sem gravar; pagamento de uma competência não afeta outra.
+- [ ] `desativarConta` → `ativo=false`, histórico preservado; conta inativa some das competências sem pagamento.
 - [ ] Testes com repository mockado e `hoje` injetado.
 
 ### BE-05 — Rendas, orçamento, dashboard e selo
@@ -74,14 +74,13 @@ Validar o baseline num Postgres/Supabase **local e descartável** e escrever `do
 **Aceite**
 - [ ] `proximoVencimento` usa o util do BE-01 e inclui a que vence hoje.
 - [ ] `assinatura.repository.ts › findById/update/remove` recebem `userId` e filtram; callers atualizados.
-- [ ] `assinaturaInsertSchema` aceita `categoria`, `recorrencia`, `mes_vencimento` (obrigatório se anual).
-- [ ] Desativar → ocorrências `pendente` futuras viram `cancelada`; mudar valor/categoria → atualiza só as `pendente` futuras.
+- [ ] Espelho em `contas_pagar` (`assinatura_id`, `recorrencia='mensal'`, `categoria='Assinaturas'`): criar/editar assinatura faz upsert da conta; ativar/desativar espelha `ativo`. Pagamentos já feitos não mudam.
 
 ### BE-07 — Web Push server + rota de cron
 `lembretes.service.ts › enviarLembretesDoDia`, `POST/DELETE /api/push/subscribe`, `GET /api/cron/lembretes` (SPEC 5.3, 6, 7).
 **Aceite**
 - [ ] Rota de cron: 401 sem `Authorization: Bearer ${CRON_SECRET}`; usa `hojeSP()`; service role só no servidor.
-- [ ] Reserva em `lembretes_enviados` **antes** de enviar; 2 execuções no mesmo dia → 0 envios na 2ª; conta paga/cancelada → 0 envios; D-2/D-1/D0 com os textos de `LEMBRETE_TEXTOS`.
+- [ ] Reserva em `lembretes_enviados` **antes** de enviar; 2 execuções no mesmo dia → 0 envios na 2ª; conta paga na competência ou inativa → 0 envios; competência seguinte volta a lembrar; URL com `?competencia=`; D-2/D-1/D0 com os textos de `LEMBRETE_TEXTOS`.
 - [ ] 404/410 remove a inscrição; logs sem endpoint, chaves ou dados pessoais.
 - [ ] `web-push` com VAPID lido de env (sem fallback hardcoded); sender injetável nos testes.
 - [ ] **Sem criar job real**: o PR descreve o trecho `crons` (`0 12 * * *`) para o `vercel.json` e a alternativa `pg_cron`; não habilitar.
@@ -105,10 +104,10 @@ Refocar `packages/ai/src/agent` (intenções/respostas) em finanças quando `APP
 - [ ] Testes para os dois modos.
 
 ### FE-02 — Hooks React Query
-`useContasMes`, `useConta`, `useCriarConta`, `useAtualizarConta`, `useCancelarConta`, `usePagarConta`, `useDesfazerPagamento`, `useRendas`, `useOrcamento`, `useResumoFinanceiroMes`.
+`useContasMes(competencia)`, `useContaDoMes(id, competencia)`, `useCriarConta`, `useAtualizarConta`, `useDesativarConta`, `usePagarConta`, `useDesfazerPagamento` (ambos recebem `{ contaId, competencia }`), `useRendas`, `useOrcamento`, `useResumoFinanceiroMes`.
 **Aceite**
-- [ ] Exportados no barrel de `hooks`; sem `any`; tipos de `@meudia/shared`.
-- [ ] Pagar/desfazer invalidam contas, conta, resumo financeiro, transações do mês e assinaturas.
+- [ ] Exportados no barrel de `hooks`; sem `any`; tipos de `@meudia/shared`; query keys incluem a competência.
+- [ ] Pagar/desfazer invalidam contas da competência, conta, resumo financeiro, transações do mês e assinaturas.
 
 ### FE-03 — Dashboard `/financas`
 **Aceite**
@@ -118,9 +117,9 @@ Refocar `packages/ai/src/agent` (intenções/respostas) em finanças quando `APP
 ### FE-04 — Contas: lista, cadastro e detalhe com "Paguei"
 `/financas/contas`, `/financas/contas/[id]`, ajustes em `/assinaturas`.
 **Aceite**
-- [ ] Cadastro com nome, valor, vencimento, recorrência (mensal/anual/única), categoria; validação igual ao validator.
-- [ ] Detalhe com botão grande **"Paguei"** (data default hoje, banco opcional), toast, "Desfazer"; abre direto pelo link do push.
-- [ ] `/assinaturas`: badge do mês, `isVencendoEstaSemana` substituído por `diasAte(proximoVencimento(...)) <= 7`, ações acessíveis por teclado.
+- [ ] Cadastro com nome, valor, recorrência (mensal/anual/única), vencimento conforme a recorrência (dia / dia+mês / data), categoria; validação igual ao validator; "Excluir" = desativar.
+- [ ] Detalhe `/financas/contas/[id]?competencia=YYYY-MM` (default competência atual) com botão grande **"Paguei"** daquela competência (data default hoje, banco opcional), toast, "Desfazer", histórico de pagamentos; abre direto pelo link do push.
+- [ ] `/assinaturas`: badge do mês (pagamento da conta espelhada na competência atual), `isVencendoEstaSemana` substituído por `diasAte(proximoVencimento(...)) <= 7`, ações acessíveis por teclado.
 
 ### FE-05 — Rendas e orçamento
 `/financas/orcamento`.
@@ -131,7 +130,7 @@ Refocar `packages/ai/src/agent` (intenções/respostas) em finanças quando `APP
 `sw.js` (cache `meudia-v6`, handlers `push`/`notificationclick`), botão "Ativar lembretes", tela "Como instalar no iPhone" (SPEC 6).
 **Aceite**
 - [ ] Permissão pedida só no toque; inscrição enviada a `/api/push/subscribe`; estados ativado/negado/não suportado.
-- [ ] `notificationclick` foca/abre `/financas/contas/<id>`.
+- [ ] `notificationclick` foca/abre `/financas/contas/<id>?competencia=<YYYY-MM>` (URL do payload, sem reconstruir).
 - [ ] Tela de instalação aparece fora do modo `standalone`.
 - [ ] Teste real no iPhone (iOS 16.4+, PWA instalado) registrado no PR (sem dados reais em prints).
 
