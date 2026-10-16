@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -10,6 +10,11 @@ import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { createClient } from '../../../lib/supabase/client';
 import { Input } from '../../../components/ui/Input';
 import { Button } from '../../../components/ui/Button';
+import {
+  getAuthCallbackUrl,
+  getResendErrorMessage,
+  isEmailNotConfirmedError,
+} from '../../../lib/auth/callback';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -19,10 +24,26 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const [showPassword, setShowPassword] = useState(false);
-  const [serverError, setServerError] = useState('');
+  const [serverError, setServerError] = useState(
+    searchParams.get('erro')
+      ? 'Não foi possível confirmar seu e-mail. Tente entrar ou reenviar o link.'
+      : '',
+  );
+  const [emailNaoConfirmado, setEmailNaoConfirmado] = useState('');
+  const [reenviando, setReenviando] = useState(false);
+  const [reenvioSucesso, setReenvioSucesso] = useState('');
 
   const {
     register,
@@ -32,8 +53,28 @@ export default function LoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
+  const reenviarConfirmacao = async () => {
+    if (!supabase || !emailNaoConfirmado) return;
+    setReenviando(true);
+    setServerError('');
+    setReenvioSucesso('');
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: emailNaoConfirmado,
+      options: { emailRedirectTo: getAuthCallbackUrl() },
+    });
+    setReenviando(false);
+    if (error) {
+      setServerError(getResendErrorMessage(error));
+      return;
+    }
+    setReenvioSucesso('E-mail reenviado. Verifique sua caixa de entrada e o spam.');
+  };
+
   const onSubmit = async (data: LoginForm) => {
     setServerError('');
+    setReenvioSucesso('');
+    setEmailNaoConfirmado('');
     if (!supabase) {
       setServerError('Serviço indisponível. Verifique a configuração.');
       return;
@@ -44,6 +85,11 @@ export default function LoginPage() {
     });
 
     if (error) {
+      if (isEmailNotConfirmedError(error)) {
+        setEmailNaoConfirmado(data.email);
+        setServerError('Confirme seu e-mail para entrar');
+        return;
+      }
       setServerError(
         error.message === 'Invalid login credentials'
           ? 'Email ou senha incorretos'
@@ -74,6 +120,24 @@ export default function LoginPage() {
             <div className="mb-4 rounded-lg border border-red/30 bg-red/[0.08] px-4 py-3 text-sm text-red" role="alert">
               {serverError}
             </div>
+          )}
+
+          {reenvioSucesso && (
+            <div className="mb-4 rounded-lg border border-green/30 bg-green/[0.08] px-4 py-3 text-sm text-green" role="status">
+              {reenvioSucesso}
+            </div>
+          )}
+
+          {emailNaoConfirmado && (
+            <Button
+              type="button"
+              variant="ghost"
+              isLoading={reenviando}
+              onClick={reenviarConfirmacao}
+              className="mb-4 w-full border border-border"
+            >
+              Reenviar e-mail de confirmação
+            </Button>
           )}
 
           <div className="flex flex-col gap-4">

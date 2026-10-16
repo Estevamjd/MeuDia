@@ -28,6 +28,11 @@ test.describe('Autenticação', () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
+  test('deve exibir erro de confirmação vindo do callback', async ({ page }) => {
+    await page.goto('/login?erro=confirmacao');
+    await expect(page.getByText(/Não foi possível confirmar seu e-mail/i)).toBeVisible();
+  });
+
   test('deve exibir link para registro', async ({ page }) => {
     await page.goto('/login');
     const registroLink = page.getByRole('link', { name: /criar conta|registr|cadastr/i });
