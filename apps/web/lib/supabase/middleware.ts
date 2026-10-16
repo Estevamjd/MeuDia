@@ -1,14 +1,24 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { getAppMode, redirecionamentoModo, rotaInicial } from '../app-mode';
 
 export async function updateSession(request: NextRequest) {
+  const mode = getAppMode();
+  const destino = redirecionamentoModo(request.nextUrl.pathname, mode);
   let supabaseResponse = NextResponse.next({ request });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // Sem env vars configuradas, apenas passa a request adiante
+  // Sem Supabase configurado, mantém o bloqueio dos módulos ocultos.
   if (!url || !key) {
+    if (destino) {
+      const target = request.nextUrl.clone();
+      target.pathname = destino;
+      target.search = '';
+      return NextResponse.redirect(target);
+    }
+
     return supabaseResponse;
   }
 
@@ -35,6 +45,12 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const redirect = (url: URL) => {
+    const response = NextResponse.redirect(url);
+    supabaseResponse.cookies.getAll().forEach(cookie => response.cookies.set(cookie));
+    return response;
+  };
+
   const isPublicRoute =
     request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/registro') ||
@@ -47,7 +63,7 @@ export async function updateSession(request: NextRequest) {
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
-    return NextResponse.redirect(url);
+    return redirect(url);
   }
 
   if (
@@ -57,8 +73,16 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith('/onboarding')
   ) {
     const url = request.nextUrl.clone();
-    url.pathname = '/inicio';
-    return NextResponse.redirect(url);
+    url.pathname = rotaInicial(mode);
+    return redirect(url);
+  }
+
+  // Usuários autenticados também não acessam módulos ocultos por URL direta.
+  if (user && destino) {
+    const target = request.nextUrl.clone();
+    target.pathname = destino;
+    target.search = '';
+    return redirect(target);
   }
 
   return supabaseResponse;

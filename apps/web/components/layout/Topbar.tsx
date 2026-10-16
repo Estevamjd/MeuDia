@@ -3,12 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { clsx } from 'clsx';
-
-const tabs = [
-  { label: '🏠 Início', href: '/inicio', color: 'accent' },
-  { label: '🏋️ Treinos', href: '/treinos', color: 'orange' },
-  { label: '📝 Notas', href: '/notas', color: 'green' },
-] as const;
+import { useAppMode } from '../AppModeProvider';
+import { tabsTopbar } from '../../lib/topbar';
 
 const PAGE_TITLES: Record<string, string> = {
   '/inicio': '✦ MeuDia',
@@ -17,6 +13,8 @@ const PAGE_TITLES: Record<string, string> = {
   '/agenda': '📅 Agenda',
   '/habitos': '✅ Hábitos',
   '/financas': '💰 Finanças',
+  '/financas/contas': '🧾 Contas',
+  '/financas/orcamento': '📊 Orçamento',
   '/compras': '🛒 Compras',
   '/veiculo': '🚗 Veículo',
   '/assinaturas': '💳 Assinaturas',
@@ -25,6 +23,7 @@ const PAGE_TITLES: Record<string, string> = {
 
 export function Topbar() {
   const pathname = usePathname();
+  const tabs = tabsTopbar(useAppMode());
 
   const pageTitle = PAGE_TITLES[pathname] ?? '✦ MeuDia';
 
@@ -39,13 +38,13 @@ export function Topbar() {
         paddingTop: 'env(safe-area-inset-top)',
       }}
     >
-      {/* Mobile: show page title */}
-      <div className="flex items-center py-3 md:hidden">
+      {/* Mobile (e desktop sem abas no modo): show page title */}
+      <div className={clsx('flex items-center py-3', tabs.length > 0 && 'md:hidden')}>
         <span className="font-syne text-base font-bold text-text">{pageTitle}</span>
       </div>
 
       {/* Desktop: show tabs */}
-      <div className="hidden md:flex items-center gap-1">
+      <div className={clsx('hidden items-center gap-1', tabs.length > 0 && 'md:flex')}>
         {tabs.map((tab) => {
           const isActive = pathname === tab.href || pathname.startsWith(tab.href + '/');
 

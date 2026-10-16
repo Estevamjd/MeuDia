@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
+import { useAppMode } from '../AppModeProvider';
 
 const TABS_PRINCIPAIS = [
   { href: '/inicio', label: 'Início', emoji: '🏠' },
@@ -23,7 +24,51 @@ const MENU_MAIS = [
   { href: '/configuracoes', label: 'Config', emoji: '⚙️' },
 ];
 
+// Modo Finanças: abas fixas, sem menu "Mais".
+const TABS_FINANCAS = [
+  { href: '/financas', label: 'Resumo', emoji: '💰', exato: true },
+  { href: '/financas/contas', label: 'Contas', emoji: '🧾' },
+  { href: '/financas/orcamento', label: 'Orçamento', emoji: '📊' },
+  { href: '/assinaturas', label: 'Assinaturas', emoji: '💳' },
+  { href: '/configuracoes', label: 'Config', emoji: '⚙️' },
+];
+
 export function BottomNav() {
+  const mode = useAppMode();
+  return mode === 'financas' ? <BottomNavFinancas /> : <BottomNavPadrao />;
+}
+
+function BottomNavFinancas() {
+  const pathname = usePathname();
+  return (
+    <nav
+      aria-label="Navegação principal"
+      className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-card/95 backdrop-blur-xl md:hidden"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      <div className="flex items-center justify-around px-2 py-1">
+        {TABS_FINANCAS.map((tab) => {
+          const ativo = pathname === tab.href || (!tab.exato && pathname.startsWith(tab.href + '/'));
+          return (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              aria-current={ativo ? 'page' : undefined}
+              className={`flex flex-col items-center gap-0.5 px-3 py-2 transition-colors ${
+                ativo ? 'text-accent' : 'text-gray-500'
+              }`}
+            >
+              <span className="text-xl" aria-hidden="true">{tab.emoji}</span>
+              <span className="text-[10px] font-medium">{tab.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+function BottomNavPadrao() {
   const pathname = usePathname();
   const [maisAberto, setMaisAberto] = useState(false);
 

@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { financasService } from '@meudia/api';
 import type { TransacaoInsert } from '@meudia/shared';
 import { useAuth } from './useAuth';
+import { resumoKeys } from '../lib/financas-query-keys';
 import { withOfflineSupport } from '../lib/offline-mutation';
 
 export function useTransacoes() {
@@ -56,6 +57,7 @@ export function useCriarTransacao() {
       void queryClient.invalidateQueries({ queryKey: ['transacoes'] });
       void queryClient.invalidateQueries({ queryKey: ['transacoes-mes'] });
       void queryClient.invalidateQueries({ queryKey: ['resumo-mensal'] });
+      void queryClient.invalidateQueries({ queryKey: resumoKeys.todas });
     },
   });
 }
@@ -77,6 +79,7 @@ export function useAtualizarTransacao() {
       void queryClient.invalidateQueries({ queryKey: ['transacoes'] });
       void queryClient.invalidateQueries({ queryKey: ['transacoes-mes'] });
       void queryClient.invalidateQueries({ queryKey: ['resumo-mensal'] });
+      void queryClient.invalidateQueries({ queryKey: resumoKeys.todas });
     },
   });
 }
@@ -98,6 +101,7 @@ export function useExcluirTransacao() {
       void queryClient.invalidateQueries({ queryKey: ['transacoes'] });
       void queryClient.invalidateQueries({ queryKey: ['transacoes-mes'] });
       void queryClient.invalidateQueries({ queryKey: ['resumo-mensal'] });
+      void queryClient.invalidateQueries({ queryKey: resumoKeys.todas });
     },
   });
 }

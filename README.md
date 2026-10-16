@@ -81,6 +81,14 @@ pnpm --filter @meudia/mobile dev
 | `NEXT_PUBLIC_APP_NAME` | Nome público do aplicativo |
 | `SENTRY_DSN` | DSN de erros no servidor |
 | `NEXT_PUBLIC_SENTRY_DSN` | DSN de erros no navegador |
+| `APP_MODE` | Modo do app (`padrao` ou `financas`); ver abaixo |
+| `VAPID_PUBLIC_KEY` | Chave pública de web-push, lida no layout raiz |
+
+### APP_MODE
+
+- Valores aceitos: `padrao` (todos os módulos) e `financas` (só Finanças, Assinaturas e Configurações). Qualquer outro valor, ou ausente, vira `padrao`.
+- É env de servidor, **sem** `NEXT_PUBLIC_`; chega ao cliente pelo layout raiz.
+- Trocar `APP_MODE` (ou `VAPID_PUBLIC_KEY`, também lida no layout) **exige rebuild/redeploy**: as páginas são pré-renderizadas no build. Promover um preview ou fazer rollback para um build com env diferente deixa a UI no modo antigo.
 
 ## Qualidade
 

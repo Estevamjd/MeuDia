@@ -8,6 +8,9 @@ import { Button } from '../../components/ui/Button';
 import { StepObjetivo } from './StepObjetivo';
 import { StepPerfil } from './StepPerfil';
 import { StepModulos } from './StepModulos';
+import { StepFinancas } from './StepFinancas';
+import { useAppMode } from '../../components/AppModeProvider';
+import { rotaInicial } from '../../lib/app-mode';
 import type { Objetivo } from '@meudia/shared';
 
 export interface OnboardingData {
@@ -33,6 +36,8 @@ const defaultData: OnboardingData = {
 export default function OnboardingPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const mode = useAppMode();
+  const modoFinancas = mode === 'financas';
   const supabase = createClient();
   const [step, setStep] = useState(0);
   const [data, setData] = useState<OnboardingData>({
@@ -68,22 +73,27 @@ export default function OnboardingPage() {
     }
     setSaving(true);
 
+    // Modo Finanças: só nome; sem campos de saúde.
     const { error } = await supabase
       .from('profiles')
-      .update({
-        nome: data.nome || undefined,
-        objetivo: data.objetivo,
-        peso_atual: data.peso_atual ? parseFloat(data.peso_atual) : null,
-        altura: data.altura ? parseFloat(data.altura) : null,
-        meta_peso: data.meta_peso ? parseFloat(data.meta_peso) : null,
-        meta_calorias: data.meta_calorias,
-        onboarding_feito: true,
-      })
+      .update(
+        modoFinancas
+          ? { nome: data.nome || undefined, onboarding_feito: true }
+          : {
+              nome: data.nome || undefined,
+              objetivo: data.objetivo,
+              peso_atual: data.peso_atual ? parseFloat(data.peso_atual) : null,
+              altura: data.altura ? parseFloat(data.altura) : null,
+              meta_peso: data.meta_peso ? parseFloat(data.meta_peso) : null,
+              meta_calorias: data.meta_calorias,
+              onboarding_feito: true,
+            },
+      )
       .eq('id', user.id);
 
     setSaving(false);
     if (!error) {
-      router.push('/inicio');
+      router.push(modoFinancas ? '/financas/orcamento' : '/inicio');
       router.refresh();
     }
   };
@@ -99,7 +109,7 @@ export default function OnboardingPage() {
       .update({ onboarding_feito: true })
       .eq('id', user.id);
     setSaving(false);
-    router.push('/inicio');
+    router.push(rotaInicial(mode));
     router.refresh();
   };
 
@@ -117,18 +127,21 @@ export default function OnboardingPage() {
     return null;
   }
 
-  const steps = [
-    <StepObjetivo key="obj" data={data} onChange={updateData} />,
-    <StepPerfil key="perf" data={data} onChange={updateData} />,
-    <StepModulos key="mod" data={data} onChange={updateData} />,
-  ];
+  const steps = modoFinancas
+    ? [<StepFinancas key="fin" data={data} onChange={updateData} />]
+    : [
+        <StepObjetivo key="obj" data={data} onChange={updateData} />,
+        <StepPerfil key="perf" data={data} onChange={updateData} />,
+        <StepModulos key="mod" data={data} onChange={updateData} />,
+      ];
+  const ultimoPasso = steps.length - 1;
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-bg px-4">
       <div className="w-full max-w-lg animate-fadeSlide">
         {/* Progress bar */}
         <div className="mb-8 flex items-center gap-2">
-          {[0, 1, 2].map((i) => (
+          {steps.map((_, i) => (
             <div
               key={i}
               className={`h-1 flex-1 rounded-full transition-colors ${
@@ -156,7 +169,7 @@ export default function OnboardingPage() {
                   Voltar
                 </Button>
               )}
-              {step < 2 ? (
+              {step < ultimoPasso ? (
                 <Button onClick={() => setStep((s) => s + 1)}>Continuar</Button>
               ) : (
                 <Button onClick={handleFinish} isLoading={saving}>
@@ -166,7 +179,7 @@ export default function OnboardingPage() {
             </div>
           </div>
 
-          {step === 2 && (
+          {!modoFinancas && step === ultimoPasso && (
             <p className="mt-3 text-center text-xs text-muted">
               Ao pular, a IA funcionará com dados limitados
             </p>
