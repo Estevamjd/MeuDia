@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Competencia, Transacao } from '@meudia/shared';
 import {
+  useContas,
   useContasMes,
   useCriarRenda,
   useOrcamento,
@@ -43,6 +44,7 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
   const orcamento = useOrcamento();
   const transacoes = useTransacoesMes(ano, mes);
   const rendas = useRendas();
+  const contasCadastradas = useContas();
   const push = usePushLembretes();
   const criarRenda = useCriarRenda();
   const { pagarConta, contaOcupada } = usePagamentoAcoes();
@@ -72,7 +74,8 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
   const comErro = consultas.filter((q) => q.isError);
 
   const rendaCadastrada = (rendas.data ?? []).some((r) => r.ativo);
-  const temContas = (contas.data ?? []).length > 0;
+  // Definições cadastradas (não as ocorrências do mês): conta anual/avulsa de outro mês também conta.
+  const temContas = (contasCadastradas.data ?? []).some((c) => c.ativo);
   // Sem a lista de rendas carregada, só o resumo vazio garante que falta o passo 1.
   const mostrarBoasVindas = rendas.isSuccess ? !rendaCadastrada || !temContas : !!secoes?.vazio;
 

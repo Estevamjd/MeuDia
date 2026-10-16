@@ -17,17 +17,21 @@ const resumoOk = {
   pctComprometida: 0.64, pagasNoPrazo: 1, vsMesAnterior: { gastoReal: { absoluto: 0, percentual: null } }, selo: 'No controle',
 };
 
-const contaOcorrencia = { conta: { id: 'c1' }, competencia: '2026-10', vencimento: '2026-10-20', situacao: 'pendente', pagamento: null };
+const contaCadastrada = { id: 'c1', ativo: true };
 
 type NomeConsulta = 'resumo' | 'contas' | 'orcamento' | 'transacoes';
-let q: Record<NomeConsulta | 'rendas', ReturnType<typeof consulta>>;
-const preparar = (erros: Partial<Record<NomeConsulta, boolean>> = {}, dados: { rendas?: unknown[]; contas?: unknown[] } = {}) => {
+let q: Record<NomeConsulta | 'rendas' | 'definicoes', ReturnType<typeof consulta>>;
+const preparar = (
+  erros: Partial<Record<NomeConsulta, boolean>> = {},
+  dados: { rendas?: unknown[]; definicoes?: unknown[] } = {},
+) => {
   q = {
     resumo: consulta(resumoOk, { isError: !!erros.resumo }),
-    contas: consulta(dados.contas ?? [], { isError: !!erros.contas }),
+    contas: consulta([], { isError: !!erros.contas }),
     orcamento: consulta([], { isError: !!erros.orcamento }),
     transacoes: consulta([], { isError: !!erros.transacoes }),
     rendas: consulta(dados.rendas ?? []),
+    definicoes: consulta(dados.definicoes ?? []),
   };
 };
 
@@ -39,6 +43,7 @@ const m = vi.hoisted(() => ({
 
 vi.mock('../../../../hooks', () => ({
   useResumoFinanceiroMes: () => q.resumo,
+  useContas: () => q.definicoes,
   useContasMes: () => q.contas,
   useOrcamento: () => q.orcamento,
   useTransacoesMes: () => q.transacoes,
@@ -98,8 +103,21 @@ describe('useFinancasHome: onboarding', () => {
     expect(usar().boasVindas?.rendaCadastrada).toBe(false);
     preparar({}, { rendas: [{ id: 'r1', ativo: true }] });
     expect(usar().boasVindas?.rendaCadastrada).toBe(true);
-    preparar({}, { rendas: [{ id: 'r1', ativo: true }], contas: [contaOcorrencia] });
+    preparar({}, { rendas: [{ id: 'r1', ativo: true }], definicoes: [contaCadastrada] });
     expect(usar().boasVindas).toBeNull();
+  });
+
+  it('conta cadastrada sem ocorrência no mês (anual/avulsa) já conclui o passo 2; inativas não contam', () => {
+    preparar({}, { rendas: [{ id: 'r1', ativo: true }], definicoes: [contaCadastrada] });
+    expect(q.contas.data).toEqual([]);
+    expect(usar().boasVindas).toBeNull();
+    preparar({}, { rendas: [{ id: 'r1', ativo: true }], definicoes: [{ id: 'c2', ativo: false }] });
+    expect(usar().boasVindas?.rendaCadastrada).toBe(true);
+  });
+
+  it('renda inativa não conta como cadastrada', () => {
+    preparar({}, { rendas: [{ id: 'r1', ativo: false }], definicoes: [contaCadastrada] });
+    expect(usar().boasVindas?.rendaCadastrada).toBe(false);
   });
 
   it('"Cadastrar minha renda" abre o sheet; salvar cria "Renda principal", fecha e mostra toast', () => {
@@ -135,7 +153,7 @@ describe('useFinancasHome: aviso de lembretes', () => {
   });
 
   it('com contas e lembretes inativos aparece; "Ativar" usa a ação do push', () => {
-    preparar({}, { contas: [contaOcorrencia] });
+    preparar({}, { definicoes: [contaCadastrada] });
     const aviso = usar().avisoLembretes;
     expect(aviso).not.toBeNull();
     aviso?.onAtivar();
@@ -143,13 +161,13 @@ describe('useFinancasHome: aviso de lembretes', () => {
   });
 
   it('lembretes ativos: não aparece', () => {
-    preparar({}, { contas: [contaOcorrencia] });
+    preparar({}, { definicoes: [contaCadastrada] });
     m.push.estado = 'ativo';
     expect(usar().avisoLembretes).toBeNull();
   });
 
   it('dispensar esconde e grava no localStorage; dispensado antes não aparece', () => {
-    preparar({}, { contas: [contaOcorrencia] });
+    preparar({}, { definicoes: [contaCadastrada] });
     const r = montar();
     act(() => r.current.avisoLembretes?.onDispensar());
     expect(r.current.avisoLembretes).toBeNull();
