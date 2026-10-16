@@ -17,3 +17,10 @@ export * as chatAgenteRepository from './chat-agente.repository';
 export * as preferenciasAgenteRepository from './preferencias-agente.repository';
 export * as dietaRepository from './dieta.repository';
 export * as medicamentoRepository from './medicamento.repository';
+
+export * as contasPagarRepository from './contas-pagar.repository';
+export * as pagamentosContaRepository from './pagamentos-conta.repository';
+export * as rendasRepository from './rendas.repository';
+export * as orcamentoRepository from './orcamento.repository';
+export * as pushSubscriptionsRepository from './push-subscriptions.repository';
+export * as lembretesEnviadosRepository from './lembretes-enviados.repository';
