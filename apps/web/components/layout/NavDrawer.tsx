@@ -50,30 +50,34 @@ export function NavDrawer({ id, isOpen, onClose, onSignOut, returnFocusRef }: Na
     return () => mql.removeEventListener('change', handleChange);
   }, [isOpen, onClose]);
 
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        onClose();
-        return;
-      }
-      if (e.key !== 'Tab' || !painelRef.current) return;
-      const focaveis = Array.from(painelRef.current.querySelectorAll<HTMLElement>(FOCAVEIS));
-      const primeiro = focaveis[0];
-      const ultimo = focaveis[focaveis.length - 1];
-      if (!primeiro || !ultimo) return;
-      const ativo = document.activeElement;
-      const dentro = painelRef.current.contains(ativo);
-      if (e.shiftKey && (ativo === primeiro || !dentro)) {
-        e.preventDefault();
-        ultimo.focus();
-      } else if (!e.shiftKey && (ativo === ultimo || !dentro)) {
-        e.preventDefault();
-        primeiro.focus();
-      }
-    },
-    [onClose],
-  );
+  // `onClose` em ref: o efeito de foco não re-roda (nem rouba o foco) se o pai
+  // passar um callback novo a cada render.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      onCloseRef.current();
+      return;
+    }
+    if (e.key !== 'Tab' || !painelRef.current) return;
+    const focaveis = Array.from(painelRef.current.querySelectorAll<HTMLElement>(FOCAVEIS));
+    const primeiro = focaveis[0];
+    const ultimo = focaveis[focaveis.length - 1];
+    if (!primeiro || !ultimo) return;
+    const ativo = document.activeElement;
+    const dentro = painelRef.current.contains(ativo);
+    if (e.shiftKey && (ativo === primeiro || !dentro)) {
+      e.preventDefault();
+      ultimo.focus();
+    } else if (!e.shiftKey && (ativo === ultimo || !dentro)) {
+      e.preventDefault();
+      primeiro.focus();
+    }
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -88,7 +92,9 @@ export function NavDrawer({ id, isOpen, onClose, onSignOut, returnFocusRef }: Na
       document.body.style.overflow = overflowAnterior;
       botao?.focus();
     };
-  }, [isOpen, handleKeyDown, returnFocusRef]);
+    // returnFocusRef é um ref (identidade estável); lido só na abertura.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, handleKeyDown]);
 
   if (!isOpen) return null;
 
