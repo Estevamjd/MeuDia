@@ -34,6 +34,10 @@ Depende de `000_baseline.sql` (profiles, assinaturas, transacoes). Só arquivo; 
 
 **Decisão (Partner, 16/10/2026):** `contas_pagar` é a **definição** da conta (recorrente ou única), **sem status por mês**. Cada pagamento é uma linha em `pagamentos_conta`, única por `(conta_id, competencia)`. A "ocorrência do mês" não é gravada: é derivada da definição + competência (5.2). **Competência** = `TEXT 'YYYY-MM'` em todo o modelo. `assinaturas` continua como está (só bugs da seção 11); cada assinatura ativa é espelhada numa conta `mensal` via `contas_pagar.assinatura_id` (BE-06) para ganhar lembretes e "Paguei".
 
+**Regras confirmadas (Partner, 16/10/2026):**
+1. Cada assinatura ativa gera **uma** conta mensal via `contas_pagar.assinatura_id`. Lembretes saem **só pela conta**; `assinaturas` não gera notificação própria (sem duplicidade).
+2. "Apagar" conta = `ativo=false`. Conta inativa **não gera lembrete** nem aparece nas competências sem pagamento.
+
 ```sql
 -- Chaves para FK composta (garante que a linha referenciada é do mesmo user_id)
 -- UNIQUE (id, user_id) em assinaturas e transacoes (DO block: só cria se a constraint não existir)
