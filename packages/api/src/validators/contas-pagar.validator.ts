@@ -7,7 +7,7 @@ export const contaPagarFieldsSchema = z.object({
   assinatura_id: z.string().uuid().nullable().optional(),
   descricao: z.string().min(1).max(500),
   categoria: z.string().min(1).max(100).default('Contas'),
-  valor: z.number().positive(),
+  valor: z.number().positive().multipleOf(0.01).max(99999999.99),
   recorrencia: z.enum(['mensal', 'anual', 'unica']),
   dia_vencimento: z.number().int().min(1).max(31).nullable().optional(),
   mes_vencimento: z.number().int().min(1).max(12).nullable().optional(),

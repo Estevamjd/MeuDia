@@ -3,5 +3,11 @@
   "framework": "nextjs",
   "buildCommand": "pnpm turbo run build --filter=@meudia/web",
   "outputDirectory": "apps/web/.next",
-  "installCommand": "pnpm install"
+  "installCommand": "pnpm install",
+  "crons": [
+    {
+      "path": "/api/cron/lembretes",
+      "schedule": "0 12 * * *"
+    }
+  ]
 }

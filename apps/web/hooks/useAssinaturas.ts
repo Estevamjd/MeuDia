@@ -22,33 +22,32 @@ export function useCriarAssinatura() {
   return useMutation({
     mutationFn: (data: AssinaturaInsert) => assinaturasService.criarAssinatura(user!.id, data),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['assinaturas'] });
-      void queryClient.invalidateQueries({ queryKey: ['total-mensal'] });
+      for (const queryKey of assinaturasService.ASSINATURA_INVALIDACOES) void queryClient.invalidateQueries({ queryKey });
     },
   });
 }
 
 export function useAtualizarAssinatura() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<AssinaturaInsert> }) =>
-      assinaturasService.atualizarAssinatura(id, data),
+      assinaturasService.atualizarAssinatura(user!.id, id, data),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['assinaturas'] });
-      void queryClient.invalidateQueries({ queryKey: ['total-mensal'] });
+      for (const queryKey of assinaturasService.ASSINATURA_INVALIDACOES) void queryClient.invalidateQueries({ queryKey });
     },
   });
 }
 
 export function useExcluirAssinatura() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => assinaturasService.excluirAssinatura(id),
+    mutationFn: (id: string) => assinaturasService.excluirAssinatura(user!.id, id),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['assinaturas'] });
-      void queryClient.invalidateQueries({ queryKey: ['total-mensal'] });
+      for (const queryKey of assinaturasService.ASSINATURA_INVALIDACOES) void queryClient.invalidateQueries({ queryKey });
     },
   });
 }

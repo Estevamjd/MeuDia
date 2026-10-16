@@ -77,3 +77,16 @@ export async function remove(transacaoId: string, userId: string): Promise<void>
 
   if (error) throw new AppError(error.message, 'DB_ERROR');
 }
+
+/** Inclui pagamentos cuja data de caixa cai fora da competência exibida. */
+export async function findByIds(userId: string, ids: string[]): Promise<Transacao[]> {
+  const rows: Transacao[] = [];
+  const unicos = [...new Set(ids)];
+  for (let i = 0; i < unicos.length; i += 100) {
+    const { data, error } = await getSupabase().from('transacoes').select(COLUMNS)
+      .eq('user_id', userId).in('id', unicos.slice(i, i + 100));
+    if (error) throw new AppError(error.message, 'DB_ERROR');
+    rows.push(...(data ?? []) as unknown as Transacao[]);
+  }
+  return rows;
+}

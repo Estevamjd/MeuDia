@@ -54,11 +54,9 @@
 --         policy só é criada se a tabela (e a coluna) existirem.
 --
 -- GAP-06  [RESOLVIDO] Sem tabelas alternativas: ENABLE RLS em todas as tabelas
---         canônicas; users_own_data em todas com user_id direto.
---         registros_agua (já existe no banco) tem bloco próprio: cria
---         users_own_data FOR ALL se faltar e, se ainda assim SELECT/UPDATE/
---         DELETE não estiverem cobertos por policy permissiva com auth.uid() e
---         user_id, cria users_own_data_<cmd>. Nada existente é alterado.
+--         canônicas; users_own_data em todas com user_id direto, inclusive
+--         registros_agua — só se a tabela não tiver os 4 comandos já cobertos
+--         (GAP-10). Nada existente é alterado.
 --
 -- GAP-07  [RESOLVIDO] handle_new_user(): SECURITY DEFINER com
 --         `SET search_path = ''` (nomes qualificados com public.). schema.sql
@@ -68,9 +66,19 @@
 --
 -- GAP-08  Policies que já existem com o mesmo nome NÃO são alteradas, mesmo que
 --         a definição no banco seja outra. Comparar com pg_policies depois.
+--         Idem tabelas: CREATE TABLE IF NOT EXISTS é no-op se a tabela existe;
+--         colunas faltantes só via ADD COLUMN IF NOT EXISTS (sem DROP/ALTER TYPE).
 --
 -- GAP-09  003 e 004 não têm arquivo _down. Este baseline também não tem
 --         (intencional: ele não destrói nada).
+--
+-- GAP-10  [R4-2] profiles, treinos, exercicios, sessoes_treino,
+--         series_realizadas e registros_agua: CREATE TABLE alinhado ao banco
+--         real (lido em 2026-10-16): colunas, tipos, NULL, defaults
+--         (extensions.uuid_generate_v4()), FKs para auth.users e ON DELETE
+--         CASCADE. Índice de sessoes_treino em (user_id, inicio) — o real não
+--         tem coluna `data`. Policies FOR ALL não duplicam as 4 por comando.
+--         Divergências código x real ficam em missions/meudia-financas/R4-2.md.
 -- ============================================================================
 
 CREATE SCHEMA IF NOT EXISTS extensions;
@@ -80,17 +88,20 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
 -- PERFIL
 -- ══════════════════════════════════════════════════════════════════════════════
 
+-- profiles, treinos, exercicios, sessoes_treino, series_realizadas e
+-- registros_agua: CREATE TABLE = estado real do banco (GAP-10). Colunas que o
+-- código usa e o real não tem entram na seção COLUNAS ADITIVAS.
 CREATE TABLE IF NOT EXISTS public.profiles (
   id              UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  nome            TEXT NOT NULL,
-  email           TEXT NOT NULL,
+  nome            TEXT,
+  email           TEXT,
   avatar_url      TEXT,
-  peso_atual      DECIMAL(5,2),
-  altura          DECIMAL(5,2),
-  meta_peso       DECIMAL(5,2),
-  meta_calorias   INTEGER DEFAULT 2200,
+  peso_atual      NUMERIC,
+  altura          NUMERIC,
+  meta_peso       NUMERIC,
+  meta_calorias   INTEGER DEFAULT 2000,
   meta_agua       INTEGER DEFAULT 8,
-  objetivo        TEXT CHECK (objetivo IN ('saude_geral','emagrecer','ganhar_massa','condicionamento')),
+  objetivo        TEXT,
   onboarding_feito BOOLEAN DEFAULT FALSE,
   created_at      TIMESTAMPTZ DEFAULT NOW()
 );
@@ -100,47 +111,48 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 -- ══════════════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS public.treinos (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id     UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  id          UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+  user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   nome        TEXT NOT NULL,
   dia_semana  INTEGER NOT NULL CHECK (dia_semana BETWEEN 0 AND 6),
-  tipo        TEXT CHECK (tipo IN ('musculacao','cardio','funcional','descanso')),
-  observacao  TEXT,
-  ordem       INTEGER DEFAULT 0,
+  descricao   TEXT,
+  ativo       BOOLEAN DEFAULT TRUE,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.exercicios (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  treino_id       UUID NOT NULL REFERENCES public.treinos(id) ON DELETE CASCADE,
-  nome            TEXT NOT NULL,
-  series          INTEGER NOT NULL DEFAULT 3,
-  repeticoes      TEXT NOT NULL DEFAULT '10-12',
-  carga           DECIMAL(6,2),
-  tempo_descanso  INTEGER DEFAULT 60,
-  observacao      TEXT,
-  ordem           INTEGER DEFAULT 0
+  id                UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+  treino_id         UUID NOT NULL REFERENCES public.treinos(id) ON DELETE CASCADE,
+  nome              TEXT NOT NULL,
+  grupo_muscular    TEXT,
+  series            INTEGER DEFAULT 3,
+  repeticoes        INTEGER DEFAULT 12,
+  carga             NUMERIC,
+  descanso_segundos INTEGER DEFAULT 60,
+  ordem             INTEGER DEFAULT 0,
+  created_at        TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.sessoes_treino (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id         UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  treino_id       UUID REFERENCES public.treinos(id),
-  data            DATE NOT NULL DEFAULT CURRENT_DATE,
+  id              UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+  user_id         UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  treino_id       UUID NOT NULL REFERENCES public.treinos(id) ON DELETE CASCADE,
+  inicio          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  fim             TIMESTAMPTZ,
   duracao_minutos INTEGER,
-  concluido       BOOLEAN DEFAULT FALSE,
-  observacao      TEXT,
+  concluida       BOOLEAN DEFAULT FALSE,
   created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.series_realizadas (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id           UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
   sessao_id    UUID NOT NULL REFERENCES public.sessoes_treino(id) ON DELETE CASCADE,
-  exercicio_id UUID NOT NULL REFERENCES public.exercicios(id),
-  numero_serie INTEGER NOT NULL,
-  carga_usada  DECIMAL(6,2),
-  reps_feitas  INTEGER,
-  concluido    BOOLEAN DEFAULT FALSE
+  exercicio_id UUID NOT NULL REFERENCES public.exercicios(id) ON DELETE CASCADE,
+  serie_numero INTEGER NOT NULL,
+  repeticoes   INTEGER,
+  carga        NUMERIC,
+  concluida    BOOLEAN DEFAULT FALSE,
+  created_at   TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -243,12 +255,12 @@ CREATE TABLE IF NOT EXISTS public.refeicoes (
 );
 
 CREATE TABLE IF NOT EXISTS public.registros_agua (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id       UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  id            UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+  user_id       UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   data          DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
   quantidade_ml INTEGER NOT NULL DEFAULT 0,
   meta_ml       INTEGER NOT NULL DEFAULT 2500,
-  created_at    TIMESTAMPTZ DEFAULT NOW(),
   updated_at    TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, data)
 );
@@ -419,12 +431,25 @@ CREATE TABLE IF NOT EXISTS public.notas (
 );
 
 -- ══════════════════════════════════════════════════════════════════════════════
+-- COLUNAS ADITIVAS (GAP-08/GAP-10)
+-- ══════════════════════════════════════════════════════════════════════════════
+-- Usadas pelo código e sem equivalente no banco real. Só ADD COLUMN IF NOT
+-- EXISTS (nullable/default): banco novo e real convergem. Renomes/troca de tipo
+-- (ex. tempo_descanso x descanso_segundos) ficam para decisão (R4-2.md).
+
+ALTER TABLE public.treinos        ADD COLUMN IF NOT EXISTS tipo TEXT
+  CHECK (tipo IN ('musculacao','cardio','funcional','descanso'));
+ALTER TABLE public.treinos        ADD COLUMN IF NOT EXISTS ordem INTEGER DEFAULT 0;
+ALTER TABLE public.exercicios     ADD COLUMN IF NOT EXISTS observacao TEXT;
+ALTER TABLE public.sessoes_treino ADD COLUMN IF NOT EXISTS observacao TEXT;
+
+-- ══════════════════════════════════════════════════════════════════════════════
 -- ÍNDICES
 -- ══════════════════════════════════════════════════════════════════════════════
 
 CREATE INDEX IF NOT EXISTS idx_treinos_user          ON public.treinos(user_id);
 CREATE INDEX IF NOT EXISTS idx_exercicios_treino     ON public.exercicios(treino_id);
-CREATE INDEX IF NOT EXISTS idx_sessoes_user_data     ON public.sessoes_treino(user_id, data);
+CREATE INDEX IF NOT EXISTS idx_sessoes_user_inicio   ON public.sessoes_treino(user_id, inicio);
 CREATE INDEX IF NOT EXISTS idx_habitos_user          ON public.habitos(user_id);
 CREATE INDEX IF NOT EXISTS idx_reg_hab_user_data     ON public.registros_habito(user_id, data);
 CREATE INDEX IF NOT EXISTS idx_transacoes_user_data  ON public.transacoes(user_id, data);
@@ -440,7 +465,8 @@ CREATE INDEX IF NOT EXISTS idx_itens_lista           ON public.itens_compras(lis
 CREATE INDEX IF NOT EXISTS idx_assinaturas_user      ON public.assinaturas(user_id);
 CREATE INDEX IF NOT EXISTS idx_conquistas_user       ON public.conquistas(user_id);
 CREATE INDEX IF NOT EXISTS idx_registros_peso_user   ON public.registros_peso(user_id, data);
-CREATE INDEX IF NOT EXISTS idx_registros_agua_user   ON public.registros_agua(user_id, data);
+-- mesmo nome do real (no-op lá); redundante com UNIQUE(user_id, data)
+CREATE INDEX IF NOT EXISTS idx_agua_user_data        ON public.registros_agua(user_id, data);
 
 -- 002
 CREATE INDEX IF NOT EXISTS idx_notif_user_lida       ON public.notificacoes_agente(user_id, lida);
@@ -481,26 +507,43 @@ END $$;
 -- RLS POLICIES
 -- ══════════════════════════════════════════════════════════════════════════════
 
+-- GAP-10: a policy FOR ALL só é criada se a tabela ainda não tiver os 4
+-- comandos (SELECT/INSERT/UPDATE/DELETE) cobertos por policies permissivas com
+-- auth.uid() — no banco real as 6 tabelas legadas já têm as 4 "Users can
+-- <cmd> own <tabela>", então nada é duplicado lá. Teste repetido em cada bloco:
+--   (SELECT count(*) FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE']) c
+--    WHERE EXISTS (SELECT 1 FROM pg_policies p WHERE ... AND p.cmd IN (c,'ALL')
+--      AND COALESCE(p.qual, p.with_check) LIKE '%auth.uid()%')) = 4
+
 -- profiles: users_own_profile (schema.sql)
 DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies
     WHERE schemaname = 'public' AND tablename = 'profiles' AND policyname = 'users_own_profile'
-  ) THEN
+  ) AND (
+    SELECT count(*) FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE']) AS c
+    WHERE EXISTS (
+      SELECT 1 FROM pg_policies p
+      WHERE p.schemaname = 'public' AND p.tablename = 'profiles'
+        AND p.permissive = 'PERMISSIVE' AND p.cmd IN (c, 'ALL')
+        AND COALESCE(p.qual, p.with_check) LIKE '%auth.uid()%'
+    )
+  ) < 4 THEN
     CREATE POLICY "users_own_profile" ON public.profiles
       FOR ALL USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
   END IF;
 END $$;
 
--- users_own_data em tabelas com user_id direto (schema.sql + 002)
+-- users_own_data em tabelas com user_id direto (schema.sql + 002).
+-- registros_agua (GAP-06) entra aqui: no real já tem as 4 por comando.
 DO $$
 DECLARE
   t TEXT;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
     'treinos', 'sessoes_treino', 'habitos', 'registros_habito', 'transacoes',
-    'assinaturas', 'compromissos', 'registros_peso', 'refeicoes',
+    'assinaturas', 'compromissos', 'registros_peso', 'refeicoes', 'registros_agua',
     'medicamentos', 'registro_medicamentos', 'listas_compras', 'veiculos',
     'scores_diarios', 'conquistas',
     'notificacoes_agente', 'chat_agente', 'acoes_agente', 'preferencias_agente'
@@ -510,47 +553,18 @@ BEGIN
     ELSIF NOT EXISTS (
       SELECT 1 FROM pg_policies
       WHERE schemaname = 'public' AND tablename = t AND policyname = 'users_own_data'
-    ) THEN
+    ) AND (
+      SELECT count(*) FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE']) AS c
+      WHERE EXISTS (
+        SELECT 1 FROM pg_policies p
+        WHERE p.schemaname = 'public' AND p.tablename = t
+          AND p.permissive = 'PERMISSIVE' AND p.cmd IN (c, 'ALL')
+          AND COALESCE(p.qual, p.with_check) LIKE '%auth.uid()%'
+      )
+    ) < 4 THEN
       EXECUTE format(
         'CREATE POLICY "users_own_data" ON public.%I FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id)',
         t
-      );
-    END IF;
-  END LOOP;
-END $$;
-
--- registros_agua (GAP-06): a tabela já existe no banco real, com policies que
--- podem não cobrir todos os comandos. Garante users_own_data FOR ALL e, se
--- SELECT/UPDATE/DELETE seguirem sem policy permissiva por user_id, cria uma
--- por comando. Idempotente; não altera nem remove policies existentes.
-DO $$
-DECLARE
-  c TEXT;
-BEGIN
-  IF to_regclass('public.registros_agua') IS NULL THEN
-    RAISE NOTICE '[baseline] public.registros_agua ausente — policies puladas';
-    RETURN;
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public' AND tablename = 'registros_agua' AND policyname = 'users_own_data'
-  ) THEN
-    CREATE POLICY "users_own_data" ON public.registros_agua
-      FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
-  END IF;
-
-  FOREACH c IN ARRAY ARRAY['SELECT', 'UPDATE', 'DELETE'] LOOP
-    IF NOT EXISTS (
-      SELECT 1 FROM pg_policies
-      WHERE schemaname = 'public' AND tablename = 'registros_agua'
-        AND permissive = 'PERMISSIVE' AND cmd IN (c, 'ALL')
-        AND qual LIKE '%auth.uid()%' AND qual LIKE '%user_id%'
-    ) THEN
-      EXECUTE format(
-        'CREATE POLICY %I ON public.registros_agua FOR %s USING (auth.uid() = user_id)%s',
-        'users_own_data_' || lower(c), c,
-        CASE WHEN c = 'UPDATE' THEN ' WITH CHECK (auth.uid() = user_id)' ELSE '' END
       );
     END IF;
   END LOOP;
@@ -576,7 +590,15 @@ BEGIN
     ELSIF NOT EXISTS (
       SELECT 1 FROM pg_policies
       WHERE schemaname = 'public' AND tablename = p[1] AND policyname = p[2]
-    ) THEN
+    ) AND (
+      SELECT count(*) FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE']) AS c
+      WHERE EXISTS (
+        SELECT 1 FROM pg_policies pp
+        WHERE pp.schemaname = 'public' AND pp.tablename = p[1]
+          AND pp.permissive = 'PERMISSIVE' AND pp.cmd IN (c, 'ALL')
+          AND COALESCE(pp.qual, pp.with_check) LIKE '%auth.uid()%'
+      )
+    ) < 4 THEN
       EXECUTE format('CREATE POLICY %I ON public.%I FOR ALL USING (%s) WITH CHECK (%s)', p[2], p[1], p[3], p[3]);
     END IF;
   END LOOP;
@@ -715,6 +737,21 @@ BEGIN
   ) THEN
     CREATE TRIGGER trg_notas_updated_at
       BEFORE UPDATE ON public.notas
+      FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+  END IF;
+END $$;
+
+-- R4-1: registros_agua.updated_at (o real não tem trigger)
+DO $$
+BEGIN
+  IF to_regclass('public.registros_agua') IS NULL THEN
+    RAISE NOTICE '[baseline] public.registros_agua ausente — trigger updated_at pulado';
+  ELSIF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'trg_registros_agua_updated_at' AND tgrelid = 'public.registros_agua'::regclass
+  ) THEN
+    CREATE TRIGGER trg_registros_agua_updated_at
+      BEFORE UPDATE ON public.registros_agua
       FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
   END IF;
 END $$;

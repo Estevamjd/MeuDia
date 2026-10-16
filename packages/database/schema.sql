@@ -4,21 +4,26 @@
 -- Executar no Supabase SQL Editor ou via migration
 -- ============================================================================
 
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
+
 -- ══════════════════════════════════════════════════════════════════════════════
 -- PERFIL
 -- ══════════════════════════════════════════════════════════════════════════════
 
+-- profiles, treinos, exercicios, sessoes_treino, series_realizadas e
+-- registros_agua: mesmas colunas da 000_baseline.sql (estado real, GAP-10).
 CREATE TABLE profiles (
   id              UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  nome            TEXT NOT NULL,
-  email           TEXT NOT NULL,
+  nome            TEXT,
+  email           TEXT,
   avatar_url      TEXT,
-  peso_atual      DECIMAL(5,2),
-  altura          DECIMAL(5,2),
-  meta_peso       DECIMAL(5,2),
-  meta_calorias   INTEGER DEFAULT 2200,
+  peso_atual      NUMERIC,
+  altura          NUMERIC,
+  meta_peso       NUMERIC,
+  meta_calorias   INTEGER DEFAULT 2000,
   meta_agua       INTEGER DEFAULT 8,
-  objetivo        TEXT CHECK (objetivo IN ('saude_geral','emagrecer','ganhar_massa','condicionamento')),
+  objetivo        TEXT,
   onboarding_feito BOOLEAN DEFAULT FALSE,
   created_at      TIMESTAMPTZ DEFAULT NOW()
 );
@@ -28,47 +33,52 @@ CREATE TABLE profiles (
 -- ══════════════════════════════════════════════════════════════════════════════
 
 CREATE TABLE treinos (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  id          UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+  user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   nome        TEXT NOT NULL,
   dia_semana  INTEGER NOT NULL CHECK (dia_semana BETWEEN 0 AND 6),
+  descricao   TEXT,
+  ativo       BOOLEAN DEFAULT TRUE,
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
   tipo        TEXT CHECK (tipo IN ('musculacao','cardio','funcional','descanso')),
-  observacao  TEXT,
-  ordem       INTEGER DEFAULT 0,
-  created_at  TIMESTAMPTZ DEFAULT NOW()
+  ordem       INTEGER DEFAULT 0
 );
 
 CREATE TABLE exercicios (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  treino_id       UUID NOT NULL REFERENCES treinos(id) ON DELETE CASCADE,
-  nome            TEXT NOT NULL,
-  series          INTEGER NOT NULL DEFAULT 3,
-  repeticoes      TEXT NOT NULL DEFAULT '10-12',
-  carga           DECIMAL(6,2),
-  tempo_descanso  INTEGER DEFAULT 60,
-  observacao      TEXT,
-  ordem           INTEGER DEFAULT 0
+  id                UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+  treino_id         UUID NOT NULL REFERENCES treinos(id) ON DELETE CASCADE,
+  nome              TEXT NOT NULL,
+  grupo_muscular    TEXT,
+  series            INTEGER DEFAULT 3,
+  repeticoes        INTEGER DEFAULT 12,
+  carga             NUMERIC,
+  descanso_segundos INTEGER DEFAULT 60,
+  ordem             INTEGER DEFAULT 0,
+  created_at        TIMESTAMPTZ DEFAULT NOW(),
+  observacao        TEXT
 );
 
 CREATE TABLE sessoes_treino (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id         UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  treino_id       UUID REFERENCES treinos(id),
-  data            DATE NOT NULL DEFAULT CURRENT_DATE,
+  id              UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+  user_id         UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  treino_id       UUID NOT NULL REFERENCES treinos(id) ON DELETE CASCADE,
+  inicio          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  fim             TIMESTAMPTZ,
   duracao_minutos INTEGER,
-  concluido       BOOLEAN DEFAULT FALSE,
-  observacao      TEXT,
-  created_at      TIMESTAMPTZ DEFAULT NOW()
+  concluida       BOOLEAN DEFAULT FALSE,
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  observacao      TEXT
 );
 
 CREATE TABLE series_realizadas (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id           UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
   sessao_id    UUID NOT NULL REFERENCES sessoes_treino(id) ON DELETE CASCADE,
-  exercicio_id UUID NOT NULL REFERENCES exercicios(id),
-  numero_serie INTEGER NOT NULL,
-  carga_usada  DECIMAL(6,2),
-  reps_feitas  INTEGER,
-  concluido    BOOLEAN DEFAULT FALSE
+  exercicio_id UUID NOT NULL REFERENCES exercicios(id) ON DELETE CASCADE,
+  serie_numero INTEGER NOT NULL,
+  repeticoes   INTEGER,
+  carga        NUMERIC,
+  concluida    BOOLEAN DEFAULT FALSE,
+  created_at   TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -171,12 +181,12 @@ CREATE TABLE refeicoes (
 );
 
 CREATE TABLE registros_agua (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id       UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  id            UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+  user_id       UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   data          DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
   quantidade_ml INTEGER NOT NULL DEFAULT 0,
   meta_ml       INTEGER NOT NULL DEFAULT 2500,
-  created_at    TIMESTAMPTZ DEFAULT NOW(),
   updated_at    TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, data)
 );
@@ -286,7 +296,7 @@ CREATE TABLE conquistas (
 
 CREATE INDEX idx_treinos_user          ON treinos(user_id);
 CREATE INDEX idx_exercicios_treino     ON exercicios(treino_id);
-CREATE INDEX idx_sessoes_user_data     ON sessoes_treino(user_id, data);
+CREATE INDEX idx_sessoes_user_inicio   ON sessoes_treino(user_id, inicio);
 CREATE INDEX idx_habitos_user          ON habitos(user_id);
 CREATE INDEX idx_reg_hab_user_data     ON registros_habito(user_id, data);
 CREATE INDEX idx_transacoes_user_data  ON transacoes(user_id, data);
@@ -302,7 +312,7 @@ CREATE INDEX idx_itens_lista           ON itens_compras(lista_id);
 CREATE INDEX idx_assinaturas_user      ON assinaturas(user_id);
 CREATE INDEX idx_conquistas_user       ON conquistas(user_id);
 CREATE INDEX idx_registros_peso_user   ON registros_peso(user_id, data);
-CREATE INDEX idx_registros_agua_user   ON registros_agua(user_id, data);
+CREATE INDEX idx_agua_user_data        ON registros_agua(user_id, data);
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- ROW LEVEL SECURITY

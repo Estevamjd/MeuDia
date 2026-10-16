@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { competenciaSchema, contaPagarInsertSchema, pagarContaSchema } from '../contas-pagar.validator';
+import { assinaturaInsertSchema } from '../assinaturas.validator';
 import { rendaInsertSchema } from '../rendas.validator';
 import { orcamentoInsertSchema } from '../orcamento.validator';
 import { pushSubscriptionSchema } from '../push-subscription.validator';
@@ -44,4 +45,23 @@ describe('BE-03: validators financeiros', () => {
     expect(pushSubscriptionSchema.safeParse({ ...sub, endpoint: 'http://example.invalid' }).success).toBe(false);
     expect(pushSubscriptionSchema.safeParse({ ...sub, keys: { p256dh: '', auth: '' } }).success).toBe(false);
   });
+});
+
+it('R5-1: valor respeita centavos e DECIMAL(10,2)', () => {
+  const base = { descricao: 'Fixture', recorrencia: 'mensal', dia_vencimento: 1 };
+  for (const valor of [0.01, 12.34, 99999999.99]) expect(contaPagarInsertSchema.safeParse({ ...base, valor }).success).toBe(true);
+  for (const valor of [1.001, 100000000, 0, -1]) expect(contaPagarInsertSchema.safeParse({ ...base, valor }).success).toBe(false);
+});
+
+it('user_agent aceita exatamente 500 caracteres e rejeita 501', () => {
+  const sub = { endpoint: 'https://example.invalid', keys: { p256dh: 'fixture', auth: 'fixture' } };
+  expect(pushSubscriptionSchema.safeParse({ ...sub, user_agent: 'x'.repeat(500) }).success).toBe(true);
+  expect(pushSubscriptionSchema.safeParse({ ...sub, user_agent: 'x'.repeat(501) }).success).toBe(false);
+});
+
+it.each([0.01, 12.34, 99999999.99, 1.001, 100000000, -1])('limites monetários de assinatura, renda e orçamento: %s', valor => {
+  const valido = [0.01, 12.34, 99999999.99].includes(valor);
+  expect(assinaturaInsertSchema.safeParse({ nome: 'Fixture', dia_vencimento: 1, valor }).success).toBe(valido);
+  expect(rendaInsertSchema.safeParse({ descricao: 'Fixture', valor }).success).toBe(valido);
+  expect(orcamentoInsertSchema.safeParse({ categoria: 'Fixture', valor_planejado: valor }).success).toBe(valido);
 });

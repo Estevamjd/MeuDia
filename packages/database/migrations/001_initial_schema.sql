@@ -12,21 +12,26 @@
 -- (IF NOT EXISTS, policies/trigger via DO block, CREATE OR REPLACE).
 -- ============================================================================
 
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
+
 -- ══════════════════════════════════════════════════════════════════════════════
 -- PERFIL
 -- ══════════════════════════════════════════════════════════════════════════════
 
+-- profiles, treinos, exercicios, sessoes_treino, series_realizadas e
+-- registros_agua: idênticas à 000_baseline.sql (estado real do banco, GAP-10).
 CREATE TABLE IF NOT EXISTS public.profiles (
   id              UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  nome            TEXT NOT NULL,
-  email           TEXT NOT NULL,
+  nome            TEXT,
+  email           TEXT,
   avatar_url      TEXT,
-  peso_atual      DECIMAL(5,2),
-  altura          DECIMAL(5,2),
-  meta_peso       DECIMAL(5,2),
-  meta_calorias   INTEGER DEFAULT 2200,
+  peso_atual      NUMERIC,
+  altura          NUMERIC,
+  meta_peso       NUMERIC,
+  meta_calorias   INTEGER DEFAULT 2000,
   meta_agua       INTEGER DEFAULT 8,
-  objetivo        TEXT CHECK (objetivo IN ('saude_geral','emagrecer','ganhar_massa','condicionamento')),
+  objetivo        TEXT,
   onboarding_feito BOOLEAN DEFAULT FALSE,
   created_at      TIMESTAMPTZ DEFAULT NOW()
 );
@@ -36,48 +41,56 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 -- ══════════════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS public.treinos (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id     UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  id          UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+  user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   nome        TEXT NOT NULL,
   dia_semana  INTEGER NOT NULL CHECK (dia_semana BETWEEN 0 AND 6),
-  tipo        TEXT CHECK (tipo IN ('musculacao','cardio','funcional','descanso')),
-  observacao  TEXT,
-  ordem       INTEGER DEFAULT 0,
+  descricao   TEXT,
+  ativo       BOOLEAN DEFAULT TRUE,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.exercicios (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  treino_id       UUID NOT NULL REFERENCES treinos(id) ON DELETE CASCADE,
-  nome            TEXT NOT NULL,
-  series          INTEGER NOT NULL DEFAULT 3,
-  repeticoes      TEXT NOT NULL DEFAULT '10-12',
-  carga           DECIMAL(6,2),
-  tempo_descanso  INTEGER DEFAULT 60,
-  observacao      TEXT,
-  ordem           INTEGER DEFAULT 0
+  id                UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+  treino_id         UUID NOT NULL REFERENCES public.treinos(id) ON DELETE CASCADE,
+  nome              TEXT NOT NULL,
+  grupo_muscular    TEXT,
+  series            INTEGER DEFAULT 3,
+  repeticoes        INTEGER DEFAULT 12,
+  carga             NUMERIC,
+  descanso_segundos INTEGER DEFAULT 60,
+  ordem             INTEGER DEFAULT 0,
+  created_at        TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.sessoes_treino (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id         UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  treino_id       UUID REFERENCES treinos(id),
-  data            DATE NOT NULL DEFAULT CURRENT_DATE,
+  id              UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+  user_id         UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  treino_id       UUID NOT NULL REFERENCES public.treinos(id) ON DELETE CASCADE,
+  inicio          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  fim             TIMESTAMPTZ,
   duracao_minutos INTEGER,
-  concluido       BOOLEAN DEFAULT FALSE,
-  observacao      TEXT,
+  concluida       BOOLEAN DEFAULT FALSE,
   created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.series_realizadas (
-  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  sessao_id    UUID NOT NULL REFERENCES sessoes_treino(id) ON DELETE CASCADE,
-  exercicio_id UUID NOT NULL REFERENCES exercicios(id),
-  numero_serie INTEGER NOT NULL,
-  carga_usada  DECIMAL(6,2),
-  reps_feitas  INTEGER,
-  concluido    BOOLEAN DEFAULT FALSE
+  id           UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+  sessao_id    UUID NOT NULL REFERENCES public.sessoes_treino(id) ON DELETE CASCADE,
+  exercicio_id UUID NOT NULL REFERENCES public.exercicios(id) ON DELETE CASCADE,
+  serie_numero INTEGER NOT NULL,
+  repeticoes   INTEGER,
+  carga        NUMERIC,
+  concluida    BOOLEAN DEFAULT FALSE,
+  created_at   TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Colunas aditivas (iguais à 000)
+ALTER TABLE public.treinos        ADD COLUMN IF NOT EXISTS tipo TEXT
+  CHECK (tipo IN ('musculacao','cardio','funcional','descanso'));
+ALTER TABLE public.treinos        ADD COLUMN IF NOT EXISTS ordem INTEGER DEFAULT 0;
+ALTER TABLE public.exercicios     ADD COLUMN IF NOT EXISTS observacao TEXT;
+ALTER TABLE public.sessoes_treino ADD COLUMN IF NOT EXISTS observacao TEXT;
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- HÁBITOS
@@ -179,12 +192,12 @@ CREATE TABLE IF NOT EXISTS public.refeicoes (
 );
 
 CREATE TABLE IF NOT EXISTS public.registros_agua (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id       UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  id            UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+  user_id       UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   data          DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
   quantidade_ml INTEGER NOT NULL DEFAULT 0,
   meta_ml       INTEGER NOT NULL DEFAULT 2500,
-  created_at    TIMESTAMPTZ DEFAULT NOW(),
   updated_at    TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(user_id, data)
 );
@@ -294,7 +307,7 @@ CREATE TABLE IF NOT EXISTS public.conquistas (
 
 CREATE INDEX IF NOT EXISTS idx_treinos_user          ON treinos(user_id);
 CREATE INDEX IF NOT EXISTS idx_exercicios_treino     ON exercicios(treino_id);
-CREATE INDEX IF NOT EXISTS idx_sessoes_user_data     ON sessoes_treino(user_id, data);
+CREATE INDEX IF NOT EXISTS idx_sessoes_user_inicio   ON sessoes_treino(user_id, inicio);
 CREATE INDEX IF NOT EXISTS idx_habitos_user          ON habitos(user_id);
 CREATE INDEX IF NOT EXISTS idx_reg_hab_user_data     ON registros_habito(user_id, data);
 CREATE INDEX IF NOT EXISTS idx_transacoes_user_data  ON transacoes(user_id, data);
@@ -310,7 +323,7 @@ CREATE INDEX IF NOT EXISTS idx_itens_lista           ON itens_compras(lista_id);
 CREATE INDEX IF NOT EXISTS idx_assinaturas_user      ON assinaturas(user_id);
 CREATE INDEX IF NOT EXISTS idx_conquistas_user       ON conquistas(user_id);
 CREATE INDEX IF NOT EXISTS idx_registros_peso_user   ON registros_peso(user_id, data);
-CREATE INDEX IF NOT EXISTS idx_registros_agua_user   ON registros_agua(user_id, data);
+CREATE INDEX IF NOT EXISTS idx_agua_user_data        ON registros_agua(user_id, data);
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- ROW LEVEL SECURITY
@@ -348,7 +361,15 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies
     WHERE schemaname = 'public' AND tablename = 'profiles' AND policyname = 'users_own_profile'
-  ) THEN
+  ) AND (
+    SELECT count(*) FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE']) AS c
+    WHERE EXISTS (
+      SELECT 1 FROM pg_policies p
+      WHERE p.schemaname = 'public' AND p.tablename = 'profiles'
+        AND p.permissive = 'PERMISSIVE' AND p.cmd IN (c, 'ALL')
+        AND COALESCE(p.qual, p.with_check) LIKE '%auth.uid()%'
+    )
+  ) < 4 THEN
     CREATE POLICY "users_own_profile" ON profiles
       FOR ALL USING (auth.uid() = id);
   END IF;
@@ -368,7 +389,15 @@ BEGIN
     IF NOT EXISTS (
       SELECT 1 FROM pg_policies
       WHERE schemaname = 'public' AND tablename = t AND policyname = 'users_own_data'
-    ) THEN
+    ) AND (
+      SELECT count(*) FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE']) AS c
+      WHERE EXISTS (
+        SELECT 1 FROM pg_policies p
+        WHERE p.schemaname = 'public' AND p.tablename = t
+          AND p.permissive = 'PERMISSIVE' AND p.cmd IN (c, 'ALL')
+          AND COALESCE(p.qual, p.with_check) LIKE '%auth.uid()%'
+      )
+    ) < 4 THEN
       EXECUTE format('CREATE POLICY "users_own_data" ON public.%I FOR ALL USING (auth.uid() = user_id)', t);
     END IF;
   END LOOP;
@@ -393,7 +422,15 @@ BEGIN
     IF NOT EXISTS (
       SELECT 1 FROM pg_policies
       WHERE schemaname = 'public' AND tablename = p[1] AND policyname = p[2]
-    ) THEN
+    ) AND (
+      SELECT count(*) FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE']) AS c
+      WHERE EXISTS (
+        SELECT 1 FROM pg_policies pp
+        WHERE pp.schemaname = 'public' AND pp.tablename = p[1]
+          AND pp.permissive = 'PERMISSIVE' AND pp.cmd IN (c, 'ALL')
+          AND COALESCE(pp.qual, pp.with_check) LIKE '%auth.uid()%'
+      )
+    ) < 4 THEN
       EXECUTE format('CREATE POLICY %I ON public.%I FOR ALL USING (%s)', p[2], p[1], p[3]);
     END IF;
   END LOOP;
