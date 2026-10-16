@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { chavesAfetadasPorPagamento, contasKeys } from '../financas-query-keys';
+import { chavesAfetadasPorOrcamento, chavesAfetadasPorPagamento, contasKeys, orcamentoKeys } from '../financas-query-keys';
+
+describe('orcamentoKeys', () => {
+  it('lista do orçamento fica sob o prefixo invalidado por chavesAfetadasPorOrcamento', () => {
+    const lista = orcamentoKeys.lista('u1');
+    expect(lista).toEqual(['orcamento-categorias', 'u1']);
+    expect(chavesAfetadasPorOrcamento()).toContainEqual(lista.slice(0, 1));
+  });
+
+  it('salvar renda/limite invalida rendas, orçamento e o resumo (sobra e selo)', () => {
+    expect(chavesAfetadasPorOrcamento()).toEqual([
+      ['rendas'],
+      ['orcamento-categorias'],
+      ['resumo-financeiro-mes'],
+    ]);
+  });
+});
 
 describe('contasKeys', () => {
   it('inclui a competência nas chaves de contas do mês e da conta', () => {

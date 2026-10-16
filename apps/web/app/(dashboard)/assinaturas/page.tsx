@@ -507,11 +507,13 @@ function AssinaturaCard({ assinatura, situacao, highlight, onEdit, onDelete }: A
       </div>
 
       {/* Info */}
-      <div className="flex flex-1 flex-col gap-0.5">
-        <span className="flex items-center gap-2 text-sm font-semibold text-text">
-          {assinatura.nome}
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-text">
+          <span className="min-w-0 max-w-full truncate">{assinatura.nome}</span>
           {situacao && (
-            <Badge color={SITUACAO_BADGE[situacao].color}>{SITUACAO_BADGE[situacao].label}</Badge>
+            <Badge color={SITUACAO_BADGE[situacao].color} className="shrink-0 whitespace-nowrap">
+              {SITUACAO_BADGE[situacao].label}
+            </Badge>
           )}
         </span>
         <span className="flex items-center gap-1 text-xs text-muted">
@@ -521,11 +523,11 @@ function AssinaturaCard({ assinatura, situacao, highlight, onEdit, onDelete }: A
       </div>
 
       {/* Value */}
-      <span className="text-sm font-bold text-text">{formatBRL(assinatura.valor)}</span>
+      <span className="whitespace-nowrap text-sm font-bold text-text">{formatBRL(assinatura.valor)}</span>
 
       {/* Actions */}
-      {/* Mobile (sem hover): sempre visível. Desktop: hover ou foco por teclado. */}
-      <div className="flex gap-1 transition-opacity md:opacity-0 md:focus-within:opacity-100 md:group-hover:opacity-100">
+      {/* Mobile e touch (sem hover): sempre visível. Desktop com mouse: hover ou foco por teclado. */}
+      <div className="flex shrink-0 gap-1 transition-opacity md:[@media(hover:hover)_and_(pointer:fine)]:opacity-0 focus-within:opacity-100 group-hover:opacity-100">
         <Button variant="icon" onClick={onEdit} aria-label={`Editar assinatura ${assinatura.nome}`}>
           <Pencil size={14} />
         </Button>

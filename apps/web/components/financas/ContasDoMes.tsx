@@ -55,9 +55,10 @@ export function ContasDoMes({ competencia }: { competencia: Competencia }) {
                   className="flex min-w-0 flex-1 items-center gap-3 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-2 truncate text-sm font-medium text-text">
-                      {oc.conta.descricao}
-                      <Badge color={ui.color}>{ui.label}</Badge>
+                    {/* Selo quebra de linha em vez de ser cortado (375px). */}
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-text">
+                      <span className="min-w-0 max-w-full truncate">{oc.conta.descricao}</span>
+                      <Badge color={ui.color} className="shrink-0 whitespace-nowrap">{ui.label}</Badge>
                     </p>
                     <p className="text-xs text-muted">
                       {oc.pagamento ? `Paga em ${formatDiaMes(oc.pagamento.pago_em)}` : `Vence ${formatDiaMes(oc.vencimento)}`}

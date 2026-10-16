@@ -119,10 +119,11 @@ export default function ContasPage() {
                 href={`/financas/contas/${conta.id}?competencia=${competencia}`}
                 className="min-w-0 flex-1 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
               >
-                <p className="flex items-center gap-2 truncate text-sm font-medium text-text">
-                  {conta.descricao}
-                  <Badge color="purple">{RECORRENCIA_LABEL[conta.recorrencia]}</Badge>
-                  {conta.assinatura_id && <Badge color="teal">Assinatura</Badge>}
+                {/* Selos quebram de linha em vez de serem cortados (375px). */}
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-text">
+                  <span className="min-w-0 max-w-full truncate">{conta.descricao}</span>
+                  <Badge color="purple" className="shrink-0 whitespace-nowrap">{RECORRENCIA_LABEL[conta.recorrencia]}</Badge>
+                  {conta.assinatura_id && <Badge color="teal" className="shrink-0 whitespace-nowrap">Assinatura</Badge>}
                 </p>
                 <p className="text-xs text-muted">
                   {descreverVencimento(conta)} · {conta.categoria}

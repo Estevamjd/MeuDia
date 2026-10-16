@@ -1,4 +1,11 @@
-import type { Competencia, OcorrenciaConta, Selo, SituacaoOcorrencia } from '@meudia/shared';
+import type {
+  Competencia,
+  OcorrenciaConta,
+  OrcamentoCategoria,
+  Selo,
+  SituacaoOcorrencia,
+  Transacao,
+} from '@meudia/shared';
 
 const MESES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -102,4 +109,94 @@ export function textoDelta(delta: { absoluto: number; percentual: number | null 
   const sinal = delta.absoluto > 0 ? '+' : '−';
   const pct = delta.percentual === null ? '' : ` (${sinal}${Math.abs(Math.round(delta.percentual * 100))}%)`;
   return `${sinal}${formatBRL(Math.abs(delta.absoluto))}${pct} vs. mês anterior`;
+}
+
+export type SituacaoLimite = 'dentro' | 'perto' | 'acima';
+
+/** A partir de 80% do limite a categoria fica "perto do limite". */
+export const LIMITE_ALERTA = 0.8;
+
+export const SITUACAO_LIMITE_UI: Record<SituacaoLimite, { label: string; color: 'green' | 'yellow' | 'red' }> = {
+  dentro: { label: 'Dentro', color: 'green' },
+  perto: { label: 'Perto do limite', color: 'yellow' },
+  acima: { label: 'Acima do limite', color: 'red' },
+};
+
+export interface LinhaOrcamento {
+  categoria: string;
+  /** `null` = categoria com gasto no mês e sem limite cadastrado. */
+  orcamento: OrcamentoCategoria | null;
+  limite: number | null;
+  gasto: number;
+  /** Fração gasto/limite; `null` sem limite ou com limite 0. */
+  pct: number | null;
+  situacao: SituacaoLimite | null;
+}
+
+export function situacaoLimite(gasto: number, limite: number): SituacaoLimite {
+  if (gasto > limite) return 'acima';
+  if (limite > 0 && gasto / limite >= LIMITE_ALERTA) return 'perto';
+  return 'dentro';
+}
+
+const centavos = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Limite × gasto por categoria. O gasto soma as despesas do mês da mesma
+ * categoria (match exato, como em `resumoFinanceiroMes`). Primeiro as categorias
+ * com limite (mais comprometidas no topo), depois as com gasto e sem limite.
+ */
+export function linhasOrcamento(
+  orcamento: readonly OrcamentoCategoria[],
+  transacoes: readonly Transacao[],
+): LinhaOrcamento[] {
+  const gastos = new Map<string, number>();
+  for (const t of transacoes) {
+    if (t.tipo !== 'despesa') continue;
+    gastos.set(t.categoria, (gastos.get(t.categoria) ?? 0) + Number(t.valor));
+  }
+
+  const comLimite = orcamento
+    .map((o): LinhaOrcamento => {
+      const limite = Number(o.valor_planejado);
+      const gasto = centavos(gastos.get(o.categoria) ?? 0);
+      return {
+        categoria: o.categoria,
+        orcamento: o,
+        limite,
+        gasto,
+        pct: limite > 0 ? gasto / limite : null,
+        situacao: situacaoLimite(gasto, limite),
+      };
+    })
+    .sort((a, b) => (b.pct ?? 0) - (a.pct ?? 0) || a.categoria.localeCompare(b.categoria));
+
+  const categoriasComLimite = new Set(orcamento.map((o) => o.categoria));
+  const semLimite = [...gastos.entries()]
+    .filter(([categoria]) => !categoriasComLimite.has(categoria))
+    .map(([categoria, gasto]): LinhaOrcamento => ({
+      categoria,
+      orcamento: null,
+      limite: null,
+      gasto: centavos(gasto),
+      pct: null,
+      situacao: null,
+    }))
+    .sort((a, b) => b.gasto - a.gasto || a.categoria.localeCompare(b.categoria));
+
+  return [...comLimite, ...semLimite];
+}
+
+/** Texto de input numérico → reais com 2 casas; `null` se vazio, inválido, ≤ 0 ou acima do máximo do validator. */
+export function parseValorPositivo(texto: string): number | null {
+  const valor = parseValorNaoNegativo(texto);
+  return valor !== null && valor > 0 ? valor : null;
+}
+
+/** Igual a `parseValorPositivo`, mas aceita 0 (limite de orçamento: validator `nonnegative`). */
+export function parseValorNaoNegativo(texto: string): number | null {
+  if (!texto.trim()) return null;
+  const valor = Number(texto.replace(',', '.'));
+  if (!Number.isFinite(valor) || valor < 0 || valor > 99999999.99) return null;
+  return centavos(valor) + 0; // `+ 0` normaliza -0 (ex.: "-0")
 }
