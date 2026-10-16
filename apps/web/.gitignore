@@ -1,1 +1,4 @@
 .vercel
+
+# artefatos do E2E com mock (screenshots, traces)
+e2e/artifacts/

@@ -2,6 +2,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
+  // Specs com mock do Supabase rodam só via playwright.mock.config.ts (pnpm e2e:mock).
+  testIgnore: [/novo-usuario\.spec\.ts$/, /onboarding-loop\.spec\.ts$/, /mock-guard\.ts$/],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
