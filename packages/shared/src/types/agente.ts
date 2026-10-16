@@ -95,6 +95,8 @@ export interface PreferenciasAgente {
   user_id: UUID;
   notif_faltou_treino: boolean;
   notif_habito_pendente: boolean;
+  notif_contas_pagar: boolean | null;
+  lembrete_dias_antes: number | null;
   horario_verificacao: string;
   timer_descanso_auto: boolean;
   sugestao_carga_auto: boolean;
@@ -105,6 +107,8 @@ export interface PreferenciasAgente {
 export interface PreferenciasAgenteUpdate {
   notif_faltou_treino?: boolean;
   notif_habito_pendente?: boolean;
+  notif_contas_pagar?: boolean | null;
+  lembrete_dias_antes?: number | null;
   horario_verificacao?: string;
   timer_descanso_auto?: boolean;
   sugestao_carga_auto?: boolean;

@@ -41,6 +41,9 @@ export type {
   TransacaoInsert,
   Assinatura,
   AssinaturaInsert,
+  StatusContaPagar,
+  ContaPagar,
+  ContaPagarInsert,
 } from './financas';
 
 export type {
