@@ -19,8 +19,8 @@ const resumoOk = {
 
 const contaCadastrada = { id: 'c1', ativo: true };
 
-type NomeConsulta = 'resumo' | 'contas' | 'orcamento' | 'transacoes';
-let q: Record<NomeConsulta | 'rendas' | 'definicoes', ReturnType<typeof consulta>>;
+type NomeConsulta = 'resumo' | 'contas' | 'orcamento' | 'transacoes' | 'rendas' | 'definicoes';
+let q: Record<NomeConsulta, ReturnType<typeof consulta>>;
 const preparar = (
   erros: Partial<Record<NomeConsulta, boolean>> = {},
   dados: { rendas?: unknown[]; definicoes?: unknown[] } = {},
@@ -30,8 +30,8 @@ const preparar = (
     contas: consulta([], { isError: !!erros.contas }),
     orcamento: consulta([], { isError: !!erros.orcamento }),
     transacoes: consulta([], { isError: !!erros.transacoes }),
-    rendas: consulta(dados.rendas ?? []),
-    definicoes: consulta(dados.definicoes ?? []),
+    rendas: consulta(dados.rendas ?? [], { isError: !!erros.rendas }),
+    definicoes: consulta(dados.definicoes ?? [], { isError: !!erros.definicoes }),
   };
 };
 
@@ -74,9 +74,21 @@ describe('useFinancasHome', () => {
     expect(usar().estado).toBe('pronto');
   });
 
-  it.each(['contas', 'orcamento', 'transacoes'] as const)('falha em %s vira erro (não lista vazia)', (nome) => {
-    preparar({ [nome]: true });
-    expect(usar().estado).toBe('erro');
+  it.each(['contas', 'orcamento', 'transacoes', 'rendas', 'definicoes'] as const)(
+    'falha em %s vira erro (não lista vazia) e "Tentar de novo" refaz ela',
+    (nome) => {
+      preparar({ [nome]: true });
+      const r = usar();
+      expect(r.estado).toBe('erro');
+      r.onTentarDeNovo?.();
+      expect(q[nome].refetch).toHaveBeenCalled();
+    },
+  );
+
+  it.each(['resumo', 'contas', 'rendas', 'definicoes'] as const)('%s carregando: carregando', (nome) => {
+    preparar();
+    q[nome] = { ...q[nome], data: undefined, isLoading: true, isSuccess: false };
+    expect(usar().estado).toBe('carregando');
   });
 
   it('"Tentar de novo" refaz todas as consultas que falharam', () => {

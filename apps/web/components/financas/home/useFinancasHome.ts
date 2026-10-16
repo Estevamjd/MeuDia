@@ -69,9 +69,10 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
     [competencia, hojeISO, resumo.data, contas.data, orcamento.data, transacoes.data],
   );
 
-  // Falha em qualquer consulta que alimenta as seções vira erro (nada de lista vazia silenciosa).
-  const consultas = [resumo, contas, orcamento, transacoes];
+  // Falha em qualquer consulta que alimenta as seções, o onboarding ou o aviso vira erro (nada de lista vazia silenciosa).
+  const consultas = [resumo, contas, orcamento, transacoes, rendas, contasCadastradas];
   const comErro = consultas.filter((q) => q.isError);
+  const carregando = resumo.isLoading || contas.isLoading || rendas.isLoading || contasCadastradas.isLoading;
 
   const rendaCadastrada = (rendas.data ?? []).some((r) => r.ativo);
   // Definições cadastradas (não as ocorrências do mês): conta anual/avulsa de outro mês também conta.
@@ -80,7 +81,7 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
   const mostrarBoasVindas = rendas.isSuccess ? !rendaCadastrada || !temContas : !!secoes?.vazio;
 
   return {
-    estado: resumo.isLoading || contas.isLoading ? 'carregando' : comErro.length > 0 || !secoes ? 'erro' : 'pronto',
+    estado: carregando ? 'carregando' : comErro.length > 0 || !secoes ? 'erro' : 'pronto',
     onTentarDeNovo: () => {
       for (const q of comErro.length > 0 ? comErro : [resumo]) void q.refetch();
     },
