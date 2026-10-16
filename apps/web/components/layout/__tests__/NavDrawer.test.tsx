@@ -10,7 +10,27 @@ vi.mock('next/navigation', () => ({ usePathname: () => pathname }));
 afterEach(() => {
   cleanup();
   pathname = '/financas';
+  vi.unstubAllGlobals();
 });
+
+/** matchMedia controlável: `mudar(true)` simula a viewport passando para >= md. */
+const mockMatchMedia = (inicial = false) => {
+  const listeners = new Set<(e: MediaQueryListEvent) => void>();
+  const mql = {
+    matches: inicial,
+    media: '(min-width: 768px)',
+    addEventListener: (_: 'change', fn: (e: MediaQueryListEvent) => void) => listeners.add(fn),
+    removeEventListener: (_: 'change', fn: (e: MediaQueryListEvent) => void) => listeners.delete(fn),
+  };
+  vi.stubGlobal('matchMedia', vi.fn(() => mql));
+  return {
+    listeners,
+    mudar: (matches: boolean) => {
+      mql.matches = matches;
+      act(() => listeners.forEach((fn) => fn({ matches } as MediaQueryListEvent)));
+    },
+  };
+};
 
 const renderTopbar = (mode: 'financas' | 'padrao', onSignOut = vi.fn()) =>
   render(
@@ -96,6 +116,32 @@ describe('Drawer do Topbar (modo finanças)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sair' }));
     expect(onSignOut).toHaveBeenCalledOnce();
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('viewport >= 768px com o drawer aberto: fecha e libera listener, focus trap e overflow', () => {
+    const media = mockMatchMedia();
+    renderTopbar('financas');
+    abrir();
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(media.listeners.size).toBe(1);
+
+    media.mudar(true);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Abrir menu' }).getAttribute('aria-expanded')).toBe('false');
+    expect(document.body.style.overflow).toBe('');
+    expect(media.listeners.size).toBe(0);
+    // Sem focus trap: Tab não é mais interceptado.
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    document.dispatchEvent(tab);
+    expect(tab.defaultPrevented).toBe(false);
+  });
+
+  it('abrir já em >= 768px fecha de imediato', () => {
+    mockMatchMedia(true);
+    renderTopbar('financas');
+    abrir();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.body.style.overflow).toBe('');
   });
 
   it('modo padrão: sem hamburger (comportamento atual)', () => {

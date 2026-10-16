@@ -9,6 +9,8 @@ import { useAppMode } from '../AppModeProvider';
 import { isNavAtivo, itensDrawer } from '../../lib/navegacao';
 
 const FOCAVEIS = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+/** Breakpoint `md` do Tailwind. */
+const MEDIA_DESKTOP = '(min-width: 768px)';
 
 interface NavDrawerProps {
   id: string;
@@ -31,6 +33,22 @@ export function NavDrawer({ id, isOpen, onClose, onSignOut, returnFocusRef }: Na
     if (pathnameAnterior.current !== pathname && isOpen) onClose();
     pathnameAnterior.current = pathname;
   }, [pathname, isOpen, onClose]);
+
+  // O drawer é só mobile (md:hidden): ao passar para >= md, fecha para liberar
+  // listener, focus trap e o overflow do body.
+  useEffect(() => {
+    if (!isOpen || typeof window.matchMedia !== 'function') return;
+    const mql = window.matchMedia(MEDIA_DESKTOP);
+    if (mql.matches) {
+      onClose();
+      return;
+    }
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (e.matches) onClose();
+    };
+    mql.addEventListener('change', handleChange);
+    return () => mql.removeEventListener('change', handleChange);
+  }, [isOpen, onClose]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
