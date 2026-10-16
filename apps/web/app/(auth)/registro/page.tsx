@@ -10,6 +10,7 @@ import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import { createClient } from '../../../lib/supabase/client';
 import { Input } from '../../../components/ui/Input';
 import { Button } from '../../../components/ui/Button';
+import { getAuthCallbackUrl } from '../../../lib/auth/callback';
 
 const registroSchema = z
   .object({
@@ -33,6 +34,7 @@ export default function RegistroPage() {
   const supabase = createClient();
   const [showPassword, setShowPassword] = useState(false);
   const [serverError, setServerError] = useState('');
+  const [emailEnviado, setEmailEnviado] = useState(false);
 
   const {
     register,
@@ -48,11 +50,12 @@ export default function RegistroPage() {
       setServerError('Serviço indisponível. Verifique a configuração.');
       return;
     }
-    const { error } = await supabase.auth.signUp({
+    const { data: signUpData, error } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
       options: {
         data: { nome: data.nome },
+        emailRedirectTo: getAuthCallbackUrl(),
       },
     });
 
@@ -62,6 +65,12 @@ export default function RegistroPage() {
           ? 'Este email já está cadastrado'
           : 'Erro ao criar conta. Tente novamente.',
       );
+      return;
+    }
+
+    // Confirmação de e-mail ativa: sem sessão até o usuário clicar no link
+    if (!signUpData.session) {
+      setEmailEnviado(true);
       return;
     }
 
@@ -79,75 +88,88 @@ export default function RegistroPage() {
           <p className="mt-2 text-sm text-muted">Crie sua conta e comece a organizar seu dia</p>
         </div>
 
-        <form
-          onSubmit={handleSubmit(onSubmit)}
-          className="rounded-card border border-border bg-card p-8"
-        >
-          {serverError && (
-            <div className="mb-4 rounded-lg border border-red/30 bg-red/[0.08] px-4 py-3 text-sm text-red" role="alert">
-              {serverError}
-            </div>
-          )}
+        {emailEnviado ? (
+          <div className="rounded-card border border-border bg-card p-8 text-center" role="status">
+            <Mail size={32} className="mx-auto mb-4 text-accent" />
+            <p className="text-sm text-text">Enviamos um link para seu e-mail. Confirme para entrar.</p>
+            <Link
+              href="/login"
+              className="mt-6 inline-block text-sm text-accent transition-colors hover:text-accent2"
+            >
+              Ir para o login
+            </Link>
+          </div>
+        ) : (
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            className="rounded-card border border-border bg-card p-8"
+          >
+            {serverError && (
+              <div className="mb-4 rounded-lg border border-red/30 bg-red/[0.08] px-4 py-3 text-sm text-red" role="alert">
+                {serverError}
+              </div>
+            )}
 
-          <div className="flex flex-col gap-4">
-            <Input
-              label="Nome"
-              type="text"
-              placeholder="Seu nome"
-              icon={<User size={16} />}
-              error={errors.nome?.message}
-              {...register('nome')}
-            />
-
-            <Input
-              label="Email"
-              type="email"
-              placeholder="seu@email.com"
-              icon={<Mail size={16} />}
-              error={errors.email?.message}
-              {...register('email')}
-            />
-
-            <div className="relative">
+            <div className="flex flex-col gap-4">
               <Input
-                label="Senha"
+                label="Nome"
+                type="text"
+                placeholder="Seu nome"
+                icon={<User size={16} />}
+                error={errors.nome?.message}
+                {...register('nome')}
+              />
+
+              <Input
+                label="Email"
+                type="email"
+                placeholder="seu@email.com"
+                icon={<Mail size={16} />}
+                error={errors.email?.message}
+                {...register('email')}
+              />
+
+              <div className="relative">
+                <Input
+                  label="Senha"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••"
+                  icon={<Lock size={16} />}
+                  error={errors.password?.message}
+                  {...register('password')}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  className="absolute right-3 top-9 text-muted transition-colors hover:text-text"
+                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+
+              <Input
+                label="Confirmar senha"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="••••••"
                 icon={<Lock size={16} />}
-                error={errors.password?.message}
-                {...register('password')}
+                error={errors.confirmPassword?.message}
+                {...register('confirmPassword')}
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword((s) => !s)}
-                className="absolute right-3 top-9 text-muted transition-colors hover:text-text"
-                aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-              >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
             </div>
 
-            <Input
-              label="Confirmar senha"
-              type={showPassword ? 'text' : 'password'}
-              placeholder="••••••"
-              icon={<Lock size={16} />}
-              error={errors.confirmPassword?.message}
-              {...register('confirmPassword')}
-            />
-          </div>
+            <Button type="submit" isLoading={isSubmitting} className="mt-6 w-full">
+              Criar conta
+            </Button>
 
-          <Button type="submit" isLoading={isSubmitting} className="mt-6 w-full">
-            Criar conta
-          </Button>
-
-          <p className="mt-4 text-center text-sm text-muted">
-            Já tem conta?{' '}
-            <Link href="/login" className="text-accent transition-colors hover:text-accent2">
-              Entrar
-            </Link>
-          </p>
-        </form>
+            <p className="mt-4 text-center text-sm text-muted">
+              Já tem conta?{' '}
+              <Link href="/login" className="text-accent transition-colors hover:text-accent2">
+                Entrar
+              </Link>
+            </p>
+          </form>
+        )}
       </div>
     </main>
   );

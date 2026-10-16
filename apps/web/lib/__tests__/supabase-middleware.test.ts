@@ -32,3 +32,14 @@ it.each(['/treinos', '/treinos/sessao?mes=10'])('bloqueia %s mesmo sem Supabase 
   const response = await updateSession(new NextRequest(`https://example.invalid${path}`));
   expect(response.headers.get('location')).toBe('https://example.invalid/financas');
 });
+
+it.each([null, { id: 'u' }])('/auth/callback é público e não redireciona (user=%o)', async user => {
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.invalid');
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'fixture');
+  vi.stubEnv('APP_MODE', 'financas');
+  vi.mocked(createServerClient).mockImplementation(() => ({
+    auth: { getUser: async () => ({ data: { user } }) },
+  }) as never);
+  const response = await updateSession(new NextRequest('https://example.invalid/auth/callback?code=abc'));
+  expect(response.headers.get('location')).toBeNull();
+});

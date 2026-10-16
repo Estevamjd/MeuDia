@@ -51,6 +51,11 @@ export async function updateSession(request: NextRequest) {
     return response;
   };
 
+  // Callback de confirmação de e-mail: sempre acessível e sem redirect para a rota inicial.
+  if (request.nextUrl.pathname.startsWith('/auth/callback')) {
+    return supabaseResponse;
+  }
+
   const isPublicRoute =
     request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/registro') ||
