@@ -50,3 +50,8 @@ export {
 export {
   medicamentoInsertSchema,
 } from './medicamentos.validator';
+
+export { competenciaSchema, contaPagarInsertSchema, contaPagarUpdateSchema, pagarContaSchema } from './contas-pagar.validator';
+export { rendaInsertSchema } from './rendas.validator';
+export { orcamentoInsertSchema } from './orcamento.validator';
+export { pushSubscriptionSchema } from './push-subscription.validator';
