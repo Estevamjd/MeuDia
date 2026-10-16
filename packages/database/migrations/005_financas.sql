@@ -13,50 +13,49 @@ BEGIN
   END IF;
 END $$;
 
--- assinaturas = contas recorrentes
-ALTER TABLE public.assinaturas
-  ADD COLUMN IF NOT EXISTS categoria     TEXT NOT NULL DEFAULT 'Assinaturas',
-  ADD COLUMN IF NOT EXISTS recorrencia   TEXT NOT NULL DEFAULT 'mensal'
-    CHECK (recorrencia IN ('mensal','anual')),
-  ADD COLUMN IF NOT EXISTS mes_vencimento INTEGER CHECK (mes_vencimento BETWEEN 1 AND 12);
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint
-    WHERE conrelid = 'public.assinaturas'::pg_catalog.regclass
-      AND conname = 'assinaturas_recorrencia_mes_check') THEN
-    ALTER TABLE public.assinaturas ADD CONSTRAINT assinaturas_recorrencia_mes_check
-      CHECK ((recorrencia = 'anual') = (mes_vencimento IS NOT NULL));
-  END IF;
-END $$;
-
 CREATE TABLE IF NOT EXISTS public.contas_pagar (
-  id            UUID PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
-  user_id       UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  assinatura_id UUID,                         -- NULL = conta única
-  descricao     TEXT NOT NULL,
-  categoria     TEXT NOT NULL DEFAULT 'Contas',
-  valor         DECIMAL(10,2) NOT NULL CHECK (valor > 0),
-  competencia   DATE NOT NULL,                -- 1º dia do mês da ocorrência
-  vencimento    DATE NOT NULL,
-  status        TEXT NOT NULL DEFAULT 'pendente'
-                  CHECK (status IN ('pendente','paga','cancelada')),
-  pago_em       DATE,
-  transacao_id  UUID,
-  created_at    TIMESTAMPTZ DEFAULT pg_catalog.now(),
-  updated_at    TIMESTAMPTZ DEFAULT pg_catalog.now(),
+  id              UUID PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
+  user_id         UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  assinatura_id   UUID,                       -- espelho de uma assinatura (opcional)
+  descricao       TEXT NOT NULL,
+  categoria       TEXT NOT NULL DEFAULT 'Contas',
+  valor           DECIMAL(10,2) NOT NULL CHECK (valor > 0),
+  recorrencia     TEXT NOT NULL CHECK (recorrencia IN ('mensal','anual','unica')),
+  dia_vencimento  INTEGER CHECK (dia_vencimento BETWEEN 1 AND 31),   -- mensal/anual
+  mes_vencimento  INTEGER CHECK (mes_vencimento BETWEEN 1 AND 12),   -- anual
+  data_vencimento DATE,                                              -- unica
+  ativo           BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at      TIMESTAMPTZ DEFAULT pg_catalog.now(),
+  updated_at      TIMESTAMPTZ DEFAULT pg_catalog.now(),
   UNIQUE (id, user_id),
-  CHECK ((status = 'paga') = (pago_em IS NOT NULL)),
-  CHECK (competencia = pg_catalog.date_trunc('month', vencimento::timestamp)::date),
-  -- FK compostas (id, user_id): impedem apontar para assinatura/transação de outro usuário
+  CHECK (
+    (recorrencia = 'mensal' AND dia_vencimento IS NOT NULL AND mes_vencimento IS NULL AND data_vencimento IS NULL) OR
+    (recorrencia = 'anual'  AND dia_vencimento IS NOT NULL AND mes_vencimento IS NOT NULL AND data_vencimento IS NULL) OR
+    (recorrencia = 'unica'  AND data_vencimento IS NOT NULL AND dia_vencimento IS NULL AND mes_vencimento IS NULL)
+  ),
+  -- FK composta (id, user_id): impede apontar para assinatura de outro usuário
   FOREIGN KEY (assinatura_id, user_id) REFERENCES public.assinaturas (id, user_id)
-    ON DELETE SET NULL (assinatura_id),
+    ON DELETE SET NULL (assinatura_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_contas_pagar_assinatura
+  ON public.contas_pagar(assinatura_id) WHERE assinatura_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_contas_pagar_user_ativo ON public.contas_pagar(user_id) WHERE ativo;
+
+-- um pagamento por (conta, competência)
+CREATE TABLE IF NOT EXISTS public.pagamentos_conta (
+  id           UUID PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
+  conta_id     UUID NOT NULL,
+  user_id      UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  competencia  TEXT NOT NULL CHECK (competencia ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'),
+  pago_em      DATE NOT NULL,
+  transacao_id UUID,                          -- despesa criada por pagar_conta (opcional)
+  created_at   TIMESTAMPTZ DEFAULT pg_catalog.now(),
+  UNIQUE (conta_id, competencia),
+  FOREIGN KEY (conta_id, user_id) REFERENCES public.contas_pagar (id, user_id) ON DELETE CASCADE,
   FOREIGN KEY (transacao_id, user_id) REFERENCES public.transacoes (id, user_id)
     ON DELETE SET NULL (transacao_id)
 );
-CREATE UNIQUE INDEX IF NOT EXISTS uq_contas_pagar_assinatura_comp
-  ON public.contas_pagar(assinatura_id, competencia) WHERE assinatura_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_contas_pagar_user_venc   ON public.contas_pagar(user_id, vencimento);
-CREATE INDEX IF NOT EXISTS idx_contas_pagar_status_venc ON public.contas_pagar(status, vencimento);
+CREATE INDEX IF NOT EXISTS idx_pagamentos_conta_user_comp ON public.pagamentos_conta(user_id, competencia);
 
 CREATE TABLE IF NOT EXISTS public.rendas (
   id              UUID PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
@@ -95,7 +94,7 @@ CREATE TABLE IF NOT EXISTS public.lembretes_enviados (
   id          UUID PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
   user_id     UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   conta_id    UUID NOT NULL,
-  competencia DATE NOT NULL,
+  competencia TEXT NOT NULL CHECK (competencia ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'),
   etapa       TEXT NOT NULL CHECK (etapa IN ('D-2','D-1','D0')),
   canal       TEXT NOT NULL DEFAULT 'push' CHECK (canal IN ('push','email')),
   enviado_em  TIMESTAMPTZ NOT NULL DEFAULT pg_catalog.now(),
@@ -108,7 +107,7 @@ DO $$
 DECLARE
   t TEXT;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['contas_pagar', 'rendas', 'orcamento_categorias', 'push_subscriptions', 'lembretes_enviados'] LOOP
+  FOREACH t IN ARRAY ARRAY['contas_pagar', 'pagamentos_conta', 'rendas', 'orcamento_categorias', 'push_subscriptions', 'lembretes_enviados'] LOOP
     EXECUTE pg_catalog.format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
     IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_policies
       WHERE schemaname = 'public' AND tablename = t AND policyname = 'users_own_data') THEN
@@ -128,19 +127,19 @@ BEGIN
   END LOOP;
 END $$;
 
--- Contrato de erros das RPCs:
--- P0002: conta inexistente ou invisível por RLS (sem revelar o proprietário).
--- 22023: estado inválido; HINT identifica o estado exigido para a operação.
+-- P0002: conta inexistente/invisível; 22023: competência/estado inválido.
 -- NULL em p_pago_em usa a data corrente em America/Sao_Paulo.
 CREATE OR REPLACE FUNCTION public.pagar_conta(
   p_conta_id UUID,
+  p_competencia TEXT,
   p_pago_em DATE DEFAULT NULL,
   p_banco TEXT DEFAULT NULL
-) RETURNS public.contas_pagar
+) RETURNS public.pagamentos_conta
 LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
 AS $$
 DECLARE
   v_conta public.contas_pagar;
+  v_pagamento public.pagamentos_conta;
   v_transacao_id UUID;
   v_pago_em DATE;
 BEGIN
@@ -149,50 +148,59 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Conta não encontrada ou acesso negado' USING ERRCODE = 'P0002';
   END IF;
-  IF v_conta.status <> 'pendente' THEN
-    RAISE EXCEPTION 'Apenas contas pendentes podem ser pagas'
-      USING ERRCODE = '22023', HINT = 'Exige status=pendente.';
+  IF p_competencia IS NULL OR p_competencia !~ '^[0-9]{4}-(0[1-9]|1[0-2])$' THEN
+    RAISE EXCEPTION 'Competência inválida' USING ERRCODE = '22023', HINT = 'Exige YYYY-MM.';
+  END IF;
+  IF NOT v_conta.ativo
+    OR (v_conta.recorrencia = 'anual' AND pg_catalog.substring(p_competencia, 6, 2)::integer <> v_conta.mes_vencimento)
+    OR (v_conta.recorrencia = 'unica' AND p_competencia <> pg_catalog.to_char(v_conta.data_vencimento, 'YYYY-MM'))
+    OR (v_conta.recorrencia IN ('mensal', 'anual') AND p_competencia < pg_catalog.to_char(v_conta.created_at AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM')) THEN
+    RAISE EXCEPTION 'Conta sem ocorrência nesta competência'
+      USING ERRCODE = '22023', HINT = 'Exige conta ativa e competência compatível com a recorrência e criação.';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.pagamentos_conta WHERE conta_id = p_conta_id AND competencia = p_competencia AND user_id = v_conta.user_id) THEN
+    RAISE EXCEPTION 'Competência já paga' USING ERRCODE = '22023', HINT = 'Exige competência sem pagamento.';
   END IF;
   v_pago_em := coalesce(p_pago_em, (pg_catalog.now() AT TIME ZONE 'America/Sao_Paulo')::date);
-
   INSERT INTO public.transacoes (user_id, tipo, categoria, descricao, valor, data, banco, automatico)
     VALUES (v_conta.user_id, 'despesa', v_conta.categoria, v_conta.descricao,
             v_conta.valor, v_pago_em, p_banco, TRUE)
     RETURNING id INTO v_transacao_id;
-
-  UPDATE public.contas_pagar
-    SET status = 'paga', pago_em = v_pago_em, transacao_id = v_transacao_id, updated_at = pg_catalog.now()
-    WHERE id = v_conta.id RETURNING * INTO v_conta;
-  RETURN v_conta;
+  INSERT INTO public.pagamentos_conta (conta_id, user_id, competencia, pago_em, transacao_id)
+    VALUES (v_conta.id, v_conta.user_id, p_competencia, v_pago_em, v_transacao_id)
+    RETURNING * INTO v_pagamento;
+  RETURN v_pagamento;
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.desfazer_pagamento(p_conta_id UUID)
-RETURNS public.contas_pagar
+CREATE OR REPLACE FUNCTION public.desfazer_pagamento(p_conta_id UUID, p_competencia TEXT)
+RETURNS void
 LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
 AS $$
 DECLARE
-  v_conta public.contas_pagar;
+  v_pagamento public.pagamentos_conta;
 BEGIN
-  SELECT * INTO v_conta FROM public.contas_pagar
+  -- Mesma ordem de locks de pagar_conta; serializa as operações da conta.
+  PERFORM 1 FROM public.contas_pagar
     WHERE id = p_conta_id AND user_id = auth.uid() FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Conta não encontrada ou acesso negado' USING ERRCODE = 'P0002';
   END IF;
-  IF v_conta.status <> 'paga' THEN
-    RAISE EXCEPTION 'Apenas contas pagas podem ter o pagamento desfeito'
-      USING ERRCODE = '22023', HINT = 'Exige status=paga.';
+  IF p_competencia IS NULL OR p_competencia !~ '^[0-9]{4}-(0[1-9]|1[0-2])$' THEN
+    RAISE EXCEPTION 'Competência inválida' USING ERRCODE = '22023', HINT = 'Exige YYYY-MM.';
   END IF;
-
-  DELETE FROM public.transacoes WHERE id = v_conta.transacao_id AND user_id = v_conta.user_id;
-  UPDATE public.contas_pagar
-    SET status = 'pendente', pago_em = NULL, transacao_id = NULL, updated_at = pg_catalog.now()
-    WHERE id = v_conta.id RETURNING * INTO v_conta;
-  RETURN v_conta;
+  SELECT * INTO v_pagamento FROM public.pagamentos_conta
+    WHERE conta_id = p_conta_id AND competencia = p_competencia AND user_id = auth.uid() FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Pagamento não encontrado nesta competência'
+      USING ERRCODE = '22023', HINT = 'Exige competência paga.';
+  END IF;
+  DELETE FROM public.transacoes WHERE id = v_pagamento.transacao_id AND user_id = v_pagamento.user_id;
+  DELETE FROM public.pagamentos_conta WHERE id = v_pagamento.id AND user_id = v_pagamento.user_id;
 END;
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.pagar_conta(UUID, DATE, TEXT) FROM PUBLIC, anon;
-REVOKE EXECUTE ON FUNCTION public.desfazer_pagamento(UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.pagar_conta(UUID, DATE, TEXT) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.desfazer_pagamento(UUID) TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.pagar_conta(UUID, TEXT, DATE, TEXT) FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.desfazer_pagamento(UUID, TEXT) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.pagar_conta(UUID, TEXT, DATE, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.desfazer_pagamento(UUID, TEXT) TO authenticated;
