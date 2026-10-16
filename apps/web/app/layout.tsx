@@ -89,10 +89,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 window.addEventListener('load', () => {
                   navigator.serviceWorker.register('/sw.js').then(reg => {
                     reg.addEventListener('updatefound', () => {
+                      // Só recarrega em atualização (já havia SW controlando): na 1ª instalação o reload apagava o que o usuário digitava.
+                      const atualizacao = !!navigator.serviceWorker.controller;
                       const newWorker = reg.installing;
                       if (newWorker) {
                         newWorker.addEventListener('statechange', () => {
-                          if (newWorker.state === 'activated') {
+                          if (newWorker.state === 'activated' && atualizacao) {
                             window.location.reload();
                           }
                         });
