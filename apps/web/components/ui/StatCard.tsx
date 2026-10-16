@@ -8,7 +8,7 @@ interface StatCardProps {
   icon?: ReactNode;
   tag?: {
     text: string;
-    color: 'green' | 'red' | 'yellow' | 'purple' | 'teal' | 'orange';
+    color: 'green' | 'red' | 'yellow' | 'purple' | 'teal' | 'orange' | 'neutral';
   };
   className?: string;
 }

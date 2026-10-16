@@ -1,5 +1,6 @@
 import { Button, SkeletonCard, SkeletonList } from '../../ui';
 import { AlertaContas } from './AlertaContas';
+import { AvisoLembretes, type AvisoLembretesProps } from './AvisoLembretes';
 import { BoasVindasFinancas, type BoasVindasFinancasProps } from './BoasVindasFinancas';
 import { EntradasSaidas } from './EntradasSaidas';
 import { HeroSobra } from './HeroSobra';
@@ -7,6 +8,7 @@ import { IndicadoresMes } from './IndicadoresMes';
 import type { SecoesHome } from './montarHome';
 import { OrcamentoResumo } from './OrcamentoResumo';
 import { ProximasContas, type ContaProxima } from './ProximasContas';
+import { RendaSheet, type RendaSheetProps } from './RendaSheet';
 import { UltimosLancamentos, type UltimosLancamentosProps } from './UltimosLancamentos';
 
 export interface FinancasHomeViewProps {
@@ -15,7 +17,11 @@ export interface FinancasHomeViewProps {
   /** Obrigatório em `pronto`. */
   secoes: SecoesHome | null;
   hojeISO: string;
-  boasVindas: Omit<BoasVindasFinancasProps, 'onNovoLancamento'>;
+  /** `null` quando renda e contas já existem (onboarding concluído). */
+  boasVindas: BoasVindasFinancasProps | null;
+  /** `null` quando o aviso não se aplica (sem contas, lembretes ativos/indisponíveis ou dispensado). */
+  avisoLembretes: AvisoLembretesProps | null;
+  rendaSheet: RendaSheetProps;
   contaOcupada?: string;
   onPagar: (conta: ContaProxima) => void;
   lancamentos: Omit<UltimosLancamentosProps, 'transacoes'>;
@@ -28,6 +34,8 @@ export function FinancasHomeView({
   secoes,
   hojeISO,
   boasVindas,
+  avisoLembretes,
+  rendaSheet,
   contaOcupada,
   onPagar,
   lancamentos,
@@ -60,9 +68,11 @@ export function FinancasHomeView({
     <div className="space-y-5">
       {secoes.alerta && <AlertaContas {...secoes.alerta} hojeISO={hojeISO} />}
 
-      {vazio ? (
-        <BoasVindasFinancas {...boasVindas} onNovoLancamento={lancamentos.onNovo} />
-      ) : (
+      {avisoLembretes && <AvisoLembretes {...avisoLembretes} />}
+
+      {boasVindas && <BoasVindasFinancas {...boasVindas} />}
+
+      {!vazio && (
         <>
           <HeroSobra {...secoes.hero} />
           <EntradasSaidas {...secoes.entradasSaidas} />
@@ -80,6 +90,8 @@ export function FinancasHomeView({
       {(!vazio || lancamentos.carregando || secoes.transacoes.length > 0) && (
         <UltimosLancamentos {...lancamentos} transacoes={secoes.transacoes} />
       )}
+
+      <RendaSheet {...rendaSheet} />
     </div>
   );
 }

@@ -46,6 +46,20 @@ export function rotuloCompetencia(competencia: Competencia): string {
 export const formatBRL = (valor: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
 
+/** Máscara de moeda: só dígitos, lidos como centavos ("480000" → R$ 4.800,00). Até 99.999.999,99. */
+export function mascaraBRL(texto: string): { digitos: string; exibicao: string; valor: number } {
+  const digitos = texto.replace(/\D/g, '').replace(/^0+/, '').slice(0, 10);
+  const valor = digitos ? Number(digitos) / 100 : 0;
+  return { digitos, exibicao: digitos ? formatBRL(valor) : '', valor };
+}
+
+/** Selo da sobra prevista no orçamento: zero não é "positiva". */
+export function tagSobraPrevista(sobra: number): { text: string; color: 'teal' | 'red' | 'neutral' } {
+  if (sobra > 0) return { text: 'positiva', color: 'teal' };
+  if (sobra < 0) return { text: 'negativa', color: 'red' };
+  return { text: 'zerada', color: 'neutral' };
+}
+
 /** Fração (0.45) → "45%"; `null` → "—". */
 export function formatPct(fracao: number | null): string {
   if (fracao === null || !Number.isFinite(fracao)) return '—';

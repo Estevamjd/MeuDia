@@ -1,96 +1,57 @@
 import Link from 'next/link';
-import { CheckCircle2, Circle } from 'lucide-react';
-import type { EstadoPush } from '../../../lib/push';
 import { Button } from '../../ui';
 
 export interface BoasVindasFinancasProps {
   rendaCadastrada: boolean;
-  contasCadastradas: boolean;
-  estadoLembretes: EstadoPush;
-  ativandoLembretes?: boolean;
-  onAtivarLembretes: () => void;
-  onNovoLancamento: () => void;
+  onCadastrarRenda: () => void;
 }
 
-/** Push que não existe neste aparelho/ambiente não vira passo pendente para sempre. */
-const LEMBRETES_INDISPONIVEIS: readonly EstadoPush[] = ['nao-suportado', 'nao-configurado'];
+const TOTAL_PASSOS = 2;
 
-function Passo({ feito, titulo, children }: { feito: boolean; titulo: string; children?: React.ReactNode }) {
-  return (
-    <li className="flex items-start gap-3">
-      {feito ? (
-        <CheckCircle2 size={20} className="mt-0.5 shrink-0 text-green" aria-label="Feito" />
-      ) : (
-        <Circle size={20} className="mt-0.5 shrink-0 text-muted" aria-label="A fazer" />
-      )}
-      <div className="min-w-0 flex-1 space-y-1">
-        <p className={feito ? 'text-[15px] text-muted line-through' : 'text-[15px] font-medium text-text'}>{titulo}</p>
-        {!feito && children}
-      </div>
-    </li>
-  );
-}
+const PASSOS = {
+  1: { titulo: 'Vamos montar seu mês', subtitulo: 'Comece pela sua renda. Leva menos de um minuto.' },
+  2: { titulo: 'Agora, suas contas', subtitulo: 'Adicione luz, aluguel e assinaturas para ver quanto sobra.' },
+} as const;
 
-/** Estado vazio da home: "Vamos montar seu mês" com passos que viram ✓ quando o dado existe. */
-export function BoasVindasFinancas({
-  rendaCadastrada,
-  contasCadastradas,
-  estadoLembretes,
-  ativandoLembretes = false,
-  onAtivarLembretes,
-  onNovoLancamento,
-}: BoasVindasFinancasProps) {
-  const mostrarLembretes = !LEMBRETES_INDISPONIVEIS.includes(estadoLembretes);
-  const passos = mostrarLembretes ? 3 : 2;
+const BOTAO_GRANDE = 'w-full py-3 text-base';
+
+/** Onboarding da home: um passo por vez (renda → contas), com "Passo X de 2". */
+export function BoasVindasFinancas({ rendaCadastrada, onCadastrarRenda }: BoasVindasFinancasProps) {
+  const passo = rendaCadastrada ? 2 : 1;
+  const { titulo, subtitulo } = PASSOS[passo];
 
   return (
     <section aria-labelledby="boas-vindas-financas" className="space-y-4 rounded-card border border-accent/30 bg-card p-5">
-      <div className="space-y-1">
-        <h2 id="boas-vindas-financas" className="text-lg font-semibold text-text">
-          Vamos montar seu mês
-        </h2>
-        <p className="text-[15px] text-muted">
-          Em {passos} passos você vê quanto sobra{mostrarLembretes ? ' e recebe lembretes das contas' : ''}.
+      <div className="space-y-2">
+        <p className="text-[13px] font-medium text-muted">
+          Passo {passo} de {TOTAL_PASSOS}
         </p>
+        <div className="flex gap-1.5" aria-hidden="true" data-testid="progresso-passos">
+          {Array.from({ length: TOTAL_PASSOS }, (_, i) => (
+            <span key={i} className={`h-1.5 flex-1 rounded-full ${i < passo ? 'bg-accent' : 'bg-card2'}`} />
+          ))}
+        </div>
       </div>
 
-      <ol className="space-y-3">
-        <Passo feito={rendaCadastrada} titulo="Cadastrar sua renda">
-          <Link href="/financas/orcamento" className="text-sm font-medium text-accent hover:underline">
-            Cadastrar renda
-          </Link>
-        </Passo>
-        <Passo feito={contasCadastradas} titulo="Adicionar suas contas fixas (luz, aluguel, assinaturas)">
-          <Link href="/financas/contas?nova=1" className="text-sm font-medium text-accent hover:underline">
-            Adicionar conta
-          </Link>
-        </Passo>
-        {mostrarLembretes && (
-          <Passo feito={estadoLembretes === 'ativo'} titulo="Ativar lembretes no iPhone">
-            {estadoLembretes === 'carregando' && <p className="text-[13px] text-muted">Verificando…</p>}
-            {estadoLembretes === 'requer-instalacao' && (
-              <p className="text-[13px] text-muted">
-                Abra o MeuDia no Safari, toque em Compartilhar e escolha “Adicionar à Tela de Início”. Depois
-                abra pelo ícone e ative aqui.
-              </p>
-            )}
-            {estadoLembretes === 'negado' && (
-              <p className="text-[13px] text-muted">
-                As notificações estão bloqueadas. No iPhone: Ajustes → Notificações → MeuDia → Permitir Notificações.
-              </p>
-            )}
-            {estadoLembretes === 'inativo' && (
-              <Button variant="ghost" className="-ml-4" onClick={onAtivarLembretes} isLoading={ativandoLembretes}>
-                Ativar lembretes
-              </Button>
-            )}
-          </Passo>
-        )}
-      </ol>
+      <div className="space-y-1">
+        <h2 id="boas-vindas-financas" className="text-lg font-semibold text-text">
+          {titulo}
+        </h2>
+        <p className="text-[15px] text-muted">{subtitulo}</p>
+      </div>
 
-      <button type="button" onClick={onNovoLancamento} className="text-sm text-muted underline-offset-2 hover:text-text hover:underline">
-        Ou registre um lançamento agora
-      </button>
+      {passo === 1 ? (
+        <Button className={BOTAO_GRANDE} onClick={onCadastrarRenda}>
+          Cadastrar minha renda
+        </Button>
+      ) : (
+        <Link
+          href="/financas/contas?nova=1"
+          className={`inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-accent to-accent2 font-medium text-white transition-all duration-200 hover:opacity-90 ${BOTAO_GRANDE}`}
+        >
+          Adicionar conta
+        </Link>
+      )}
     </section>
   );
 }

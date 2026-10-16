@@ -1,7 +1,7 @@
 import { clsx } from 'clsx';
 import type { ReactNode } from 'react';
 
-type BadgeColor = 'green' | 'red' | 'yellow' | 'purple' | 'teal' | 'orange';
+type BadgeColor = 'green' | 'red' | 'yellow' | 'purple' | 'teal' | 'orange' | 'neutral';
 
 interface BadgeProps {
   children: ReactNode;
@@ -16,6 +16,7 @@ const colorStyles: Record<BadgeColor, string> = {
   purple: 'bg-accent/[0.14] text-accent',
   teal: 'bg-accent3/[0.14] text-accent3',
   orange: 'bg-orange/[0.14] text-orange',
+  neutral: 'bg-card2 text-muted',
 };
 
 export function Badge({ children, color = 'purple', className }: BadgeProps) {

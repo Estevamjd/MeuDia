@@ -3,14 +3,32 @@ import type { Competencia, OrcamentoCategoria, Transacao } from '@meudia/shared'
 import {
   formatBRLSinal,
   linhasOrcamento,
+  mascaraBRL,
   parseValorNaoNegativo,
   parseValorPositivo,
   partesCompetencia,
   referenciaMesAnterior,
   situacaoLimite,
+  tagSobraPrevista,
   textoDelta,
   textoVencimento,
 } from '../financas-ui';
+
+it('mascaraBRL: dígitos viram centavos; ignora não dígitos e zeros à esquerda; limita 10 dígitos', () => {
+  const m = mascaraBRL('480000');
+  expect(m.valor).toBe(4800);
+  expect(m.exibicao.replace(/\s/g, ' ')).toBe('R$ 4.800,00');
+  expect(mascaraBRL('R$ 0,05')).toMatchObject({ digitos: '5', valor: 0.05 });
+  expect(mascaraBRL('')).toEqual({ digitos: '', exibicao: '', valor: 0 });
+  expect(mascaraBRL('000')).toEqual({ digitos: '', exibicao: '', valor: 0 });
+  expect(mascaraBRL('12345678901234').valor).toBe(12345678.9);
+});
+
+it('tagSobraPrevista: zero é "zerada" (neutra), não "positiva"', () => {
+  expect(tagSobraPrevista(0)).toEqual({ text: 'zerada', color: 'neutral' });
+  expect(tagSobraPrevista(0.01)).toEqual({ text: 'positiva', color: 'teal' });
+  expect(tagSobraPrevista(-10)).toEqual({ text: 'negativa', color: 'red' });
+});
 
 it('separa ano e mês válidos', () => {
   expect(partesCompetencia('2026-10')).toEqual({ ano: 2026, mes: 10 });

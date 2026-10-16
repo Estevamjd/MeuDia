@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { ContaPagar, OcorrenciaConta, OrcamentoCategoria, Transacao } from '@meudia/shared';
 import { AlertaContas } from '../AlertaContas';
+import { AvisoLembretes, mostrarAvisoLembretes } from '../AvisoLembretes';
 import { BoasVindasFinancas } from '../BoasVindasFinancas';
+import { RendaSheet } from '../RendaSheet';
 import { EntradasSaidas } from '../EntradasSaidas';
 import { FinancasHomeView, type FinancasHomeViewProps } from '../FinancasHomeView';
 import { HeroSobra } from '../HeroSobra';
@@ -60,7 +62,9 @@ const viewProps = (over: Partial<FinancasHomeViewProps> = {}, dados: Partial<Par
   secoes: montarHome({
     competencia: '2026-10', hojeISO: HOJE, resumo: resumo(), ocorrencias, orcamento: [limite('Alimentação', 500)], transacoes, ...dados,
   }),
-  boasVindas: { rendaCadastrada: false, contasCadastradas: false, estadoLembretes: 'inativo', onAtivarLembretes: vi.fn() },
+  boasVindas: null,
+  avisoLembretes: null,
+  rendaSheet: { open: false, onClose: vi.fn(), onSalvar: vi.fn() },
   onPagar: vi.fn(),
   lancamentos: { expandido: false, onAlternarExpandido: vi.fn(), onNovo: vi.fn(), onEditar: vi.fn(), onExcluir: vi.fn() },
   ...over,
@@ -194,31 +198,129 @@ describe('IndicadoresMes', () => {
 });
 
 describe('BoasVindasFinancas', () => {
-  it('3 passos com links e botão de lembretes; passo feito vira ✓', () => {
-    const onAtivar = vi.fn();
-    render(
-      <BoasVindasFinancas rendaCadastrada={false} contasCadastradas estadoLembretes="inativo"
-        onAtivarLembretes={onAtivar} onNovoLancamento={vi.fn()} />,
-    );
+  const segmentosAtivos = () =>
+    Array.from(screen.getByTestId('progresso-passos').children).filter((s) => s.className.includes('bg-accent')).length;
+
+  it('passo 1 (sem renda): só "Cadastrar minha renda", Passo 1 de 2', () => {
+    const onCadastrarRenda = vi.fn();
+    render(<BoasVindasFinancas rendaCadastrada={false} onCadastrarRenda={onCadastrarRenda} />);
+    expect(texto()).toContain('Passo 1 de 2');
+    expect(segmentosAtivos()).toBe(1);
     expect(texto()).toContain('Vamos montar seu mês');
-    expect(texto()).toContain('Em 3 passos você vê quanto sobra e recebe lembretes das contas.');
-    expect(screen.getByRole('link', { name: 'Cadastrar renda' }).getAttribute('href')).toBe('/financas/orcamento');
     expect(screen.queryByRole('link', { name: 'Adicionar conta' })).toBeNull();
-    expect(screen.getAllByLabelText('Feito')).toHaveLength(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Ativar lembretes' }));
-    expect(onAtivar).toHaveBeenCalled();
+    expect(texto()).not.toMatch(/iPhone|Tela de Início|lembrete|Ou registre um lançamento/i);
+    const botao = screen.getByRole('button', { name: 'Cadastrar minha renda' });
+    expect(botao.className).toContain('w-full');
+    fireEvent.click(botao);
+    expect(onCadastrarRenda).toHaveBeenCalled();
   });
 
-  it('iPhone sem PWA instalado: orienta "Adicionar à Tela de Início"', () => {
-    render(<BoasVindasFinancas rendaCadastrada={false} contasCadastradas={false} estadoLembretes="requer-instalacao" onAtivarLembretes={vi.fn()} onNovoLancamento={vi.fn()} />);
-    expect(texto()).toContain('Adicionar à Tela de Início');
+  it('passo 2 (renda cadastrada): "Adicionar conta", Passo 2 de 2', () => {
+    render(<BoasVindasFinancas rendaCadastrada onCadastrarRenda={vi.fn()} />);
+    expect(texto()).toContain('Passo 2 de 2');
+    expect(segmentosAtivos()).toBe(2);
     expect(screen.getByRole('link', { name: 'Adicionar conta' }).getAttribute('href')).toBe('/financas/contas?nova=1');
+    expect(screen.queryByRole('button', { name: 'Cadastrar minha renda' })).toBeNull();
+  });
+});
+
+describe('AvisoLembretes', () => {
+  const props = { estado: 'inativo' as const, onAtivar: vi.fn(), onDispensar: vi.fn() };
+
+  it.each([
+    [true, 'inativo', false, true],
+    [true, 'requer-instalacao', false, true],
+    [false, 'inativo', false, false],
+    [true, 'ativo', false, false],
+    [true, 'carregando', false, false],
+    [true, 'nao-suportado', false, false],
+    [true, 'inativo', true, false],
+  ] as const)('visibilidade: contas=%s estado=%s dispensado=%s → %s', (temContas, estado, dispensado, esperado) => {
+    expect(mostrarAvisoLembretes(temContas, estado, dispensado)).toBe(esperado);
   });
 
-  it('push indisponível: some o passo de lembretes', () => {
-    render(<BoasVindasFinancas rendaCadastrada={false} contasCadastradas={false} estadoLembretes="nao-suportado" onAtivarLembretes={vi.fn()} onNovoLancamento={vi.fn()} />);
-    expect(texto()).toContain('Em 2 passos');
-    expect(texto()).not.toContain('Ativar lembretes');
+  it('"Ativar" chama a ação; "Dispensar" chama onDispensar', () => {
+    const onAtivar = vi.fn();
+    const onDispensar = vi.fn();
+    render(<AvisoLembretes {...props} onAtivar={onAtivar} onDispensar={onDispensar} />);
+    expect(texto()).toContain('Ative os lembretes');
+    expect(texto()).toContain('Receba um aviso no iPhone antes de cada conta vencer.');
+    fireEvent.click(screen.getByRole('button', { name: 'Ativar' }));
+    expect(onAtivar).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Dispensar' }));
+    expect(onDispensar).toHaveBeenCalled();
+  });
+
+  it('"Como ativar" expande com aria-expanded', () => {
+    render(<AvisoLembretes {...props} />);
+    const botao = screen.getByRole('button', { name: 'Como ativar' });
+    expect(botao.getAttribute('aria-expanded')).toBe('false');
+    expect(texto()).not.toContain('Adicionar à Tela de Início');
+    fireEvent.click(botao);
+    expect(botao.getAttribute('aria-expanded')).toBe('true');
+    expect(texto()).toContain(
+      'No iPhone, abra o MeuDia no Safari, toque em Compartilhar e depois em Adicionar à Tela de Início. Abra o app pela Tela de Início e toque em Ativar.',
+    );
+  });
+
+  it('sem o app instalado, "Ativar" mostra o passo a passo em vez de pedir permissão', () => {
+    const onAtivar = vi.fn();
+    render(<AvisoLembretes {...props} estado="requer-instalacao" onAtivar={onAtivar} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Ativar' }));
+    expect(onAtivar).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Como ativar' }).getAttribute('aria-expanded')).toBe('true');
+  });
+});
+
+describe('RendaSheet', () => {
+  const abrir = (over: Partial<Parameters<typeof RendaSheet>[0]> = {}) => {
+    const onSalvar = vi.fn();
+    render(<RendaSheet open onClose={vi.fn()} onSalvar={onSalvar} {...over} />);
+    return { onSalvar, valor: screen.getByLabelText('Valor') as HTMLInputElement, dia: screen.getByLabelText('Dia que recebe (opcional)') as HTMLInputElement };
+  };
+
+  it('título e campos; fechado não renderiza', () => {
+    const { rerender } = render(<RendaSheet open={false} onClose={vi.fn()} onSalvar={vi.fn()} />);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    rerender(<RendaSheet open onClose={vi.fn()} onSalvar={vi.fn()} />);
+    expect(screen.getByRole('dialog').textContent).toContain('Sua renda do mês');
+    expect(screen.getByLabelText('Valor').getAttribute('inputmode')).toBe('decimal');
+  });
+
+  it('máscara BRL: digitar 480000 mostra R$ 4.800,00', () => {
+    const { valor } = abrir();
+    fireEvent.change(valor, { target: { value: '480000' } });
+    expect(valor.value.replace(/\s/g, ' ')).toBe('R$ 4.800,00');
+    // Apagar o último caractere tira um dígito.
+    fireEvent.change(valor, { target: { value: 'R$ 4.800,0' } });
+    expect(valor.value.replace(/\s/g, ' ')).toBe('R$ 480,00');
+  });
+
+  it('valida valor obrigatório > 0 e dia 1–31 em pt-BR', () => {
+    const { onSalvar, valor, dia } = abrir();
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    expect(texto()).toContain('Informe um valor maior que zero.');
+    fireEvent.change(valor, { target: { value: '000' } });
+    fireEvent.change(dia, { target: { value: '32' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    expect(texto()).toContain('Informe um valor maior que zero.');
+    expect(texto()).toContain('O dia vai de 1 a 31.');
+    expect(onSalvar).not.toHaveBeenCalled();
+  });
+
+  it('salvar envia valor em reais e o dia (ou null)', () => {
+    const { onSalvar, valor, dia } = abrir();
+    fireEvent.change(valor, { target: { value: '480000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    expect(onSalvar).toHaveBeenLastCalledWith(4800, null);
+    fireEvent.change(dia, { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar' }));
+    expect(onSalvar).toHaveBeenLastCalledWith(4800, 5);
+  });
+
+  it('mostra o erro recebido', () => {
+    abrir({ erro: 'Não foi possível salvar a renda. Tente de novo.' });
+    expect(screen.getByRole('alert').textContent).toBe('Não foi possível salvar a renda. Tente de novo.');
   });
 });
 
@@ -288,8 +390,22 @@ describe('FinancasHomeView', () => {
     expect(onPagar).toHaveBeenCalledWith(expect.objectContaining({ contaId: 'c2', competencia: '2026-10' }));
   });
 
+  it('aviso de lembretes aparece quando recebido e some quando null', () => {
+    const { rerender } = render(<FinancasHomeView {...viewProps()} />);
+    expect(texto()).not.toContain('Ative os lembretes');
+    rerender(<FinancasHomeView {...viewProps({ avisoLembretes: { estado: 'inativo', onAtivar: vi.fn(), onDispensar: vi.fn() } })} />);
+    expect(texto()).toContain('Ative os lembretes');
+  });
+
+  it('renda cadastrada sem contas: card no passo 2 acima do resumo', () => {
+    render(<FinancasHomeView {...viewProps({ boasVindas: { rendaCadastrada: true, onCadastrarRenda: vi.fn() } })} />);
+    expect(texto()).toContain('Passo 2 de 2');
+    expect(texto()).toContain('Sobra do mês');
+  });
+
   it('usuária nova (vazio): só o card de boas-vindas, sem "R$ 0,00"', () => {
-    const props = viewProps({}, {
+    const onCadastrarRenda = vi.fn();
+    const props = viewProps({ boasVindas: { rendaCadastrada: false, onCadastrarRenda } }, {
       resumo: resumo({ rendaPrevista: 0, rendaReal: 0, gastoReal: 0, gastoPrevisto: 0, sobraPrevista: 0, sobraReal: 0, pctComprometida: null, pagasNoPrazo: null, selo: null, vsMesAnterior: { gastoReal: { absoluto: 0, percentual: null } } }),
       ocorrencias: [], orcamento: [], transacoes: [],
     });
@@ -298,8 +414,9 @@ describe('FinancasHomeView', () => {
     expect(texto()).toContain('Vamos montar seu mês');
     expect(texto()).not.toContain('R$');
     expect(texto()).not.toMatch(/Sobra do mês|Próximas contas|Últimos lançamentos|Renda comprometida/);
-    fireEvent.click(screen.getByRole('button', { name: 'Ou registre um lançamento agora' }));
-    expect(props.lancamentos.onNovo).toHaveBeenCalled();
+    expect(texto()).toContain('Passo 1 de 2');
+    fireEvent.click(screen.getByRole('button', { name: 'Cadastrar minha renda' }));
+    expect(onCadastrarRenda).toHaveBeenCalled();
     semTransacaoSemAcento();
   });
 
