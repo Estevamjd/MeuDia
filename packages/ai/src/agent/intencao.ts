@@ -205,10 +205,14 @@ export function classificarIntencao(mensagem: string): Intencao {
     if (tipo === 'GENERICA') continue;
     const match = padroes.some((p) => p.test(original) || p.test(norm));
     if (match) {
+      const parametros = extrairParametros(original);
+      if (tipo === 'AGENDAR_TREINO' && !parametros.dia && parametros.diaSemana) {
+        parametros.dia = parametros.diaSemana;
+      }
       return {
         tipo: tipo as TipoIntencao,
         confianca: 0.85,
-        parametros: extrairParametros(original),
+        parametros,
       };
     }
   }
@@ -331,6 +335,10 @@ export function extrairParametros(mensagem: string): Record<string, string> {
     /(?:costas|peito|pernas?|b[ií]ceps|tr[ií]ceps|ombro|gl[úu]teo|abd[oô]men|cardio)/i,
   );
   if (matchGrupo?.[0]) params.grupoMuscular = matchGrupo[0].toLowerCase();
+
+  // Exercício citado na consulta de carga
+  const matchExercicio = mensagem.match(/\b(?:supino|agachamento|rosca|remada|puxada)\b/i);
+  if (matchExercicio?.[0]) params.exercicio = matchExercicio[0].toLowerCase();
 
   // Nível (treinos)
   const matchNivel = mensagem.match(
