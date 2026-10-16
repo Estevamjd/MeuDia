@@ -117,11 +117,11 @@ export default function ContasPage() {
             <li key={conta.id} className="flex flex-wrap items-center gap-3 rounded-card border border-border bg-card p-4">
               <Link
                 href={`/financas/contas/${conta.id}?competencia=${competencia}`}
-                className="min-w-0 flex-1 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                className="min-w-0 flex-1 basis-full sm:basis-0 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
               >
                 {/* Selos quebram de linha em vez de serem cortados (375px). */}
                 <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-text">
-                  <span className="min-w-0 max-w-full truncate">{conta.descricao}</span>
+                  <span className="min-w-0 max-w-full truncate" title={conta.descricao}>{conta.descricao}</span>
                   <Badge color="purple" className="shrink-0 whitespace-nowrap">{RECORRENCIA_LABEL[conta.recorrencia]}</Badge>
                   {conta.assinatura_id && <Badge color="teal" className="shrink-0 whitespace-nowrap">Assinatura</Badge>}
                 </p>
@@ -129,14 +129,14 @@ export default function ContasPage() {
                   {descreverVencimento(conta)} · {conta.categoria}
                 </p>
               </Link>
-              <span className="whitespace-nowrap text-sm font-bold text-text">{formatBRL(Number(conta.valor))}</span>
+              <span className="shrink-0 whitespace-nowrap text-sm font-bold text-text">{formatBRL(Number(conta.valor))}</span>
               {conta.assinatura_id ? (
                 // Espelho de assinatura: editar/excluir pela tela de assinaturas.
-                <Link href="/assinaturas" className="text-xs text-accent hover:underline">
+                <Link href="/assinaturas" className="shrink-0 whitespace-nowrap text-xs text-accent hover:underline">
                   Editar em Assinaturas
                 </Link>
               ) : (
-                <div className="flex gap-1">
+                <div className="flex shrink-0 gap-1">
                   <Button variant="icon" onClick={() => abrirEdicao(conta)} aria-label={`Editar conta ${conta.descricao}`}>
                     <Pencil size={14} />
                   </Button>

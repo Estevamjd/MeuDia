@@ -57,7 +57,7 @@ export function ContasDoMes({ competencia }: { competencia: Competencia }) {
                   <div className="min-w-0 flex-1">
                     {/* Selo quebra de linha em vez de ser cortado (375px). */}
                     <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-text">
-                      <span className="min-w-0 max-w-full truncate">{oc.conta.descricao}</span>
+                      <span className="min-w-0 max-w-full truncate" title={oc.conta.descricao}>{oc.conta.descricao}</span>
                       <Badge color={ui.color} className="shrink-0 whitespace-nowrap">{ui.label}</Badge>
                     </p>
                     <p className="text-xs text-muted">
@@ -66,8 +66,8 @@ export function ContasDoMes({ competencia }: { competencia: Competencia }) {
                       {oc.conta.categoria}
                     </p>
                   </div>
-                  <span className="whitespace-nowrap text-sm font-bold text-text">{formatBRL(Number(oc.conta.valor))}</span>
-                  <ChevronRight size={16} className="text-muted" aria-hidden="true" />
+                  <span className="shrink-0 whitespace-nowrap text-sm font-bold text-text">{formatBRL(Number(oc.conta.valor))}</span>
+                  <ChevronRight size={16} className="shrink-0 text-muted" aria-hidden="true" />
                 </Link>
                 {oc.situacao === 'paga' ? (
                   <Button
