@@ -50,9 +50,15 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
     [competencia, hojeISO, resumo.data, contas.data, orcamento.data, transacoes.data],
   );
 
+  // Falha em qualquer consulta que alimenta as seções vira erro (nada de lista vazia silenciosa).
+  const consultas = [resumo, contas, orcamento, transacoes];
+  const comErro = consultas.filter((q) => q.isError);
+
   return {
-    estado: resumo.isLoading || contas.isLoading ? 'carregando' : resumo.isError || !secoes ? 'erro' : 'pronto',
-    onTentarDeNovo: () => void resumo.refetch(),
+    estado: resumo.isLoading || contas.isLoading ? 'carregando' : comErro.length > 0 || !secoes ? 'erro' : 'pronto',
+    onTentarDeNovo: () => {
+      for (const q of comErro.length > 0 ? comErro : [resumo]) void q.refetch();
+    },
     secoes,
     hojeISO,
     boasVindas: {

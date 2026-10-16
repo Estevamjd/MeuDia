@@ -85,6 +85,15 @@ describe('HeroSobra', () => {
     expect(valor.className).toContain('tabular-nums');
     expect(valor.getAttribute('style')).toContain('clamp(1.5rem, 8vw, 2rem)');
   });
+
+  it('gasto acima da renda: aria-valuenow limitado a 100, % real no aria-valuetext', () => {
+    render(<HeroSobra sobraReal={-2500} sobraPrevista={100} selo="Apertado" gastoReal={7500} rendaBase={5000} />);
+    const barra = screen.getByRole('progressbar');
+    expect(barra.getAttribute('aria-valuenow')).toBe('100');
+    expect(barra.getAttribute('aria-valuemax')).toBe('100');
+    expect(barra.getAttribute('aria-valuetext')).toBe('150% da renda usada');
+    expect(texto()).toContain('Você já usou 150% da renda');
+  });
 });
 
 describe('EntradasSaidas', () => {
@@ -99,6 +108,18 @@ describe('EntradasSaidas', () => {
     expect(texto()).toContain('de R$ 3.200,00 previstos');
     expect(texto()).toContain('a menos que em setembro');
     expect(texto()).not.toContain(' / ');
+  });
+
+  it('valores grandes: fonte fluida, sem quebra, cards com min-w-0 (375px)', () => {
+    render(<EntradasSaidas rendaReal={100000} rendaPrevista={100000} gastoReal={100000} gastoPrevisto={100000} comparativoGasto={null} />);
+    const valores = screen.getAllByText((_, el) => el?.tagName === 'P' && texto(el as HTMLElement) === 'R$ 100.000,00');
+    expect(valores).toHaveLength(2);
+    for (const v of valores) {
+      expect(v.className).toContain('whitespace-nowrap');
+      expect(v.className).not.toContain('text-lg');
+      expect(v.getAttribute('style')).toContain('clamp(0.95rem, 4.6vw, 1.125rem)');
+      expect(v.parentElement?.className).toContain('min-w-0');
+    }
   });
 
   it('sem comparativo quando o gasto não mudou', () => {

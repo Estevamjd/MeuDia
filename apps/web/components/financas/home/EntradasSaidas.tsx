@@ -28,7 +28,12 @@ function Coluna({
         {icone}
         {rotulo}
       </p>
-      <p className="mt-1 whitespace-nowrap text-lg font-semibold tabular-nums text-text">{formatBRL(valor)}</p>
+      <p
+        className="mt-1 whitespace-nowrap font-semibold tabular-nums text-text"
+        style={{ fontSize: 'clamp(0.95rem, 4.6vw, 1.125rem)' }}
+      >
+        {formatBRL(valor)}
+      </p>
       <p className="text-[13px] text-muted">
         de <span className="whitespace-nowrap tabular-nums">{formatBRL(previsto)}</span> previstos
       </p>

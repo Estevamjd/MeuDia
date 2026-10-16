@@ -16,6 +16,7 @@ export interface HeroSobraProps {
 export function HeroSobra({ sobraReal, sobraPrevista, selo, gastoReal, rendaBase }: HeroSobraProps) {
   const usado = rendaBase > 0 ? gastoReal / rendaBase : null;
   const pctUsado = usado === null ? null : Math.round(usado * 100);
+  const pctBarra = pctUsado === null ? 0 : Math.min(Math.max(pctUsado, 0), 100);
   const corBarra = usado === null || usado < 0.7 ? 'bg-green' : usado < 0.9 ? 'bg-orange' : 'bg-red';
 
   return (
@@ -47,11 +48,12 @@ export function HeroSobra({ sobraReal, sobraPrevista, selo, gastoReal, rendaBase
             className="h-1.5 w-full overflow-hidden rounded-full bg-card2"
             role="progressbar"
             aria-label="Renda usada no mês"
-            aria-valuenow={pctUsado}
+            aria-valuenow={pctBarra}
             aria-valuemin={0}
             aria-valuemax={100}
+            aria-valuetext={`${pctUsado}% da renda usada`}
           >
-            <div className={clsx('h-full rounded-full', corBarra)} style={{ width: `${Math.min(Math.max(pctUsado, 0), 100)}%` }} />
+            <div className={clsx('h-full rounded-full', corBarra)} style={{ width: `${pctBarra}%` }} />
           </div>
           <p className="text-[13px] text-muted">
             Você já usou <span className="tabular-nums">{pctUsado}%</span> da renda
