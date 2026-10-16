@@ -8,7 +8,6 @@ import { createServerSupabaseClient } from '../../../lib/supabase/server';
 import { createPushSender } from '../../../lib/web-push';
 import { createClient } from '@supabase/supabase-js';
 import { lembretesService, pushSubscriptionsRepository as push, contasPagarService as contas } from '@meudia/api';
-import type * as Api from '@meudia/api';
 vi.mock('../../../lib/supabase/server', () => ({ createServerSupabaseClient: vi.fn() }));
 vi.mock('../../../lib/web-push', () => ({ createPushSender: vi.fn() }));
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
