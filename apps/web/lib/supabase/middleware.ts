@@ -71,12 +71,13 @@ export async function updateSession(request: NextRequest) {
     return redirect(url);
   }
 
-  if (
-    user &&
-    isPublicRoute &&
-    !request.nextUrl.pathname.startsWith('/api/') &&
-    !request.nextUrl.pathname.startsWith('/onboarding')
-  ) {
+  // Logado só sai das telas de entrada; /privacidade e /termos (linkadas em Configurações) seguem acessíveis.
+  const isAuthRoute =
+    request.nextUrl.pathname.startsWith('/login') ||
+    request.nextUrl.pathname.startsWith('/registro') ||
+    request.nextUrl.pathname === '/';
+
+  if (user && isAuthRoute) {
     const url = request.nextUrl.clone();
     url.pathname = rotaInicial(mode);
     return redirect(url);

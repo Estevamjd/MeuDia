@@ -43,3 +43,14 @@ it.each([null, { id: 'u' }])('/auth/callback é público e não redireciona (use
   const response = await updateSession(new NextRequest('https://example.invalid/auth/callback?code=abc'));
   expect(response.headers.get('location')).toBeNull();
 });
+
+it.each(['/privacidade', '/termos'])('%s segue acessível para usuário logado', async path => {
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.invalid');
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'fixture');
+  vi.stubEnv('APP_MODE', 'financas');
+  vi.mocked(createServerClient).mockImplementation(() => ({
+    auth: { getUser: async () => ({ data: { user: { id: 'u' } } }) },
+  }) as never);
+  const response = await updateSession(new NextRequest(`https://example.invalid${path}`));
+  expect(response.headers.get('location')).toBeNull();
+});

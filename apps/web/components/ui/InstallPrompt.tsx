@@ -20,6 +20,11 @@ function detectPlatform(): Platform {
   return 'desktop';
 }
 
+// z-30: abaixo da BottomNav/AgentPanel (z-40) e dos modais (z-50), que não podem ficar cobertos.
+// No mobile sobe acima da BottomNav (fixa no rodapé).
+const CONTAINER =
+  'fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-4 right-4 z-30 md:bottom-4 md:left-auto md:right-6';
+
 function isStandalone(): boolean {
   if (typeof window === 'undefined') return false;
   return (
@@ -76,7 +81,7 @@ export function InstallPrompt() {
   // iOS prompt
   if (platform === 'ios' && showIOSPrompt && !dismissed) {
     return (
-      <div className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-6 md:w-96">
+      <div className={`${CONTAINER} md:w-96`}>
         <div className="rounded-card border border-accent/30 bg-card p-4 shadow-lg shadow-accent/10">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-sm font-semibold text-text">Instalar MeuDia</p>
@@ -115,7 +120,7 @@ export function InstallPrompt() {
   if (!deferredPrompt || dismissed) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-6 md:w-80">
+    <div className={`${CONTAINER} md:w-80`}>
       <div className="flex items-center gap-3 rounded-card border border-accent/30 bg-card p-4 shadow-lg shadow-accent/10">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/[0.14]">
           <Download size={20} className="text-accent" />

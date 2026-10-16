@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useCallback, type ReactNode } from 'react';
+import { useEffect, useRef, useCallback, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { clsx } from 'clsx';
 import { X } from 'lucide-react';
 
@@ -15,6 +16,9 @@ interface ModalProps {
 export function Modal({ isOpen, onClose, title, children, className }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  // Portal só no cliente (após montar): sem `document` no SSR.
+  const [montado, setMontado] = useState(false);
+  useEffect(() => setMontado(true), []);
 
   // Callers costumam passar `onClose` inline: guardado em ref para o efeito de
   // abertura não re-rodar a cada render do pai (re-focava o 1º campo a cada tecla).
@@ -77,9 +81,11 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
     };
   }, [isOpen, handleKeyDown]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !montado) return null;
 
-  return (
+  // Portal: o layout do dashboard cria stacking context (z-10); dentro dele o z-50 do modal
+  // ficava abaixo da BottomNav e do InstallPrompt (fixos na raiz), que cobriam campos e botões.
+  return createPortal(
     <div
       ref={overlayRef}
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -111,6 +117,7 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
