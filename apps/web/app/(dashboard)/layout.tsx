@@ -16,11 +16,18 @@ import { AgentFAB } from '../../components/agent/AgentFAB';
 import { AgentPanel } from '../../components/agent/AgentPanel';
 import { BottomNav } from '../../components/layout/BottomNav';
 import { useAppMode } from '../../components/AppModeProvider';
+import { deveRedirecionarOnboarding, precisaOnboarding } from '../../lib/onboarding';
 import { clsx } from 'clsx';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, signOut } = useAuth();
-  const { data: profile, isLoading: loadingProfile } = useProfile();
+  // Sempre rebusca ao montar: o cache pode estar com onboarding_feito=false de antes da conclusão.
+  const {
+    data: profile,
+    isLoading: loadingProfile,
+    isFetching: fetchingProfile,
+    isFetchedAfterMount,
+  } = useProfile({ refetchOnMount: 'always' });
   const router = useRouter();
   const { isOnline, isSyncing, pendingCount, lastSyncError, forceSync } =
     useOfflineSync(handleOfflineAction);
@@ -28,11 +35,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const financas = useAppMode() === 'financas';
 
   // Redirect to onboarding if user hasn't completed it
+  const redirecionarOnboarding = deveRedirecionarOnboarding({
+    authLoading: loading,
+    temUsuario: !!user,
+    profile,
+    isFetching: fetchingProfile,
+    isFetchedAfterMount,
+  });
   useEffect(() => {
-    if (!loading && !loadingProfile && user && profile && !profile.onboarding_feito) {
-      router.push('/onboarding');
-    }
-  }, [loading, loadingProfile, user, profile, router]);
+    if (redirecionarOnboarding) router.replace('/onboarding');
+  }, [redirecionarOnboarding, router]);
 
   if (loading || loadingProfile) {
     return (
@@ -50,9 +62,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return null;
   }
 
-  // Don't render dashboard if onboarding not done
-  if (profile && !profile.onboarding_feito) {
-    return null;
+  // Don't render dashboard if onboarding not done (ou enquanto confirma um cache que diz "não feito")
+  if (precisaOnboarding(profile)) {
+    return redirecionarOnboarding ? null : (
+      <div className="flex min-h-screen items-center justify-center bg-bg">
+        <Skeleton className="h-8 w-32" />
+      </div>
+    );
   }
 
   const userName = user?.user_metadata?.nome as string | undefined
