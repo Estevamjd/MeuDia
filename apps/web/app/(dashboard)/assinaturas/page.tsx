@@ -3,7 +3,8 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { CreditCard, Plus, Calendar, DollarSign, Pencil, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
-import type { Assinatura, AssinaturaInsert } from '@meudia/shared';
+import type { Assinatura, AssinaturaInsert, SituacaoOcorrencia } from '@meudia/shared';
+import { competenciaDe, hojeSP } from '@meudia/shared';
 
 import {
   useAssinaturas,
@@ -11,9 +12,12 @@ import {
   useAtualizarAssinatura,
   useExcluirAssinatura,
   useTotalMensal,
+  useContasMes,
 } from '../../../hooks';
+import { isVencendoEstaSemana, situacaoPorAssinatura } from '../../../lib/assinaturas';
 
 import {
+  Badge,
   Button,
   Input,
   Modal,
@@ -46,12 +50,11 @@ function formatBRL(value: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
-function isVencendoEstaSemana(diaVencimento: number): boolean {
-  const hoje = new Date();
-  const diaAtual = hoje.getDate();
-  const diffDias = diaVencimento - diaAtual;
-  return diffDias >= 0 && diffDias <= 7;
-}
+const SITUACAO_BADGE: Record<SituacaoOcorrencia, { label: string; color: 'green' | 'yellow' | 'red' }> = {
+  paga: { label: 'Paga', color: 'green' },
+  pendente: { label: 'Pendente', color: 'yellow' },
+  vencida: { label: 'Vencida', color: 'red' },
+};
 
 // --- Add/Edit Modal ---
 interface AssinaturaModalProps {
@@ -189,12 +192,39 @@ function AssinaturaModal({
   );
 }
 
+// Data de hoje em SP como estado: acompanha a virada do dia com a aba aberta ou ao voltar a ela.
+function useHojeSP(): string {
+  const [hoje, setHoje] = useState(hojeSP);
+  useEffect(() => {
+    const atualizar = () => setHoje(hojeSP());
+    const id = window.setInterval(atualizar, 60_000);
+    window.addEventListener('focus', atualizar);
+    document.addEventListener('visibilitychange', atualizar);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener('focus', atualizar);
+      document.removeEventListener('visibilitychange', atualizar);
+    };
+  }, []);
+  return hoje;
+}
+
 // --- Main Page ---
 export default function AssinaturasPage() {
   const toast = useToast();
   // Data hooks
   const { data: assinaturas, isLoading: loadingAssinaturas } = useAssinaturas();
   const { data: totalMensal, isLoading: loadingTotal } = useTotalMensal();
+  const hoje = useHojeSP();
+  // Badge do mês vem da conta espelhada (contas_pagar.assinatura_id); sem espelho, sem badge.
+  const {
+    data: contasMes,
+    isLoading: loadingContas,
+    isError: erroContas,
+    isFetching: fetchingContas,
+    refetch: refetchContas,
+  } = useContasMes(competenciaDe(hoje));
+  const situacoes = useMemo(() => situacaoPorAssinatura(contasMes ?? []), [contasMes]);
 
   // Mutations
   const criarAssinatura = useCriarAssinatura();
@@ -214,14 +244,14 @@ export default function AssinaturasPage() {
     const vencendo: Assinatura[] = [];
     const rest: Assinatura[] = [];
     for (const a of assinaturas) {
-      if (isVencendoEstaSemana(a.dia_vencimento)) {
+      if (isVencendoEstaSemana(a.dia_vencimento, hoje)) {
         vencendo.push(a);
       } else {
         rest.push(a);
       }
     }
     return { vencendoSemana: vencendo, outras: rest };
-  }, [assinaturas]);
+  }, [assinaturas, hoje]);
 
   // Handlers
   const handleCriar = useCallback(
@@ -346,6 +376,24 @@ export default function AssinaturasPage() {
         />
       </div>
 
+      {/* Situação do mês (badges): carregando/erro não pode parecer "sem conta" */}
+      {loadingContas && (
+        <p role="status" className="text-sm text-muted">
+          Carregando situação do mês…
+        </p>
+      )}
+      {erroContas && (
+        <div
+          role="alert"
+          className="flex items-center justify-between gap-3 rounded-card border border-red/40 bg-card p-3 text-sm text-text"
+        >
+          <span>Não foi possível carregar a situação (paga/pendente/vencida) deste mês.</span>
+          <Button variant="ghost" onClick={() => void refetchContas()} isLoading={fetchingContas}>
+            Tentar de novo
+          </Button>
+        </div>
+      )}
+
       {/* Vencendo esta semana */}
       {vencendoSemana.length > 0 && (
         <div className="space-y-3">
@@ -357,6 +405,7 @@ export default function AssinaturasPage() {
               <AssinaturaCard
                 key={assinatura.id}
                 assinatura={assinatura}
+                situacao={situacoes.get(assinatura.id)}
                 highlight
                 onEdit={() => setEditingAssinatura(assinatura)}
                 onDelete={() => setDeletingAssinatura(assinatura)}
@@ -377,6 +426,7 @@ export default function AssinaturasPage() {
               <AssinaturaCard
                 key={assinatura.id}
                 assinatura={assinatura}
+                situacao={situacoes.get(assinatura.id)}
                 onEdit={() => setEditingAssinatura(assinatura)}
                 onDelete={() => setDeletingAssinatura(assinatura)}
               />
@@ -433,12 +483,13 @@ export default function AssinaturasPage() {
 // --- Subscription Card ---
 interface AssinaturaCardProps {
   assinatura: Assinatura;
+  situacao?: SituacaoOcorrencia;
   highlight?: boolean;
   onEdit: () => void;
   onDelete: () => void;
 }
 
-function AssinaturaCard({ assinatura, highlight, onEdit, onDelete }: AssinaturaCardProps) {
+function AssinaturaCard({ assinatura, situacao, highlight, onEdit, onDelete }: AssinaturaCardProps) {
   return (
     <div
       className={clsx(
@@ -457,7 +508,12 @@ function AssinaturaCard({ assinatura, highlight, onEdit, onDelete }: AssinaturaC
 
       {/* Info */}
       <div className="flex flex-1 flex-col gap-0.5">
-        <span className="text-sm font-semibold text-text">{assinatura.nome}</span>
+        <span className="flex items-center gap-2 text-sm font-semibold text-text">
+          {assinatura.nome}
+          {situacao && (
+            <Badge color={SITUACAO_BADGE[situacao].color}>{SITUACAO_BADGE[situacao].label}</Badge>
+          )}
+        </span>
         <span className="flex items-center gap-1 text-xs text-muted">
           <Calendar size={12} />
           Vence dia {assinatura.dia_vencimento}
@@ -468,11 +524,12 @@ function AssinaturaCard({ assinatura, highlight, onEdit, onDelete }: AssinaturaC
       <span className="text-sm font-bold text-text">{formatBRL(assinatura.valor)}</span>
 
       {/* Actions */}
-      <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-        <Button variant="icon" onClick={onEdit} aria-label="Editar assinatura">
+      {/* Visível também no foco por teclado */}
+      <div className="flex gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+        <Button variant="icon" onClick={onEdit} aria-label={`Editar assinatura ${assinatura.nome}`}>
           <Pencil size={14} />
         </Button>
-        <Button variant="icon" onClick={onDelete} aria-label="Excluir assinatura">
+        <Button variant="icon" onClick={onDelete} aria-label={`Excluir assinatura ${assinatura.nome}`}>
           <Trash2 size={14} />
         </Button>
       </div>
