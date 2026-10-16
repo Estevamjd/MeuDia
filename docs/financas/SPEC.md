@@ -164,6 +164,6 @@ Cancelar uma conta paga não é permitido (é preciso desfazer o pagamento antes
 
 ## 10. Riscos e dependências
 
-- **Baseline/gaps de schema**: ver cabeçalho de `packages/database/migrations/000_baseline.sql`. Em especial `registro_agua` × `registros_agua` (fora do domínio, mas bloqueia confiar no baseline).
+- **Baseline/gaps de schema**: ver cabeçalho de `packages/database/migrations/000_baseline.sql`. Nomes de tabela já padronizados (GAP-02 resolvido: `registros_agua`, `registros_habito`, `registro_medicamentos`, `itens_compras`, `scores_diarios`, `conquistas`); falta validar o baseline em banco local (BE-00).
 - O ponto de chamada dos lembretes depende do fluxo atual do agente, que precisa ser confirmado no BE-05.
 - Fuso: servidor em UTC → usar sempre `hojeSP()`.

@@ -3,7 +3,7 @@
 -- ============================================================================
 -- Data: 2026-10-15
 -- Objetivo: recriar, de forma segura para reexecução, o estado descrito por
---   schema.sql + 001 (que só faz \i ../schema.sql) + 002 + 003 + 004.
+--   schema.sql/001 (SQL inline equivalente) + 002 + 003 + 004.
 --   - Tabelas/índices: CREATE ... IF NOT EXISTS
 --   - Policies/trigger: DO blocks que checam pg_policies/pg_trigger antes de criar
 --   - Funções: CREATE OR REPLACE
@@ -15,31 +15,27 @@
 -- Depende de Supabase: auth.users, auth.uid(), schema "extensions".
 -- ============================================================================
 --
--- GAPS ENCONTRADOS (sinalizados, NÃO resolvidos aqui)
+-- GAPS ENCONTRADOS
 -- ----------------------------------------------------------------------------
--- GAP-01  001_initial_schema.sql usa `\i ../schema.sql` (meta-comando do psql).
---         Não roda no SQL Editor do Supabase nem via CLI. Na prática, as tabelas
---         de schema.sql (profiles, treinos, transacoes, assinaturas, compromissos,
---         refeicoes, medicamentos, veiculos, ...) não têm migration real.
---         Este arquivo inclui todas elas inline.
+-- GAP-01  [RESOLVIDO] 001_initial_schema.sql usava `\i ../schema.sql`
+--         (meta-comando do psql, não roda no SQL Editor/CLI). Agora o SQL está
+--         inline no 001. Este arquivo também inclui todas as tabelas inline.
 --
--- GAP-02  Nomes de tabela divergentes entre schema.sql, 004 e o código da API:
+-- GAP-02  [RESOLVIDO] Nomes de tabela divergentes entre schema.sql, 004 e código.
+--         Mapa CANÔNICO (aplicado em schema.sql, 001, 004, seeds, queries e código):
 --
---         schema.sql              | 004_fix_insert_policies | código (packages/api)
---         ------------------------+-------------------------+-------------------------------
---         registro_agua           | registros_agua          | registro_agua (dieta.repository)
---         registro_habitos        | registros_habito        | registros_habito (habito.repository)
---         registro_medicamentos   | registros_medicamento   | registro_medicamentos (medicamento.repository)
---         itens_compras           | itens_compra            | itens_compras (compras.repository)
---         scores_diarios          | scores                  | scores_diarios (score.repository)
---         conquistas              | badges                  | conquistas (score.repository)
+--         canônico               | variantes descartadas
+--         -----------------------+-------------------------------------------
+--         registros_agua (banco) | registro_agua
+--         registros_habito       | registro_habitos
+--         registro_medicamentos  | registros_medicamento
+--         itens_compras          | itens_compra
+--         scores_diarios         | scores
+--         conquistas             | badges
 --
---         Relatado: o banco real tem `registros_agua`, mas schema.sql e
---         dieta.repository.ts usam `registro_agua` -> provável erro em runtime
---         no módulo de água. Os outros 5 pares não foram verificados no banco.
---         Tratamento aqui: a tabela com nome do schema.sql só é criada se a
---         variante alternativa NÃO existir; se existir, emite NOTICE e pula
---         (evita criar tabela duplicada vazia). Nome canônico = decisão pendente.
+--         Sem RENAME: só CREATE TABLE IF NOT EXISTS com os nomes canônicos.
+--         Pendente: conferir no banco se as colunas de registros_agua batem
+--         com a definição abaixo (CREATE IF NOT EXISTS não altera tabela viva).
 --
 -- GAP-03  schema.sql repete as tabelas do agente (002), mas sem índices, sem
 --         ENABLE RLS e sem policies -> rodar só o schema.sql deixa essas
@@ -52,14 +48,11 @@
 --
 -- GAP-05  004 cria policies "Users can insert own <tabela>" (FOR INSERT), que
 --         são redundantes com users_own_data FOR ALL (USING vale como
---         WITH CHECK). Também referencia as tabelas alternativas do GAP-02,
---         então 004 falha num banco criado só a partir do schema.sql (DROP
---         POLICY IF EXISTS falha se a tabela não existir). Aqui cada policy só
---         é criada se a tabela (e a coluna) existirem.
+--         WITH CHECK). [RESOLVIDO] 004 agora usa os nomes canônicos. Aqui cada
+--         policy só é criada se a tabela (e a coluna) existirem.
 --
--- GAP-06  O estado de RLS/policies das tabelas alternativas do GAP-02 no banco
---         real é desconhecido. Este arquivo NÃO ativa RLS nelas nem cria
---         users_own_data nelas; só recria as policies de INSERT do 004.
+-- GAP-06  [RESOLVIDO] Sem tabelas alternativas: RLS e users_own_data são
+--         aplicados a todas as tabelas canônicas.
 --
 -- GAP-07  handle_new_user(): SECURITY DEFINER sem `SET search_path`
 --         (o advisor do Supabase acusa). Mantido igual ao schema.sql. Atenção:
@@ -160,24 +153,15 @@ CREATE TABLE IF NOT EXISTS public.habitos (
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
--- GAP-02: registro_habitos (schema.sql) vs registros_habito (004 + habito.repository)
-DO $$
-BEGIN
-  IF to_regclass('public.registros_habito') IS NOT NULL THEN
-    RAISE NOTICE '[baseline][GAP-02] public.registros_habito existe; public.registro_habitos (schema.sql) NAO foi criada.';
-  ELSE
-    CREATE TABLE IF NOT EXISTS public.registro_habitos (
-      id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      habito_id  UUID NOT NULL REFERENCES public.habitos(id) ON DELETE CASCADE,
-      user_id    UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-      data       DATE NOT NULL DEFAULT CURRENT_DATE,
-      concluido  BOOLEAN DEFAULT FALSE,
-      valor      INTEGER DEFAULT 1,
-      UNIQUE(habito_id, data)
-    );
-    CREATE INDEX IF NOT EXISTS idx_reg_hab_user_data ON public.registro_habitos(user_id, data);
-  END IF;
-END $$;
+CREATE TABLE IF NOT EXISTS public.registros_habito (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  habito_id  UUID NOT NULL REFERENCES public.habitos(id) ON DELETE CASCADE,
+  user_id    UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  data       DATE NOT NULL DEFAULT CURRENT_DATE,
+  concluido  BOOLEAN DEFAULT FALSE,
+  valor      INTEGER DEFAULT 1,
+  UNIQUE(habito_id, data)
+);
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- FINANÇAS
@@ -251,23 +235,14 @@ CREATE TABLE IF NOT EXISTS public.refeicoes (
   total_gordura    DECIMAL(6,2) DEFAULT 0
 );
 
--- GAP-02: registro_agua (schema.sql + dieta.repository) vs registros_agua (004 + banco real)
-DO $$
-BEGIN
-  IF to_regclass('public.registros_agua') IS NOT NULL THEN
-    RAISE NOTICE '[baseline][GAP-02] public.registros_agua existe; public.registro_agua (schema.sql) NAO foi criada. dieta.repository.ts usa registro_agua.';
-  ELSE
-    CREATE TABLE IF NOT EXISTS public.registro_agua (
-      id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id       UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-      data          DATE NOT NULL DEFAULT CURRENT_DATE,
-      copos_bebidos INTEGER DEFAULT 0,
-      meta_copos    INTEGER DEFAULT 8,
-      UNIQUE(user_id, data)
-    );
-    CREATE INDEX IF NOT EXISTS idx_registro_agua_user ON public.registro_agua(user_id, data);
-  END IF;
-END $$;
+CREATE TABLE IF NOT EXISTS public.registros_agua (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  data          DATE NOT NULL DEFAULT CURRENT_DATE,
+  copos_bebidos INTEGER DEFAULT 0,
+  meta_copos    INTEGER DEFAULT 8,
+  UNIQUE(user_id, data)
+);
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- MEDICAMENTOS
@@ -286,22 +261,13 @@ CREATE TABLE IF NOT EXISTS public.medicamentos (
   created_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
--- GAP-02: registro_medicamentos (schema.sql + medicamento.repository) vs registros_medicamento (004)
-DO $$
-BEGIN
-  IF to_regclass('public.registros_medicamento') IS NOT NULL THEN
-    RAISE NOTICE '[baseline][GAP-02] public.registros_medicamento existe; public.registro_medicamentos (schema.sql) NAO foi criada.';
-  ELSE
-    CREATE TABLE IF NOT EXISTS public.registro_medicamentos (
-      id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      medicamento_id UUID NOT NULL REFERENCES public.medicamentos(id) ON DELETE CASCADE,
-      user_id        UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-      data_hora      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      tomado         BOOLEAN DEFAULT FALSE
-    );
-    CREATE INDEX IF NOT EXISTS idx_reg_med_user ON public.registro_medicamentos(user_id, data_hora);
-  END IF;
-END $$;
+CREATE TABLE IF NOT EXISTS public.registro_medicamentos (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  medicamento_id UUID NOT NULL REFERENCES public.medicamentos(id) ON DELETE CASCADE,
+  user_id        UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  data_hora      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  tomado         BOOLEAN DEFAULT FALSE
+);
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- COMPRAS
@@ -314,25 +280,16 @@ CREATE TABLE IF NOT EXISTS public.listas_compras (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- GAP-02: itens_compras (schema.sql + compras.repository) vs itens_compra (004)
-DO $$
-BEGIN
-  IF to_regclass('public.itens_compra') IS NOT NULL THEN
-    RAISE NOTICE '[baseline][GAP-02] public.itens_compra existe; public.itens_compras (schema.sql) NAO foi criada.';
-  ELSE
-    CREATE TABLE IF NOT EXISTS public.itens_compras (
-      id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      lista_id        UUID NOT NULL REFERENCES public.listas_compras(id) ON DELETE CASCADE,
-      nome            TEXT NOT NULL,
-      quantidade      DECIMAL(8,2) DEFAULT 1,
-      unidade         TEXT DEFAULT 'un',
-      categoria       TEXT,
-      comprado        BOOLEAN DEFAULT FALSE,
-      preco_estimado  DECIMAL(10,2)
-    );
-    CREATE INDEX IF NOT EXISTS idx_itens_lista ON public.itens_compras(lista_id);
-  END IF;
-END $$;
+CREATE TABLE IF NOT EXISTS public.itens_compras (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  lista_id        UUID NOT NULL REFERENCES public.listas_compras(id) ON DELETE CASCADE,
+  nome            TEXT NOT NULL,
+  quantidade      DECIMAL(8,2) DEFAULT 1,
+  unidade         TEXT DEFAULT 'un',
+  categoria       TEXT,
+  comprado        BOOLEAN DEFAULT FALSE,
+  preco_estimado  DECIMAL(10,2)
+);
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- VEÍCULO
@@ -363,46 +320,28 @@ CREATE TABLE IF NOT EXISTS public.manutencoes (
 -- GAMIFICAÇÃO
 -- ══════════════════════════════════════════════════════════════════════════════
 
--- GAP-02: scores_diarios (schema.sql + score.repository) vs scores (004)
-DO $$
-BEGIN
-  IF to_regclass('public.scores') IS NOT NULL THEN
-    RAISE NOTICE '[baseline][GAP-02] public.scores existe; public.scores_diarios (schema.sql) NAO foi criada.';
-  ELSE
-    CREATE TABLE IF NOT EXISTS public.scores_diarios (
-      id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id             UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-      data                DATE NOT NULL DEFAULT CURRENT_DATE,
-      score               INTEGER DEFAULT 0 CHECK (score BETWEEN 0 AND 100),
-      pts_treino          INTEGER DEFAULT 0,
-      pts_habitos         INTEGER DEFAULT 0,
-      pts_agua            INTEGER DEFAULT 0,
-      pts_calorias        INTEGER DEFAULT 0,
-      pts_medicamentos    INTEGER DEFAULT 0,
-      UNIQUE(user_id, data)
-    );
-    CREATE INDEX IF NOT EXISTS idx_scores_user_data ON public.scores_diarios(user_id, data);
-  END IF;
-END $$;
+CREATE TABLE IF NOT EXISTS public.scores_diarios (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id             UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  data                DATE NOT NULL DEFAULT CURRENT_DATE,
+  score               INTEGER DEFAULT 0 CHECK (score BETWEEN 0 AND 100),
+  pts_treino          INTEGER DEFAULT 0,
+  pts_habitos         INTEGER DEFAULT 0,
+  pts_agua            INTEGER DEFAULT 0,
+  pts_calorias        INTEGER DEFAULT 0,
+  pts_medicamentos    INTEGER DEFAULT 0,
+  UNIQUE(user_id, data)
+);
 
--- GAP-02: conquistas (schema.sql + score.repository) vs badges (004)
-DO $$
-BEGIN
-  IF to_regclass('public.badges') IS NOT NULL THEN
-    RAISE NOTICE '[baseline][GAP-02] public.badges existe; public.conquistas (schema.sql) NAO foi criada.';
-  ELSE
-    CREATE TABLE IF NOT EXISTS public.conquistas (
-      id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id        UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-      tipo           TEXT NOT NULL,
-      titulo         TEXT NOT NULL,
-      descricao      TEXT,
-      icone          TEXT DEFAULT '🏆',
-      conquistado_em TIMESTAMPTZ DEFAULT NOW()
-    );
-    CREATE INDEX IF NOT EXISTS idx_conquistas_user ON public.conquistas(user_id);
-  END IF;
-END $$;
+CREATE TABLE IF NOT EXISTS public.conquistas (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id        UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  tipo           TEXT NOT NULL,
+  titulo         TEXT NOT NULL,
+  descricao      TEXT,
+  icone          TEXT DEFAULT '🏆',
+  conquistado_em TIMESTAMPTZ DEFAULT NOW()
+);
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- AGENTE IA (002)
@@ -471,22 +410,28 @@ CREATE TABLE IF NOT EXISTS public.notas (
 );
 
 -- ══════════════════════════════════════════════════════════════════════════════
--- ÍNDICES (os das tabelas do GAP-02 ficam nos DO blocks acima)
+-- ÍNDICES
 -- ══════════════════════════════════════════════════════════════════════════════
 
 CREATE INDEX IF NOT EXISTS idx_treinos_user          ON public.treinos(user_id);
 CREATE INDEX IF NOT EXISTS idx_exercicios_treino     ON public.exercicios(treino_id);
 CREATE INDEX IF NOT EXISTS idx_sessoes_user_data     ON public.sessoes_treino(user_id, data);
 CREATE INDEX IF NOT EXISTS idx_habitos_user          ON public.habitos(user_id);
+CREATE INDEX IF NOT EXISTS idx_reg_hab_user_data     ON public.registros_habito(user_id, data);
 CREATE INDEX IF NOT EXISTS idx_transacoes_user_data  ON public.transacoes(user_id, data);
 CREATE INDEX IF NOT EXISTS idx_refeicoes_user_data   ON public.refeicoes(user_id, data);
 CREATE INDEX IF NOT EXISTS idx_compromissos_user     ON public.compromissos(user_id, data_inicio);
+CREATE INDEX IF NOT EXISTS idx_scores_user_data      ON public.scores_diarios(user_id, data);
 CREATE INDEX IF NOT EXISTS idx_series_sessao         ON public.series_realizadas(sessao_id);
+CREATE INDEX IF NOT EXISTS idx_reg_med_user          ON public.registro_medicamentos(user_id, data_hora);
 CREATE INDEX IF NOT EXISTS idx_medicamentos_user     ON public.medicamentos(user_id);
 CREATE INDEX IF NOT EXISTS idx_veiculos_user         ON public.veiculos(user_id);
 CREATE INDEX IF NOT EXISTS idx_listas_compras_user   ON public.listas_compras(user_id);
+CREATE INDEX IF NOT EXISTS idx_itens_lista           ON public.itens_compras(lista_id);
 CREATE INDEX IF NOT EXISTS idx_assinaturas_user      ON public.assinaturas(user_id);
+CREATE INDEX IF NOT EXISTS idx_conquistas_user       ON public.conquistas(user_id);
 CREATE INDEX IF NOT EXISTS idx_registros_peso_user   ON public.registros_peso(user_id, data);
+CREATE INDEX IF NOT EXISTS idx_registros_agua_user   ON public.registros_agua(user_id, data);
 
 -- 002
 CREATE INDEX IF NOT EXISTS idx_notif_user_lida       ON public.notificacoes_agente(user_id, lida);
@@ -499,7 +444,7 @@ CREATE INDEX IF NOT EXISTS idx_notas_user_id         ON public.notas(user_id);
 CREATE INDEX IF NOT EXISTS idx_notas_fixada          ON public.notas(user_id, fixada);
 
 -- ══════════════════════════════════════════════════════════════════════════════
--- ROW LEVEL SECURITY (somente tabelas definidas neste arquivo — ver GAP-06)
+-- ROW LEVEL SECURITY
 -- ══════════════════════════════════════════════════════════════════════════════
 
 DO $$
@@ -508,14 +453,12 @@ DECLARE
 BEGIN
   FOREACH t IN ARRAY ARRAY[
     'profiles', 'treinos', 'exercicios', 'sessoes_treino', 'series_realizadas',
-    'habitos', 'registro_habitos', 'transacoes', 'assinaturas', 'compromissos',
-    'registros_peso', 'refeicoes', 'registro_agua', 'medicamentos',
+    'habitos', 'registros_habito', 'transacoes', 'assinaturas', 'compromissos',
+    'registros_peso', 'refeicoes', 'registros_agua', 'medicamentos',
     'registro_medicamentos', 'listas_compras', 'itens_compras', 'veiculos',
     'manutencoes', 'scores_diarios', 'conquistas',
     'notificacoes_agente', 'chat_agente', 'acoes_agente', 'preferencias_agente',
-    'notas',
-    -- revisão Codex: nomes alternativos (004/banco)
-    'registros_habito', 'registros_agua', 'registros_medicamento', 'itens_compra', 'scores', 'badges'
+    'notas'
   ] LOOP
     IF to_regclass(format('public.%I', t)) IS NULL THEN
       RAISE NOTICE '[baseline] public.% ausente — ENABLE RLS pulado', t;
@@ -547,8 +490,8 @@ DECLARE
   t TEXT;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
-    'treinos', 'sessoes_treino', 'habitos', 'registro_habitos', 'transacoes',
-    'assinaturas', 'compromissos', 'registros_peso', 'refeicoes', 'registro_agua',
+    'treinos', 'sessoes_treino', 'habitos', 'registros_habito', 'transacoes',
+    'assinaturas', 'compromissos', 'registros_peso', 'refeicoes', 'registros_agua',
     'medicamentos', 'registro_medicamentos', 'listas_compras', 'veiculos',
     'scores_diarios', 'conquistas',
     'notificacoes_agente', 'chat_agente', 'acoes_agente', 'preferencias_agente'
@@ -613,8 +556,8 @@ BEGIN
   END LOOP;
 END $$;
 
--- 004: policies de INSERT com WITH CHECK (GAP-05). Inclui os nomes
--- alternativos do GAP-02; cada uma só é criada se tabela e coluna existirem.
+-- 004: policies de INSERT com WITH CHECK (GAP-05). Cada uma só é criada se
+-- tabela e coluna existirem.
 DO $$
 DECLARE
   t TEXT;
@@ -630,8 +573,8 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'treinos', 'sessoes_treino', 'habitos', 'registros_habito', 'compromissos',
     'transacoes', 'refeicoes', 'registros_agua', 'registros_peso', 'medicamentos',
-    'registros_medicamento', 'assinaturas', 'listas_compras', 'veiculos',
-    'scores', 'badges'
+    'registro_medicamentos', 'assinaturas', 'listas_compras', 'veiculos',
+    'scores_diarios', 'conquistas'
   ] LOOP
     IF NOT EXISTS (
       SELECT 1 FROM information_schema.columns
@@ -659,7 +602,7 @@ BEGIN
      'treino_id IN (SELECT id FROM public.treinos WHERE user_id = auth.uid())'],
     ['series_realizadas', 'Users can insert own series',
      'sessao_id IN (SELECT id FROM public.sessoes_treino WHERE user_id = auth.uid())'],
-    ['itens_compra',      'Users can insert own itens_compra',
+    ['itens_compras',     'Users can insert own itens_compras',
      'lista_id IN (SELECT id FROM public.listas_compras WHERE user_id = auth.uid())'],
     ['manutencoes',       'Users can insert own manutencoes',
      'veiculo_id IN (SELECT id FROM public.veiculos WHERE user_id = auth.uid())']

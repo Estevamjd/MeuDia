@@ -174,7 +174,7 @@ BEGIN
 
   -- Água — concluído nos últimos 8 de 10 dias
   FOR i IN 0..9 LOOP
-    INSERT INTO registro_habitos (habito_id, user_id, data, concluido, valor)
+    INSERT INTO registros_habito (habito_id, user_id, data, concluido, valor)
     VALUES (
       v_habito_agua,
       v_user_id,
@@ -186,7 +186,7 @@ BEGIN
 
   -- Leitura — concluído nos últimos 6 de 10 dias
   FOR i IN 0..9 LOOP
-    INSERT INTO registro_habitos (habito_id, user_id, data, concluido, valor)
+    INSERT INTO registros_habito (habito_id, user_id, data, concluido, valor)
     VALUES (
       v_habito_leitura,
       v_user_id,
@@ -198,7 +198,7 @@ BEGIN
 
   -- Meditação — concluído nos últimos 7 de 10 dias
   FOR i IN 0..9 LOOP
-    INSERT INTO registro_habitos (habito_id, user_id, data, concluido, valor)
+    INSERT INTO registros_habito (habito_id, user_id, data, concluido, valor)
     VALUES (
       v_habito_meditacao,
       v_user_id,
@@ -210,7 +210,7 @@ BEGIN
 
   -- Caminhada — concluído nos últimos 5 de 10 dias
   FOR i IN 0..9 LOOP
-    INSERT INTO registro_habitos (habito_id, user_id, data, concluido, valor)
+    INSERT INTO registros_habito (habito_id, user_id, data, concluido, valor)
     VALUES (
       v_habito_caminhada,
       v_user_id,
@@ -222,7 +222,7 @@ BEGIN
 
   -- Vitaminas — quase perfeito, falhou 1 dia
   FOR i IN 0..9 LOOP
-    INSERT INTO registro_habitos (habito_id, user_id, data, concluido, valor)
+    INSERT INTO registros_habito (habito_id, user_id, data, concluido, valor)
     VALUES (
       v_habito_vitamina,
       v_user_id,

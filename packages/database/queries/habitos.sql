@@ -8,7 +8,7 @@ SELECT h.*,
   rh.concluido AS concluido_hoje,
   rh.valor AS valor_hoje
 FROM habitos h
-LEFT JOIN registro_habitos rh
+LEFT JOIN registros_habito rh
   ON rh.habito_id = h.id
   AND rh.data = CURRENT_DATE
 WHERE h.user_id = :user_id
@@ -20,7 +20,7 @@ ORDER BY h.ordem;
 WITH dias AS (
   SELECT data, concluido,
     data - ROW_NUMBER() OVER (ORDER BY data)::INTEGER AS grp
-  FROM registro_habitos
+  FROM registros_habito
   WHERE habito_id = :habito_id
     AND concluido = TRUE
   ORDER BY data DESC
@@ -35,7 +35,7 @@ SELECT
   rh.data,
   COUNT(*) FILTER (WHERE rh.concluido = TRUE) AS concluidos,
   COUNT(*) AS total
-FROM registro_habitos rh
+FROM registros_habito rh
 JOIN habitos h ON h.id = rh.habito_id AND h.ativo = TRUE
 WHERE rh.user_id = :user_id
   AND rh.data >= date_trunc('week', CURRENT_DATE)
@@ -49,7 +49,7 @@ SELECT
   COUNT(*) FILTER (WHERE rh.concluido = TRUE)::FLOAT /
   NULLIF(COUNT(*), 0) * 100 AS percentual
 FROM habitos h
-LEFT JOIN registro_habitos rh
+LEFT JOIN registros_habito rh
   ON rh.habito_id = h.id
   AND rh.data = CURRENT_DATE
 WHERE h.user_id = :user_id

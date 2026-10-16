@@ -21,8 +21,8 @@ FE-01 (após BE-03/BE-04) ─> FE-02, FE-03 ─> FE-04 (após BE-05)
 Validar o baseline num Postgres/Supabase **local e descartável** e escrever `docs/financas/SCHEMA_GAPS.md` com o estado real de cada gap.
 **Aceite**
 - [ ] `000_baseline.sql` roda 2x seguidas no banco local sem erro (a 2ª execução não cria nada novo).
-- [ ] Rodar com as tabelas alternativas do GAP-02 já existentes (ex.: `registros_agua`) emite NOTICE e não cria `registro_agua`.
-- [ ] `SCHEMA_GAPS.md` lista, para cada um dos 6 pares do GAP-02, qual nome o código usa e uma recomendação, sem renomear nada.
+- [ ] Rodar com `registros_agua` já existente (como no banco real) não falha nem a altera; nenhuma tabela com nome não canônico é criada.
+- [ ] `SCHEMA_GAPS.md` confirma que schema.sql, 001, 004, seeds, queries e código usam só os nomes canônicos do GAP-02 (`registros_agua`, `registros_habito`, `registro_medicamentos`, `itens_compras`, `scores_diarios`, `conquistas`) e lista divergências de colunas encontradas, sem renomear nada.
 - [ ] Nenhuma alteração em banco remoto.
 
 ### BE-01 — Utilitário de datas de vencimento em `@meudia/shared`

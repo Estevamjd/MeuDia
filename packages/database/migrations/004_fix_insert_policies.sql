@@ -69,9 +69,9 @@ DROP POLICY IF EXISTS "Users can insert own medicamentos" ON public.medicamentos
 CREATE POLICY "Users can insert own medicamentos" ON public.medicamentos
   FOR INSERT WITH CHECK (user_id = auth.uid());
 
--- registros_medicamento
-DROP POLICY IF EXISTS "Users can insert own registros_medicamento" ON public.registros_medicamento;
-CREATE POLICY "Users can insert own registros_medicamento" ON public.registros_medicamento
+-- registro_medicamentos
+DROP POLICY IF EXISTS "Users can insert own registro_medicamentos" ON public.registro_medicamentos;
+CREATE POLICY "Users can insert own registro_medicamentos" ON public.registro_medicamentos
   FOR INSERT WITH CHECK (user_id = auth.uid());
 
 -- assinaturas
@@ -84,9 +84,9 @@ DROP POLICY IF EXISTS "Users can insert own listas_compras" ON public.listas_com
 CREATE POLICY "Users can insert own listas_compras" ON public.listas_compras
   FOR INSERT WITH CHECK (user_id = auth.uid());
 
--- itens_compra
-DROP POLICY IF EXISTS "Users can insert own itens_compra" ON public.itens_compra;
-CREATE POLICY "Users can insert own itens_compra" ON public.itens_compra
+-- itens_compras
+DROP POLICY IF EXISTS "Users can insert own itens_compras" ON public.itens_compras;
+CREATE POLICY "Users can insert own itens_compras" ON public.itens_compras
   FOR INSERT WITH CHECK (
     lista_id IN (SELECT id FROM listas_compras WHERE user_id = auth.uid())
   );
@@ -103,12 +103,12 @@ CREATE POLICY "Users can insert own manutencoes" ON public.manutencoes
     veiculo_id IN (SELECT id FROM veiculos WHERE user_id = auth.uid())
   );
 
--- scores
-DROP POLICY IF EXISTS "Users can insert own scores" ON public.scores;
-CREATE POLICY "Users can insert own scores" ON public.scores
+-- scores_diarios
+DROP POLICY IF EXISTS "Users can insert own scores_diarios" ON public.scores_diarios;
+CREATE POLICY "Users can insert own scores_diarios" ON public.scores_diarios
   FOR INSERT WITH CHECK (user_id = auth.uid());
 
--- badges
-DROP POLICY IF EXISTS "Users can insert own badges" ON public.badges;
-CREATE POLICY "Users can insert own badges" ON public.badges
+-- conquistas
+DROP POLICY IF EXISTS "Users can insert own conquistas" ON public.conquistas;
+CREATE POLICY "Users can insert own conquistas" ON public.conquistas
   FOR INSERT WITH CHECK (user_id = auth.uid());
