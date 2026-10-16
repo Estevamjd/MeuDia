@@ -26,7 +26,7 @@ export function StatCard({ label, value, icon, tag, className }: StatCardProps) 
         {icon && <span className="text-muted">{icon}</span>}
       </div>
       <div className="mt-2 flex items-end gap-2">
-        <span className="font-syne text-2xl font-bold text-text">{value}</span>
+        <span className="whitespace-nowrap font-dm text-2xl font-semibold tabular-nums text-text">{value}</span>
         {tag && <Badge color={tag.color}>{tag.text}</Badge>}
       </div>
     </div>

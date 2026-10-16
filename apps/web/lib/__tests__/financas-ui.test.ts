@@ -1,6 +1,16 @@
 import { expect, it } from 'vitest';
 import type { Competencia, OrcamentoCategoria, Transacao } from '@meudia/shared';
-import { linhasOrcamento, parseValorNaoNegativo, parseValorPositivo, partesCompetencia, situacaoLimite } from '../financas-ui';
+import {
+  formatBRLSinal,
+  linhasOrcamento,
+  parseValorNaoNegativo,
+  parseValorPositivo,
+  partesCompetencia,
+  referenciaMesAnterior,
+  situacaoLimite,
+  textoDelta,
+  textoVencimento,
+} from '../financas-ui';
 
 it('separa ano e mês válidos', () => {
   expect(partesCompetencia('2026-10')).toEqual({ ano: 2026, mes: 10 });
@@ -85,4 +95,34 @@ it.each([
   ['100000000', null],
 ] as const)('parseValorNaoNegativo(%j) = %s (limite de orçamento aceita 0)', (texto, esperado) => {
   expect(parseValorNaoNegativo(texto)).toBe(esperado);
+});
+
+/** Intl usa NBSP entre "R$" e o número. */
+const nbsp = (s: string) => s.replace(/\s/g, ' ');
+
+it('textoDelta: null quando não mudou (a home oculta o comparativo)', () => {
+  expect(textoDelta({ absoluto: 0, percentual: null })).toBeNull();
+  expect(textoDelta({ absoluto: 0, percentual: 0 })).toBeNull();
+});
+it('textoDelta: "a mais"/"a menos" com referência do mês', () => {
+  expect(nbsp(textoDelta({ absoluto: -120, percentual: -0.1 }, 'em setembro')!)).toBe('R$ 120,00 a menos que em setembro');
+  expect(nbsp(textoDelta({ absoluto: 50.5, percentual: null })!)).toBe('R$ 50,50 a mais que no mês anterior');
+});
+it('referenciaMesAnterior vira o ano', () => {
+  expect(referenciaMesAnterior('2026-10')).toBe('em setembro');
+  expect(referenciaMesAnterior('2026-01')).toBe('em dezembro');
+});
+it('formatBRLSinal usa "−" (U+2212) no negativo', () => {
+  expect(nbsp(formatBRLSinal(-10))).toBe('−R$ 10,00');
+  expect(nbsp(formatBRLSinal(0))).toBe('R$ 0,00');
+});
+it.each([
+  ['2026-10-16', 'vence hoje'],
+  ['2026-10-17', 'vence amanhã'],
+  ['2026-10-20', 'vence em 4 dias'],
+  ['2026-10-15', 'venceu ontem'],
+  ['2026-10-10', 'venceu há 6 dias'],
+  ['2026-11-01', 'vence em 16 dias'],
+])('textoVencimento(%s) com hoje 2026-10-16 = %s', (venc, esperado) => {
+  expect(textoVencimento(venc, '2026-10-16')).toBe(esperado);
 });

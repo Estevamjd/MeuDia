@@ -103,12 +103,46 @@ export function mensagemErroPagamento(error: unknown): string {
   }
 }
 
-/** Texto do comparativo com o mês anterior (`percentual` é fração ou `null` sem base). */
-export function textoDelta(delta: { absoluto: number; percentual: number | null }): string {
-  if (delta.absoluto === 0) return 'igual ao mês anterior';
-  const sinal = delta.absoluto > 0 ? '+' : '−';
-  const pct = delta.percentual === null ? '' : ` (${sinal}${Math.abs(Math.round(delta.percentual * 100))}%)`;
-  return `${sinal}${formatBRL(Math.abs(delta.absoluto))}${pct} vs. mês anterior`;
+/**
+ * Comparativo com o mês anterior: "R$ 120,00 a menos que em setembro".
+ * `null` quando não mudou nada (a home oculta o comparativo).
+ */
+export function textoDelta(
+  delta: { absoluto: number; percentual: number | null },
+  referencia = 'no mês anterior',
+): string | null {
+  if (delta.absoluto === 0) return null;
+  return `${formatBRL(Math.abs(delta.absoluto))} a ${delta.absoluto > 0 ? 'mais' : 'menos'} que ${referencia}`;
+}
+
+/** Valor com sinal "−" (U+2212) quando negativo — nunca só a cor indica o sinal. */
+export function formatBRLSinal(valor: number): string {
+  return valor < 0 ? `−${formatBRL(Math.abs(valor))}` : formatBRL(valor);
+}
+
+/** "em setembro" para a competência anterior à informada. */
+export function referenciaMesAnterior(competencia: Competencia): string {
+  const { mes } = partesCompetencia(deslocarCompetencia(competencia, -1));
+  return `em ${MESES[mes - 1]!.toLowerCase()}`;
+}
+
+/** Dias corridos de `hojeISO` até `dataISO` (ambos `yyyy-MM-dd`, sem fuso). */
+export function diasAte(dataISO: string, hojeISO: string): number {
+  const utc = (iso: string) => {
+    const [a, m, d] = iso.split('-').map(Number);
+    return Date.UTC(a!, m! - 1, d!);
+  };
+  return Math.round((utc(dataISO) - utc(hojeISO)) / 86_400_000);
+}
+
+/** "vence hoje", "vence amanhã", "vence em 3 dias", "venceu ontem", "venceu há 4 dias". */
+export function textoVencimento(vencimentoISO: string, hojeISO: string): string {
+  const dias = diasAte(vencimentoISO, hojeISO);
+  if (dias === 0) return 'vence hoje';
+  if (dias === 1) return 'vence amanhã';
+  if (dias > 1) return `vence em ${dias} dias`;
+  if (dias === -1) return 'venceu ontem';
+  return `venceu há ${-dias} dias`;
 }
 
 export type SituacaoLimite = 'dentro' | 'perto' | 'acima';
