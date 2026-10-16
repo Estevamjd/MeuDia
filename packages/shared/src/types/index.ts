@@ -41,6 +41,19 @@ export type {
   TransacaoInsert,
   Assinatura,
   AssinaturaInsert,
+  Competencia,
+  Recorrencia,
+  PagamentoConta,
+  SituacaoOcorrencia,
+  OcorrenciaConta,
+  Renda,
+  OrcamentoCategoria,
+  PushSubscriptionRow,
+  LembreteEnviado,
+  EtapaLembrete,
+  Selo,
+  ContaPagar,
+  ContaPagarInsert,
 } from './financas';
 
 export type {
@@ -106,3 +119,5 @@ export type {
   ResumoDiario,
   ItemResumo,
 } from './agente';
+
+export { SELO_LIMITES, LEMBRETE_TEXTOS } from './financas';
