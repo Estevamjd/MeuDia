@@ -4,6 +4,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "env": ["APP_MODE", "VAPID_PUBLIC_KEY"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
     "dev": {
