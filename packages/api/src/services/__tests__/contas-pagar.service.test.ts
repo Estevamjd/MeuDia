@@ -72,7 +72,7 @@ describe('BE-04: contas service', () => {
   it('pagar/desfazer validam e chamam RPCs', async () => {
     vi.mocked(contas.rpcPagar).mockResolvedValue(pagamento);
     expect(await service.pagarConta('user', 'conta', { competencia: '2026-10', pago_em: '2026-10-14', banco: null })).toEqual(pagamento);
-    expect(contas.rpcPagar).toHaveBeenCalledWith('conta', '2026-10', '2026-10-14', null);
+    expect(contas.rpcPagar).toHaveBeenCalledWith('conta', '2026-10', '2026-10-14', null, undefined);
     await service.desfazerPagamento('user', 'conta', '2026-10');
     expect(contas.rpcDesfazer).toHaveBeenCalledWith('conta', '2026-10');
     await expect(service.pagarConta('user', 'conta', { competencia: '2026-13' })).rejects.toThrow();

@@ -12,3 +12,6 @@ export * as notasService from './notas.service';
 export * as dietaService from './dieta.service';
 export * as medicamentosService from './medicamentos.service';
 export * as contasPagarService from './contas-pagar.service';
+export * as orcamentoService from './orcamento.service';
+export * as lembretesService from './lembretes.service';
+export type { PushPayload, PushSender } from './lembretes.service';

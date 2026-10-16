@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ContaPagar, OcorrenciaConta, PagamentoConta } from '@meudia/shared';
 import { AppError, hojeSP, ocorrenciaDaConta } from '@meudia/shared';
 import { contasPagarRepository, pagamentosContaRepository } from '../repositories';
@@ -61,11 +62,11 @@ export async function desativarConta(userId: string, id: string) {
   return contasPagarRepository.update(id, { ativo: false }, userId);
 }
 
-export async function pagarConta(userId: string, id: string, data: unknown) {
+export async function pagarConta(userId: string, id: string, data: unknown, client?: SupabaseClient) {
   validarUsuario(userId);
   const parsed = pagarContaSchema.parse(data);
-  await contasPagarRepository.findById(id, userId);
-  return contasPagarRepository.rpcPagar(id, parsed.competencia, parsed.pago_em, parsed.banco);
+  await contasPagarRepository.findById(id, userId, client);
+  return contasPagarRepository.rpcPagar(id, parsed.competencia, parsed.pago_em, parsed.banco, client);
 }
 
 export async function desfazerPagamento(userId: string, id: string, competencia: string) {

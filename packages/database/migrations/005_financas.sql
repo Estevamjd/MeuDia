@@ -81,13 +81,15 @@ CREATE TABLE IF NOT EXISTS public.orcamento_categorias (
 CREATE TABLE IF NOT EXISTS public.push_subscriptions (
   id           UUID PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
   user_id      UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  endpoint     TEXT NOT NULL UNIQUE,
+  endpoint     TEXT NOT NULL,
   p256dh       TEXT NOT NULL,
   auth         TEXT NOT NULL,
   user_agent   TEXT,
   created_at   TIMESTAMPTZ DEFAULT pg_catalog.now(),
   last_used_at TIMESTAMPTZ
 );
+ALTER TABLE public.push_subscriptions DROP CONSTRAINT IF EXISTS push_subscriptions_endpoint_key;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_push_subscriptions_user_endpoint ON public.push_subscriptions(user_id, endpoint);
 CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON public.push_subscriptions(user_id);
 
 CREATE TABLE IF NOT EXISTS public.lembretes_enviados (
@@ -159,7 +161,7 @@ BEGIN
       USING ERRCODE = '22023', HINT = 'Exige conta ativa e competência compatível com a recorrência e criação.';
   END IF;
   IF EXISTS (SELECT 1 FROM public.pagamentos_conta WHERE conta_id = p_conta_id AND competencia = p_competencia AND user_id = v_conta.user_id) THEN
-    RAISE EXCEPTION 'Competência já paga' USING ERRCODE = '22023', HINT = 'Exige competência sem pagamento.';
+    RAISE EXCEPTION 'Competência já paga' USING ERRCODE = 'P0003', HINT = 'Exige competência sem pagamento.';
   END IF;
   v_pago_em := coalesce(p_pago_em, (pg_catalog.now() AT TIME ZONE 'America/Sao_Paulo')::date);
   INSERT INTO public.transacoes (user_id, tipo, categoria, descricao, valor, data, banco, automatico)

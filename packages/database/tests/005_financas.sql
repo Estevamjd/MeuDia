@@ -33,6 +33,13 @@ BEGIN
   RAISE EXCEPTION 'Operação deveria falhar com %: %', expected_state, statement;
 END $$;
 
+-- O mesmo endpoint pode pertencer a usuários distintos, mas não duplicar no mesmo usuário.
+INSERT INTO public.push_subscriptions (user_id, endpoint, p256dh, auth) VALUES
+  ('be020000-0000-4000-8000-000000000001', 'https://example.invalid/push', 'fixture', 'fixture'),
+  ('be020000-0000-4000-8000-000000000002', 'https://example.invalid/push', 'fixture', 'fixture');
+SELECT pg_temp.expect_error($q$INSERT INTO public.push_subscriptions (user_id, endpoint, p256dh, auth)
+  VALUES ('be020000-0000-4000-8000-000000000001', 'https://example.invalid/push', 'fixture', 'fixture')$q$, '23505');
+
 DO $$
 DECLARE f pg_catalog.regprocedure;
 BEGIN
@@ -96,7 +103,7 @@ BEGIN
     OR EXISTS (SELECT 1 FROM public.pagamentos_conta WHERE conta_id = a AND competencia = '2026-11') THEN
     RAISE EXCEPTION 'Pagamento/transação divergente ou afetou novembro';
   END IF;
-  PERFORM pg_temp.expect_error(pg_catalog.format('SELECT public.pagar_conta(%L, %L)', a, '2026-10'), '22023');
+  PERFORM pg_temp.expect_error(pg_catalog.format('SELECT public.pagar_conta(%L, %L)', a, '2026-10'), 'P0003');
   PERFORM pg_temp.expect_error(pg_catalog.format($q$INSERT INTO public.pagamentos_conta (conta_id, user_id, competencia, pago_em)
     VALUES (%L, auth.uid(), '2026-10', '2026-10-15')$q$, a), '23505');
   SELECT * INTO p2 FROM public.pagar_conta(a, '2026-11', NULL);
