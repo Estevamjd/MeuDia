@@ -17,7 +17,7 @@ export function usePagamentoAcoes() {
   const pagar = usePagarConta();
   const desfazer = useDesfazerPagamento();
 
-  const pagarConta = (alvo: Alvo, extra: { pago_em?: string; banco?: string | null } = {}) =>
+  const pagarConta = (alvo: Alvo, extra: { pago_em?: string; banco?: string | null; carteira_id?: string | null } = {}) =>
     pagar.mutate(
       { contaId: alvo.contaId, competencia: alvo.competencia, ...extra },
       {

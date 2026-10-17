@@ -30,9 +30,21 @@ export const orcamentoKeys = {
   lista: (userId: string | undefined) => ['orcamento-categorias', userId] as const,
 };
 
-/** Rendas e orçamento mudam a sobra prevista, % comprometida e o selo. */
+/** Bancos e carteira: lista e painel (saldo de hoje, previsões, "Recebi"). */
+export const carteirasKeys = {
+  todas: ['carteiras'] as const,
+  lista: (userId: string | undefined) => ['carteiras', userId, 'lista'] as const,
+  painel: (userId: string | undefined, hojeISO: string) => ['carteiras', userId, 'painel', hojeISO] as const,
+};
+
+/** Rendas e orçamento mudam a sobra prevista, % comprometida e o selo; rendas também a previsão de saldo. */
 export function chavesAfetadasPorOrcamento(): QueryKey[] {
-  return [rendasKeys.todas, orcamentoKeys.todas, resumoKeys.todas];
+  return [rendasKeys.todas, orcamentoKeys.todas, resumoKeys.todas, carteirasKeys.todas];
+}
+
+/** Qualquer lançamento/transferência/recebimento muda saldo, previsão, resumo e listas do mês. */
+export function chavesAfetadasPorLancamento(): QueryKey[] {
+  return [['transacoes'], ['transacoes-mes'], ['resumo-mensal'], resumoKeys.todas, carteirasKeys.todas];
 }
 
 /** Chaves afetadas ao pagar/desfazer uma conta numa competência. */
@@ -51,5 +63,7 @@ export function chavesAfetadasPorPagamento(
     ['transacoes'],
     ['transacoes-mes'],
     ['assinaturas'],
+    // Paguei com carteira muda o saldo e a previsão.
+    carteirasKeys.todas,
   ];
 }

@@ -135,3 +135,19 @@ export {
   useCriarManutencao,
   useExcluirManutencao,
 } from './useVeiculo';
+export {
+  useCarteiras,
+  usePainelSaldo,
+  useCriarCarteira,
+  useAtualizarCarteira,
+  useGastei,
+  useEntrouDinheiro,
+  useTransferir,
+  useCorrigirSaldo,
+  useReceberRenda,
+  useDesfazerRecebimento,
+  type CarteiraPatch,
+  type GasteiInput,
+  type EntrouInput,
+  type TransferirInput,
+} from './useCarteiras';

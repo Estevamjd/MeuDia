@@ -71,7 +71,7 @@ it('salvar limite chama o upsert do usuário e invalida orçamento, rendas e res
   await result.current.mutationFn({ categoria: 'Mercado', valor_planejado: 500 });
   expect(mocks.salvarOrcamento).toHaveBeenCalledWith('u1', { categoria: 'Mercado', valor_planejado: 500 });
   result.current.onSuccess();
-  expect(chavesInvalidadas()).toEqual([['rendas'], ['orcamento-categorias'], ['resumo-financeiro-mes']]);
+  expect(chavesInvalidadas()).toEqual([['rendas'], ['orcamento-categorias'], ['resumo-financeiro-mes'], ['carteiras']]);
 });
 
 it('excluir limite usa o id e invalida as mesmas chaves', async () => {
