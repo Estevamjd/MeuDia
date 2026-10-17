@@ -8,4 +8,6 @@ export const transacaoInsertSchema = z.object({
   data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de data inválido').optional(),
   banco: z.string().max(100).nullable().optional(),
   automatico: z.boolean().optional(),
+  carteira_id: z.string().uuid().nullable().optional(),
+  ajuste: z.boolean().optional(),
 });

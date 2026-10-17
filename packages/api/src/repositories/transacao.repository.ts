@@ -2,7 +2,7 @@ import type { Transacao, TransacaoInsert } from '@meudia/shared';
 import { AppError } from '@meudia/shared';
 import { getSupabase } from './supabase';
 
-const COLUMNS = 'id, user_id, tipo, categoria, descricao, valor, data, banco, automatico, created_at';
+const COLUMNS = 'id, user_id, tipo, categoria, descricao, valor, data, banco, automatico, created_at, carteira_id, ajuste';
 
 export async function findByUserId(userId: string): Promise<Transacao[]> {
   const { data, error } = await getSupabase()
@@ -89,4 +89,13 @@ export async function findByIds(userId: string, ids: string[]): Promise<Transaca
     rows.push(...(data ?? []) as unknown as Transacao[]);
   }
   return rows;
+}
+
+/** Lançamentos com carteira a partir de `desde` (a âncora mais antiga): base do saldo. */
+export async function findComCarteiraDesde(userId: string, desde: string): Promise<Transacao[]> {
+  const { data, error } = await getSupabase().from('transacoes').select(COLUMNS)
+    .eq('user_id', userId).not('carteira_id', 'is', null).gte('data', desde)
+    .order('data', { ascending: true });
+  if (error) throw new AppError(error.message, 'DB_ERROR');
+  return data as unknown as Transacao[];
 }

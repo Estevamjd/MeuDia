@@ -43,10 +43,14 @@ export async function findByAssinatura(assinaturaId: string, userId: string): Pr
 }
 
 // SECURITY INVOKER: as RPCs filtram auth.uid() e aplicam RLS na sessão do usuário.
-export async function rpcPagar(contaId: string, competencia: string, pagoEm?: string, banco?: string | null, client = getSupabase()) {
-  const { data, error } = await client.rpc('pagar_conta', {
-    p_conta_id: contaId, p_competencia: competencia, p_pago_em: pagoEm ?? null, p_banco: banco ?? null,
-  });
+// Com carteira usa pagar_conta_v2 (006); sem carteira mantém a pagar_conta da 005.
+export async function rpcPagar(
+  contaId: string, competencia: string, pagoEm?: string, banco?: string | null, client = getSupabase(), carteiraId?: string | null,
+) {
+  const base = { p_conta_id: contaId, p_competencia: competencia, p_pago_em: pagoEm ?? null, p_banco: banco ?? null };
+  const { data, error } = carteiraId
+    ? await client.rpc('pagar_conta_v2', { ...base, p_carteira_id: carteiraId })
+    : await client.rpc('pagar_conta', base);
   if (error) {
     if (error.code === 'P0003' || error.code === '23505') throw new AppError('Competência já paga', 'COMPETENCIA_JA_PAGA', 409);
     if (error.code === 'P0002') throw new AppError('Conta não encontrada', 'NOT_FOUND', 404);

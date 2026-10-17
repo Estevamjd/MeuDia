@@ -2,8 +2,8 @@ import type { Renda } from '@meudia/shared';
 import { AppError } from '@meudia/shared';
 import { getSupabase } from './supabase';
 
-const COLUMNS = 'id, user_id, descricao, valor, dia_recebimento, ativo, created_at, updated_at';
-type Insert = Omit<Renda, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'dia_recebimento' | 'ativo'> & { dia_recebimento?: number | null; ativo?: boolean };
+const COLUMNS = 'id, user_id, descricao, valor, dia_recebimento, ativo, carteira_id, created_at, updated_at';
+type Insert = Omit<Renda, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'dia_recebimento' | 'ativo' | 'carteira_id'> & { dia_recebimento?: number | null; ativo?: boolean; carteira_id?: string | null };
 
 export async function findAll(userId: string, filters: { ativo?: boolean } = {}): Promise<Renda[]> {
   let query = getSupabase().from('rendas').select(COLUMNS).eq('user_id', userId);

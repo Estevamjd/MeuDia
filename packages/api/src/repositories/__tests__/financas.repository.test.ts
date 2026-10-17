@@ -61,6 +61,9 @@ describe('BE-03: repositories (sem banco)', () => {
     expect(client.rpc).toHaveBeenCalledWith('pagar_conta', { p_conta_id: 'conta', p_competencia: '2026-10', p_pago_em: null, p_banco: null });
     await contas.rpcDesfazer('conta', '2026-10');
     expect(client.rpc).toHaveBeenCalledWith('desfazer_pagamento', { p_conta_id: 'conta', p_competencia: '2026-10' });
+    // Com carteira: pagar_conta_v2 (006); a pagar_conta da 005 segue para chamadas sem carteira.
+    await contas.rpcPagar('conta', '2026-10', undefined, null, undefined, 'cart');
+    expect(client.rpc).toHaveBeenLastCalledWith('pagar_conta_v2', { p_conta_id: 'conta', p_competencia: '2026-10', p_pago_em: null, p_banco: null, p_carteira_id: 'cart' });
   });
   it.each([[[], false], [[{ id: 'reserva' }], true]] as const)('reserva duplicada ou nova', async (data, esperado) => {
     const { admin, query } = mockClient(data);

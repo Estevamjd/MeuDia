@@ -96,21 +96,23 @@ export function saldosCarteiras(
   carteiras: readonly Carteira[],
   transacoes: readonly TransacaoSaldo[],
   transferencias: readonly TransferenciaSaldo[],
+  ate?: string,
 ): SaldoDaCarteira[] {
   return carteiras
     .filter((c) => !c.arquivada)
     .sort((a, b) => a.ordem - b.ordem || (a.created_at ?? '').localeCompare(b.created_at ?? ''))
-    .map((carteira) => ({ carteira, saldo: saldoCarteira(carteira, transacoes, transferencias) }));
+    .map((carteira) => ({ carteira, saldo: saldoCarteira(carteira, transacoes, transferencias, ate) }));
 }
 
-/** R3: soma das carteiras ativas marcadas "somar no total". */
+/** R3: soma das carteiras ativas marcadas "somar no total". `ate` = hoje ignora lançamentos futuros. */
 export function saldoHoje(
   carteiras: readonly Carteira[],
   transacoes: readonly TransacaoSaldo[],
   transferencias: readonly TransferenciaSaldo[],
+  ate?: string,
 ): number {
   return centavos(
-    saldosCarteiras(carteiras, transacoes, transferencias)
+    saldosCarteiras(carteiras, transacoes, transferencias, ate)
       .filter((s) => s.carteira.incluir_no_total)
       .reduce((soma, s) => soma + s.saldo, 0),
   );

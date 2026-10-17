@@ -73,11 +73,14 @@ describe('BE-04: contas service', () => {
     vi.mocked(contas.rpcPagar).mockResolvedValue(pagamento);
     expect(await service.pagarConta('user', 'conta', { competencia: '2026-10', pago_em: '2026-10-14', banco: null })).toEqual(pagamento);
     expect(contas.rpcPagar).toHaveBeenCalledWith('conta', '2026-10', '2026-10-14', null, undefined);
+    const carteira = 'c0060000-0000-4000-8000-0000000000a2';
+    await service.pagarConta('user', 'conta', { competencia: '2026-10', carteira_id: carteira });
+    expect(contas.rpcPagar).toHaveBeenLastCalledWith('conta', '2026-10', undefined, undefined, undefined, carteira);
     await service.desfazerPagamento('user', 'conta', '2026-10');
     expect(contas.rpcDesfazer).toHaveBeenCalledWith('conta', '2026-10');
     await expect(service.pagarConta('user', 'conta', { competencia: '2026-13' })).rejects.toThrow();
     await expect(service.desfazerPagamento('user', 'conta', '2026-1')).rejects.toThrow();
-    expect(contas.rpcPagar).toHaveBeenCalledTimes(1);
+    expect(contas.rpcPagar).toHaveBeenCalledTimes(2);
     expect(contas.rpcDesfazer).toHaveBeenCalledTimes(1);
   });
   it('não chama RPC para conta inacessível', async () => {

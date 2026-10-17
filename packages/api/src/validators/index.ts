@@ -55,3 +55,13 @@ export { competenciaSchema, contaPagarInsertSchema, contaPagarUpdateSchema, paga
 export { rendaInsertSchema } from './rendas.validator';
 export { orcamentoInsertSchema } from './orcamento.validator';
 export { pushSubscriptionSchema } from './push-subscription.validator';
+export {
+  carteiraInsertSchema,
+  carteiraUpdateSchema,
+  corrigirSaldoSchema,
+  entradaAvulsaSchema,
+  gastoRapidoSchema,
+  receberRendaSchema,
+  tipoCarteiraSchema,
+  transferenciaInsertSchema,
+} from './carteiras.validator';

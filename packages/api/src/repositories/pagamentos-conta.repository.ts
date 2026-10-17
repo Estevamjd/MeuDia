@@ -13,6 +13,14 @@ export async function findByCompetencia(userId: string, competencia: string): Pr
   return data as unknown as PagamentoConta[];
 }
 
+export async function findByCompetencias(userId: string, competencias: string[]): Promise<PagamentoConta[]> {
+  if (!competencias.length) return [];
+  const { data, error } = await getSupabase().from('pagamentos_conta').select(COLUMNS)
+    .eq('user_id', userId).in('competencia', competencias);
+  if (error) throw new AppError(error.message, 'DB_ERROR');
+  return data as unknown as PagamentoConta[];
+}
+
 export async function findByConta(userId: string, contaId: string): Promise<PagamentoConta[]> {
   const { data, error } = await getSupabase().from('pagamentos_conta').select(COLUMNS)
     .eq('user_id', userId).eq('conta_id', contaId).order('competencia', { ascending: false });
