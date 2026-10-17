@@ -579,6 +579,12 @@ function handleRest(req, res, url, body) {
   if (table === 'transacoes' && (req.method === 'PATCH' || req.method === 'DELETE') && matching().some(vinculada)) {
     throw new PgError(400, '55000', 'Lançamento vinculado a Recebi/Paguei não pode ser alterado');
   }
+  // O vínculo também: sem trocar transacao_id nem apagar recebimento/pagamento com a transação viva.
+  if ((table === 'recebimentos_renda' || table === 'pagamentos_conta')
+    && ((req.method === 'PATCH' && body && 'transacao_id' in body && matching().some((v) => v.transacao_id !== body.transacao_id))
+      || (req.method === 'DELETE' && matching().some((v) => v.transacao_id != null)))) {
+    throw new PgError(400, '55000', 'Vínculo de Recebi/Paguei não pode ser alterado');
+  }
   if (table === 'carteiras' && req.method === 'DELETE') throw new PgError(403, '42501', 'permission denied for table carteiras');
 
   if (req.method === 'PATCH') {

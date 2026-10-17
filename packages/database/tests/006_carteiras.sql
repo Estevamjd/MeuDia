@@ -133,6 +133,7 @@ DECLARE
   aj2 public.transacoes;
   c public.carteiras;
   r public.recebimentos_renda;
+  tmp_id UUID;
   r2 public.recebimentos_renda;
   r3 public.recebimentos_renda;
   p public.pagamentos_conta;
@@ -220,6 +221,10 @@ BEGIN
   PERFORM pg_temp.expect_error(pg_catalog.format(
     'UPDATE public.recebimentos_renda SET transacao_id = NULL WHERE id = %L; SET CONSTRAINTS ALL IMMEDIATE', r2.id), '55000');
   SET CONSTRAINTS ALL DEFERRED;
+  -- Nem trocar o vínculo para outra transação própria, nem apagar o recebimento direto (liberaria a receita).
+  PERFORM pg_temp.expect_error(pg_catalog.format('UPDATE public.recebimentos_renda SET transacao_id = %L WHERE id = %L',
+    'c0060000-0000-4000-8000-0000000000a8', r2.id), '55000');
+  PERFORM pg_temp.expect_error(pg_catalog.format('DELETE FROM public.recebimentos_renda WHERE id = %L', r2.id), '55000');
   IF NOT EXISTS (SELECT 1 FROM public.recebimentos_renda WHERE id = r2.id AND transacao_id = r2.transacao_id)
     OR NOT EXISTS (SELECT 1 FROM public.transacoes WHERE id = r2.transacao_id AND valor = 900) THEN
     RAISE EXCEPTION 'Bloqueio do vínculo deixou recebimento/receita alterados';
@@ -247,6 +252,12 @@ BEGIN
   PERFORM pg_temp.expect_error(pg_catalog.format(
     'UPDATE public.pagamentos_conta SET transacao_id = NULL WHERE id = %L; SET CONSTRAINTS ALL IMMEDIATE', p.id), '55000');
   SET CONSTRAINTS ALL DEFERRED;
+  PERFORM pg_temp.expect_error(pg_catalog.format('UPDATE public.pagamentos_conta SET transacao_id = %L WHERE id = %L',
+    'c0060000-0000-4000-8000-0000000000a8', p.id), '55000');
+  PERFORM pg_temp.expect_error(pg_catalog.format('DELETE FROM public.pagamentos_conta WHERE id = %L', p.id), '55000');
+  IF NOT EXISTS (SELECT 1 FROM public.pagamentos_conta WHERE id = p.id AND transacao_id = p.transacao_id) THEN
+    RAISE EXCEPTION 'Bloqueio do vínculo deixou o pagamento alterado';
+  END IF;
   PERFORM pg_temp.expect_error(pg_catalog.format('SELECT public.pagar_conta_v2(%L, %L, NULL, NULL, %L)', conta_a, '2026-11', arquivada), 'P0002');
   PERFORM public.desfazer_pagamento(conta_a, '2026-10');
   SET CONSTRAINTS ALL IMMEDIATE;
@@ -262,6 +273,24 @@ BEGIN
   SELECT * INTO STRICT t FROM public.transacoes WHERE id = p.transacao_id;
   IF t.carteira_id IS NOT NULL OR t.banco IS NOT NULL THEN RAISE EXCEPTION 'pagar_conta_v2 sem carteira divergiu da antiga'; END IF;
   PERFORM public.desfazer_pagamento(conta_a, '2026-10');
+
+  -- Excluir a conta/renda (CASCADE) com vínculo vivo segue ok: o lançamento fica, agora sem vínculo e editável.
+  INSERT INTO public.contas_pagar (user_id, descricao, categoria, valor, recorrencia, dia_vencimento, created_at)
+    VALUES (ua, 'Temp', 'Contas', 10, 'mensal', 5, '2026-10-01 03:00:00+00') RETURNING id INTO tmp_id;
+  SELECT * INTO p FROM public.pagar_conta_v2(tmp_id, '2026-10', '2026-10-05', NULL, nubank);
+  DELETE FROM public.contas_pagar WHERE id = tmp_id;
+  UPDATE public.transacoes SET valor = 11 WHERE id = p.transacao_id;
+  INSERT INTO public.rendas (user_id, descricao, valor, dia_recebimento) VALUES (ua, 'Temp', 10, 5) RETURNING id INTO tmp_id;
+  SELECT * INTO r FROM public.receber_renda(tmp_id, '2026-10');
+  DELETE FROM public.rendas WHERE id = tmp_id;
+  UPDATE public.transacoes SET valor = 11 WHERE id = r.transacao_id;
+  SET CONSTRAINTS ALL IMMEDIATE;
+  SET CONSTRAINTS ALL DEFERRED;
+  IF EXISTS (SELECT 1 FROM public.pagamentos_conta WHERE id = p.id) OR EXISTS (SELECT 1 FROM public.recebimentos_renda WHERE id = r.id)
+    OR (SELECT count(*) FROM public.transacoes WHERE id IN (p.transacao_id, r.transacao_id) AND valor = 11) <> 2 THEN
+    RAISE EXCEPTION 'CASCADE de contas_pagar/rendas com vínculo falhou';
+  END IF;
+  DELETE FROM public.transacoes WHERE id IN (p.transacao_id, r.transacao_id);
 
   -- Lançamento sem vínculo segue editável e apagável.
   INSERT INTO public.transacoes (user_id, tipo, categoria, descricao, valor, data, carteira_id)
@@ -407,7 +436,8 @@ BEGIN
     OR EXISTS (SELECT 1 FROM public.transacoes WHERE id = 'c0060000-0000-4000-8000-0000000000f1')
     OR NOT EXISTS (SELECT 1 FROM public.transacoes WHERE id = 'c0060000-0000-4000-8000-0000000000f2')
     OR EXISTS (SELECT 1 FROM pg_catalog.pg_trigger WHERE tgname LIKE 'trg_vinculo%')
-    OR pg_catalog.to_regprocedure('public.proteger_transacao_vinculada()') IS NOT NULL THEN
+    OR pg_catalog.to_regprocedure('public.proteger_transacao_vinculada()') IS NOT NULL
+    OR pg_catalog.to_regprocedure('public.proteger_vinculo()') IS NOT NULL THEN
     RAISE EXCEPTION 'Down removeu demais ou de menos';
   END IF;
 END $$;

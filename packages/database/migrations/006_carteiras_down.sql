@@ -7,8 +7,11 @@
 DROP TRIGGER IF EXISTS trg_vinculo_transacoes ON public.transacoes;
 DROP TRIGGER IF EXISTS trg_vinculo_orfao ON public.pagamentos_conta;
 DROP TRIGGER IF EXISTS trg_vinculo_orfao ON public.recebimentos_renda;
+DROP TRIGGER IF EXISTS trg_vinculo_proteger ON public.pagamentos_conta;
+DROP TRIGGER IF EXISTS trg_vinculo_proteger ON public.recebimentos_renda;
 DROP FUNCTION IF EXISTS public.proteger_transacao_vinculada();
 DROP FUNCTION IF EXISTS public.checar_vinculo_orfao();
+DROP FUNCTION IF EXISTS public.proteger_vinculo();
 DROP INDEX IF EXISTS public.idx_pagamentos_conta_transacao;
 DROP FUNCTION IF EXISTS public.corrigir_saldo(UUID, NUMERIC, UUID);
 DROP FUNCTION IF EXISTS public.pagar_conta_v2(UUID, TEXT, DATE, TEXT, UUID);

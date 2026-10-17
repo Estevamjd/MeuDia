@@ -188,9 +188,10 @@ BEGIN
     RAISE EXCEPTION 'Recebimento não encontrado nesta competência'
       USING ERRCODE = '22023', HINT = 'Exige competência recebida.';
   END IF;
-  -- Vínculo antes da receita: a receita deixa de ser protegida (ver proteger_transacao_vinculada).
-  DELETE FROM public.recebimentos_renda WHERE id = v_recebimento.id AND user_id = v_recebimento.user_id;
+  -- Receita antes do vínculo (mesma ordem da desfazer_pagamento da 005): o FK zera transacao_id e só então o
+  -- recebimento pode ser apagado (ver proteger_vinculo); o vínculo órfão some antes da checagem do COMMIT.
   DELETE FROM public.transacoes WHERE id = v_recebimento.transacao_id AND user_id = v_recebimento.user_id;
+  DELETE FROM public.recebimentos_renda WHERE id = v_recebimento.id AND user_id = v_recebimento.user_id;
 END;
 $$;
 
@@ -351,6 +352,30 @@ BEGIN
 END;
 $$;
 
+-- O próprio vínculo também não muda direto: trocar transacao_id (para outra transação ou NULL) ou apagar o
+-- recebimento/pagamento com a transação ainda viva liberaria a transação e faria o desfazer apagar outra.
+-- desfazer_* apagam a transação antes (o FK zera transacao_id em cascata, pg_trigger_depth() > 1) e depois o vínculo,
+-- já com transacao_id NULL. CASCADE de profiles/contas_pagar/rendas chega por RI (pg_trigger_depth() > 1) e passa.
+CREATE OR REPLACE FUNCTION public.proteger_vinculo()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
+AS $$
+BEGIN
+  IF pg_catalog.pg_trigger_depth() > 1 THEN
+    RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+  END IF;
+  IF TG_OP = 'UPDATE' AND NEW.transacao_id IS DISTINCT FROM OLD.transacao_id THEN
+    RAISE EXCEPTION 'Vínculo de Recebi/Paguei não pode ser alterado' USING ERRCODE = '55000',
+      HINT = 'Use desfazer_recebimento ou desfazer_pagamento.';
+  END IF;
+  IF TG_OP = 'DELETE' AND OLD.transacao_id IS NOT NULL THEN
+    RAISE EXCEPTION 'Vínculo de Recebi/Paguei não pode ser excluído' USING ERRCODE = '55000',
+      HINT = 'Use desfazer_recebimento ou desfazer_pagamento.';
+  END IF;
+  RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+END;
+$$;
+
 DO $$
 DECLARE
   t TEXT;
@@ -368,10 +393,16 @@ BEGIN
         'WHEN (OLD.transacao_id IS NOT NULL AND NEW.transacao_id IS NULL) '
         'EXECUTE FUNCTION public.checar_vinculo_orfao()', t);
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger
+      WHERE tgname = 'trg_vinculo_proteger' AND tgrelid = pg_catalog.to_regclass(pg_catalog.format('public.%I', t))) THEN
+      EXECUTE pg_catalog.format('CREATE TRIGGER trg_vinculo_proteger BEFORE UPDATE OF transacao_id OR DELETE ON public.%I '
+        'FOR EACH ROW EXECUTE FUNCTION public.proteger_vinculo()', t);
+    END IF;
   END LOOP;
 END $$;
 REVOKE EXECUTE ON FUNCTION public.proteger_transacao_vinculada() FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.checar_vinculo_orfao() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.proteger_vinculo() FROM PUBLIC, anon, authenticated;
 
 -- Tabelas novas: acesso explícito para authenticated (RLS users_own_data filtra as linhas), nada para anon.
 -- REVOKE ALL antes do GRANT: no Supabase os default privileges dão ALL (inclusive TRUNCATE, REFERENCES e TRIGGER)
