@@ -3,6 +3,8 @@ import type { Carteira, ContaPagar, Renda, Transacao, Transferencia } from '../.
 import {
   alvosPrevisao,
   comecouMesCom,
+  competenciaDeslocada,
+  competenciasPrevisao,
   entraNoSaldo,
   evolucaoMes,
   gastoDoMes,
@@ -180,6 +182,44 @@ describe('bordas do saldo', () => {
     expect(p.valor).toBe(420);
     expect(p.itens[0]?.vencida).toBe(true);
     expect(previsao({ ...base, pagamentos: [{ conta_id: 'v', competencia: '2026-10' }] }).valor).toBe(500);
+  });
+
+  it('virada do mês: conta única vencida em setembro e ainda não paga continua descontada em outubro', () => {
+    const unica: ContaPagar = {
+      ...conta('u1', 'IPVA', 300, 1), recorrencia: 'unica', dia_vencimento: null, data_vencimento: '2026-09-20',
+      created_at: '2026-09-01T12:00:00Z',
+    };
+    const base = { hojeISO: HOJE, alvoISO: '2026-10-24', saldoHoje: 1000, rendas: [], recebimentos: [], contas: [unica] };
+    const p = previsao({ ...base, pagamentos: [] });
+    expect(p.itens.map((i) => [i.descricao, i.competencia, i.vencida])).toEqual([['IPVA', '2026-09', true]]);
+    expect(p.valor).toBe(700);
+    expect(previsao({ ...base, pagamentos: [{ conta_id: 'u1', competencia: '2026-09' }] }).valor).toBe(1000);
+  });
+
+  it('recorrente: ocorrências anteriores não pagas entram (até 12 meses e nunca antes da criação)', () => {
+    const aluguel = { ...conta('al', 'Aluguel', 500, 10), created_at: '2026-08-15T12:00:00Z' };
+    const base = { hojeISO: HOJE, alvoISO: '2026-10-24', saldoHoje: 2000, rendas: [], recebimentos: [], contas: [aluguel] };
+    // Criada em agosto: ago, set e out (10/10) vencidas; julho não existe.
+    const p = previsao({ ...base, pagamentos: [{ conta_id: 'al', competencia: '2026-08' }] });
+    expect(p.itens.map((i) => i.competencia)).toEqual(['2026-09', '2026-10']);
+    expect(p.valor).toBe(1000);
+    const antiga = { ...aluguel, created_at: '2020-01-01T12:00:00Z' };
+    const longa = previsao({ ...base, contas: [antiga], pagamentos: [] });
+    // Limite de 12 meses: de 2025-10 a 2026-10 (13 competências).
+    expect(longa.itens[0]?.competencia).toBe('2025-10');
+    expect(longa.itens).toHaveLength(13);
+  });
+
+  it('rendas antigas não recebidas não entram na previsão (só do mês corrente em diante)', () => {
+    const r = renda(900, 5, { created_at: '2026-01-01T12:00:00Z' });
+    const p = previsao({ hojeISO: HOJE, alvoISO: '2026-10-24', saldoHoje: 0, rendas: [r], recebimentos: [], contas: [], pagamentos: [] });
+    expect(p.itens.map((i) => i.competencia)).toEqual(['2026-10']);
+    expect(competenciasPrevisao(HOJE, '2026-11-03')).toEqual({
+      contas: ['2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11'],
+      rendas: ['2026-10', '2026-11'],
+    });
+    expect(competenciaDeslocada('2026-01', -1)).toBe('2025-12');
+    expect(competenciaDeslocada('2025-12', 13)).toBe('2027-01');
   });
 
   it('renda sem dia conta no último dia do mês', () => {

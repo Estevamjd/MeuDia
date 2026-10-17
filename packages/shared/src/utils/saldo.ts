@@ -36,8 +36,14 @@ export function fimDoMes(dataOuCompetencia: string): string {
 }
 
 function proximaCompetencia(competencia: string): string {
+  return competenciaDeslocada(competencia, 1);
+}
+
+/** Competência `n` meses depois (negativo: antes). */
+export function competenciaDeslocada(competencia: string, n: number): string {
   const [a, m] = competencia.split('-').map(Number) as [number, number];
-  return m === 12 ? `${String(a + 1).padStart(4, '0')}-01` : `${String(a).padStart(4, '0')}-${String(m + 1).padStart(2, '0')}`;
+  const total = a * 12 + (m - 1) + n;
+  return `${String(Math.floor(total / 12)).padStart(4, '0')}-${String((total % 12) + 1).padStart(2, '0')}`;
 }
 
 /** Competências de `de` até `ate` (inclusive). */
@@ -158,17 +164,41 @@ export interface Previsao {
   itens: ItemPrevisao[];
 }
 
+/** Quantos meses antes do corrente a previsão ainda procura contas vencidas sem "Paguei". */
+export const MESES_CONTAS_VENCIDAS = 12;
+
 /**
- * R10: saldo de hoje + rendas ativas ainda não recebidas com dia ≤ alvo − ocorrências de contas
- * não pagas (vencidas inclusive) com vencimento ≤ alvo, do mês corrente até o mês do alvo.
- * Limites de orçamento não entram. Meses anteriores ao corrente ficam de fora (pendência antiga
- * sem "Paguei" não deve puxar a previsão para sempre).
+ * Competências que a previsão lê: contas desde `MESES_CONTAS_VENCIDAS` meses atrás (dívida vencida
+ * não some na virada do mês) e rendas só do mês corrente em diante (renda antiga não recebida não é dinheiro a entrar).
+ */
+export function competenciasPrevisao(hojeISO: string, alvoISO: string): { contas: string[]; rendas: string[] } {
+  const atual = competenciaDe(hojeISO);
+  const fim = competenciaDe(alvoISO);
+  return { contas: competenciasEntre(competenciaDeslocada(atual, -MESES_CONTAS_VENCIDAS), fim), rendas: competenciasEntre(atual, fim) };
+}
+
+/**
+ * R10: saldo de hoje + rendas ativas ainda não recebidas com dia ≤ alvo (do mês corrente até o do alvo)
+ * − ocorrências de contas não pagas com vencimento ≤ alvo, inclusive as vencidas de até
+ * `MESES_CONTAS_VENCIDAS` meses atrás (recorrentes nunca antes da criação da conta, como em pagar_conta).
+ * Limites de orçamento não entram.
  */
 export function previsao({ hojeISO, alvoISO, saldoHoje: hoje, rendas, recebimentos, contas, pagamentos }: EntradaPrevisao): Previsao {
   const recebidas = new Set(recebimentos.map((r) => `${r.renda_id}|${r.competencia}`));
   const pagas = new Set(pagamentos.map((p) => `${p.conta_id}|${p.competencia}`));
   const itens: ItemPrevisao[] = [];
-  for (const competencia of competenciasEntre(competenciaDe(hojeISO), competenciaDe(alvoISO))) {
+  const periodo = competenciasPrevisao(hojeISO, alvoISO);
+  for (const competencia of periodo.contas) {
+    for (const conta of contas) {
+      const ocorrencia = ocorrenciaDaConta(conta, competencia);
+      if (!ocorrencia || ocorrencia.vencimento > alvoISO || pagas.has(`${conta.id}|${competencia}`)) continue;
+      itens.push({
+        tipo: 'conta', id: conta.id, descricao: conta.descricao, categoria: conta.categoria, valor: -Number(conta.valor),
+        data: ocorrencia.vencimento, competencia, vencida: ocorrencia.vencimento < hojeISO,
+      });
+    }
+  }
+  for (const competencia of periodo.rendas) {
     for (const renda of rendas) {
       if (!rendaVigente(renda, competencia) || recebidas.has(`${renda.id}|${competencia}`)) continue;
       const data = dataRendaNoMes(renda, competencia);
@@ -176,14 +206,6 @@ export function previsao({ hojeISO, alvoISO, saldoHoje: hoje, rendas, recebiment
       itens.push({
         tipo: 'renda', id: renda.id, descricao: renda.descricao, categoria: 'Salário', valor: Number(renda.valor),
         data, competencia, vencida: data < hojeISO,
-      });
-    }
-    for (const conta of contas) {
-      const ocorrencia = ocorrenciaDaConta(conta, competencia);
-      if (!ocorrencia || ocorrencia.vencimento > alvoISO || pagas.has(`${conta.id}|${competencia}`)) continue;
-      itens.push({
-        tipo: 'conta', id: conta.id, descricao: conta.descricao, categoria: conta.categoria, valor: -Number(conta.valor),
-        data: ocorrencia.vencimento, competencia, vencida: ocorrencia.vencimento < hojeISO,
       });
     }
   }
