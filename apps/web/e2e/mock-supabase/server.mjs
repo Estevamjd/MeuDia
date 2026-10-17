@@ -1,6 +1,7 @@
 // Mock STATEFUL (em memória) de Supabase Auth (GoTrue) + PostgREST para os testes E2E.
 // Nunca toca um Supabase real. Uso: node e2e/mock-supabase/server.mjs [porta]
-// Endpoints de apoio: GET /__mock/state (dump), POST /__mock/reset, GET /__mock/health.
+// Endpoints de apoio: GET /__mock/state (dump), POST /__mock/reset, GET /__mock/health,
+// POST /__mock/clock {"now": ISO | null} (relógio injetável só do mock: datas default, JWT e now()).
 import http from 'node:http';
 import crypto from 'node:crypto';
 
@@ -21,9 +22,14 @@ function reset() {
 reset();
 const rowsOf = (t) => (tables[t] ??= []);
 
+// ─── Relógio (deslocável por /__mock/clock; o tempo continua andando a partir do instante fixado) ──
+let clockOffsetMs = 0;
+const agora = () => new Date(Date.now() + clockOffsetMs);
+const agoraSeg = () => Math.floor(agora().getTime() / 1000);
+
 // ─── Schema (subconjunto fiel das migrations usadas pelo modo Finanças) ────────
-const nowIso = () => new Date().toISOString();
-const hojeSP = (d = new Date()) =>
+const nowIso = () => agora().toISOString();
+const hojeSP = (d = agora()) =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
 const competenciaSP = (d) => hojeSP(d).slice(0, 7);
 
@@ -32,19 +38,23 @@ const DEFAULTS = {
   profiles: () => ({ nome: null, email: null, avatar_url: null, peso_atual: null, altura: null, meta_peso: null, meta_calorias: 2000, meta_agua: 8, objetivo: null, onboarding_feito: false, created_at: nowIso() }),
   contas_pagar: () => ({ assinatura_id: null, categoria: 'Contas', dia_vencimento: null, mes_vencimento: null, data_vencimento: null, ativo: true, created_at: nowIso(), updated_at: nowIso() }),
   pagamentos_conta: () => ({ transacao_id: null, created_at: nowIso() }),
-  rendas: () => ({ dia_recebimento: null, ativo: true, created_at: nowIso(), updated_at: nowIso() }),
+  rendas: () => ({ dia_recebimento: null, ativo: true, carteira_id: null, created_at: nowIso(), updated_at: nowIso() }),
   orcamento_categorias: () => ({ created_at: nowIso(), updated_at: nowIso() }),
-  transacoes: () => ({ data: hojeSP(), banco: null, automatico: false, created_at: nowIso() }),
+  transacoes: () => ({ data: hojeSP(), banco: null, automatico: false, carteira_id: null, ajuste: false, created_at: nowIso() }),
+  carteiras: () => ({ tipo: 'banco', saldo_inicial: 0, saldo_inicial_em: nowIso(), incluir_no_total: true, arquivada: false, ordem: 0, created_at: nowIso(), updated_at: nowIso() }),
+  transferencias: () => ({ descricao: null, created_at: nowIso(), updated_at: nowIso() }),
+  recebimentos_renda: () => ({ transacao_id: null, created_at: nowIso() }),
   assinaturas: () => ({ icone: null, cor: null, ativo: true, created_at: nowIso() }),
   chat_agente: () => ({ intencao: null, acoes: null, created_at: nowIso() }),
   notificacoes_agente: () => ({ lida: false, created_at: nowIso() }),
 };
-const COM_UPDATED_AT = new Set(['contas_pagar', 'rendas', 'orcamento_categorias']);
+const COM_UPDATED_AT = new Set(['contas_pagar', 'rendas', 'orcamento_categorias', 'carteiras', 'transferencias']);
 
 /** Chaves únicas (além do PK `id`). Linhas com algum valor null não conflitam (semântica SQL). */
 const UNIQUES = {
   orcamento_categorias: [['user_id', 'categoria']],
   pagamentos_conta: [['conta_id', 'competencia']],
+  recebimentos_renda: [['renda_id', 'competencia']],
   contas_pagar: [['assinatura_id']],
   push_subscriptions: [['user_id', 'endpoint']],
   lembretes_enviados: [['conta_id', 'competencia', 'etapa', 'canal']],
@@ -96,9 +106,42 @@ function checkRow(table, r) {
     notNull('user_id', 'tipo', 'categoria', 'descricao', 'valor');
     if (!['receita', 'despesa'].includes(r.tipo)) fail('tipo');
   }
+  if (table === 'carteiras') {
+    notNull('user_id', 'nome');
+    const nome = String(r.nome).trim();
+    if (nome.length < 1 || nome.length > 60) fail('nome');
+    if (!['banco', 'dinheiro', 'poupanca'].includes(r.tipo)) fail('tipo');
+  }
+  if (table === 'transferencias') {
+    notNull('user_id', 'origem_id', 'destino_id', 'valor', 'data');
+    if (!(Number(r.valor) > 0)) fail('valor > 0');
+    if (r.origem_id === r.destino_id) fail('origem_id <> destino_id');
+  }
+  if (table === 'recebimentos_renda') {
+    notNull('renda_id', 'user_id', 'competencia', 'recebido_em');
+    if (!/^[0-9]{4}-(0[1-9]|1[0-2])$/.test(r.competencia)) fail('competencia');
+  }
   if (table === 'pagamentos_conta') {
     notNull('conta_id', 'user_id', 'competencia', 'pago_em');
     if (!/^[0-9]{4}-(0[1-9]|1[0-2])$/.test(r.competencia)) fail('competencia');
+  }
+}
+
+/** FKs compostas (x_id, user_id) da 006: a carteira/renda referenciada precisa ser do mesmo usuário. */
+const FKS_COMPOSTAS = {
+  transacoes: [['carteira_id', 'carteiras']],
+  rendas: [['carteira_id', 'carteiras']],
+  transferencias: [['origem_id', 'carteiras'], ['destino_id', 'carteiras']],
+  recebimentos_renda: [['renda_id', 'rendas']],
+};
+function checkFks(table, r) {
+  for (const [col, alvo] of FKS_COMPOSTAS[table] ?? []) {
+    if (r[col] === null || r[col] === undefined) continue;
+    if (!rowsOf(alvo).some((o) => o.id === r[col] && o.user_id === r.user_id)) {
+      throw new PgError(409, '23503', `insert or update on table "${table}" violates foreign key constraint`, {
+        details: `Key (${col}, user_id)=(${r[col]}, ${r.user_id}) is not present in table "${alvo}".`,
+      });
+    }
   }
 }
 
@@ -144,7 +187,7 @@ function verifyJwt(token) {
   if (sig !== parts[2]) return null;
   try {
     const p = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
-    if (p.exp && p.exp < Date.now() / 1000) return null;
+    if (p.exp && p.exp < agoraSeg()) return null;
     return p;
   } catch {
     return null;
@@ -162,7 +205,7 @@ function publicUser(u) {
   return rest;
 }
 function newSession(u, sessionId = crypto.randomUUID()) {
-  const iat = Math.floor(Date.now() / 1000);
+  const iat = agoraSeg();
   const exp = iat + ACCESS_TTL;
   const access_token = signJwt({
     aud: 'authenticated', exp, iat, iss: `http://127.0.0.1:${PORT}/auth/v1`, sub: u.id, email: u.email,
@@ -499,6 +542,7 @@ function handleRest(req, res, url, body) {
           if (COM_UPDATED_AT.has(table)) merged.updated_at = nowIso();
           assertWritable(table, merged, uid);
           checkRow(table, merged);
+          checkFks(table, merged);
           staged.push({ kind: 'update', target: existing, value: merged });
           continue;
         }
@@ -506,6 +550,7 @@ function handleRest(req, res, url, body) {
       const row = { id: crypto.randomUUID(), ...(DEFAULTS[table]?.() ?? { created_at: nowIso() }), ...raw };
       assertWritable(table, row, uid);
       checkRow(table, row);
+      checkFks(table, row);
       checkUnique(table, row);
       for (const s of staged) if (s.kind === 'insert' && s.value.id === row.id) throw new PgError(409, '23505', 'duplicate key');
       staged.push({ kind: 'insert', value: row });
@@ -531,6 +576,7 @@ function handleRest(req, res, url, body) {
       if (COM_UPDATED_AT.has(table) && !('updated_at' in patch)) v.updated_at = nowIso();
       assertWritable(table, v, uid);
       checkRow(table, v);
+      checkFks(table, v);
       checkUnique(table, v, r);
       return v;
     });
@@ -547,41 +593,97 @@ function handleRest(req, res, url, body) {
   return send(res, 405, { code: 'PGRST', message: 'method not allowed' });
 }
 
-// ─── RPCs (fiéis a packages/database/migrations/005_financas.sql) ─────────────
+// ─── RPCs (fiéis a packages/database/migrations/005_financas.sql e 006_carteiras.sql) ─
+const RE_COMP = /^[0-9]{4}-(0[1-9]|1[0-2])$/;
+function carteiraAtivaDe(uid, id) {
+  const c = rowsOf('carteiras').find((x) => x.id === id && x.user_id === uid && !x.arquivada);
+  if (!c) throw new PgError(400, 'P0002', 'Carteira não encontrada ou arquivada');
+  return c;
+}
+
+/** Fiel a pagar_conta (005_financas.sql). */
+function pagarConta(uid, args) {
+  const conta = rowsOf('contas_pagar').find((c) => c.id === args.p_conta_id && c.user_id === uid);
+  if (!conta) throw new PgError(400, 'P0002', 'Conta não encontrada ou acesso negado');
+  const comp = args.p_competencia;
+  if (!comp || !/^[0-9]{4}-(0[1-9]|1[0-2])$/.test(comp)) throw new PgError(400, '22023', 'Competência inválida', { hint: 'Exige YYYY-MM.' });
+  const criada = competenciaSP(new Date(conta.created_at));
+  if (
+    !conta.ativo ||
+    (conta.recorrencia === 'anual' && Number(comp.slice(5, 7)) !== conta.mes_vencimento) ||
+    (conta.recorrencia === 'unica' && comp !== String(conta.data_vencimento).slice(0, 7)) ||
+    (['mensal', 'anual'].includes(conta.recorrencia) && comp < criada)
+  ) {
+    throw new PgError(400, '22023', 'Conta sem ocorrência nesta competência', {
+      hint: 'Exige conta ativa e competência compatível com a recorrência e criação.',
+    });
+  }
+  if (rowsOf('pagamentos_conta').some((p) => p.conta_id === conta.id && p.competencia === comp && p.user_id === conta.user_id)) {
+    throw new PgError(400, 'P0003', 'Competência já paga', { hint: 'Exige competência sem pagamento.' });
+  }
+  const pagoEm = args.p_pago_em ?? hojeSP();
+  const transacao = {
+    id: crypto.randomUUID(), ...DEFAULTS.transacoes(), user_id: conta.user_id, tipo: 'despesa',
+    categoria: conta.categoria, descricao: conta.descricao, valor: conta.valor, data: pagoEm,
+    banco: args.p_banco ?? null, automatico: true,
+  };
+  const pagamento = {
+    id: crypto.randomUUID(), conta_id: conta.id, user_id: conta.user_id, competencia: comp,
+    pago_em: pagoEm, transacao_id: transacao.id, created_at: nowIso(),
+  };
+  rowsOf('transacoes').push(transacao);
+  rowsOf('pagamentos_conta').push(pagamento);
+  return pagamento;
+}
+
 function handleRpc(req, res, fn, args = {}, uid) {
   if (!uid) throw new PgError(401, '42501', `permission denied for function ${fn}`);
-  if (fn === 'pagar_conta') {
-    const conta = rowsOf('contas_pagar').find((c) => c.id === args.p_conta_id && c.user_id === uid);
-    if (!conta) throw new PgError(400, 'P0002', 'Conta não encontrada ou acesso negado');
+  if (fn === 'pagar_conta') return send(res, 200, pagarConta(uid, args));
+  if (fn === 'pagar_conta_v2') {
+    // 006: valida a carteira, delega à pagar_conta e vincula a despesa.
+    const carteira = args.p_carteira_id ? carteiraAtivaDe(uid, args.p_carteira_id) : null;
+    const pagamento = pagarConta(uid, { ...args, p_banco: args.p_banco ?? carteira?.nome ?? null });
+    if (carteira) {
+      const t = rowsOf('transacoes').find((x) => x.id === pagamento.transacao_id);
+      if (t) t.carteira_id = carteira.id;
+    }
+    return send(res, 200, pagamento);
+  }
+  if (fn === 'receber_renda') {
+    const renda = rowsOf('rendas').find((r) => r.id === args.p_renda_id && r.user_id === uid);
+    if (!renda) throw new PgError(400, 'P0002', 'Renda não encontrada ou acesso negado');
     const comp = args.p_competencia;
-    if (!comp || !/^[0-9]{4}-(0[1-9]|1[0-2])$/.test(comp)) throw new PgError(400, '22023', 'Competência inválida', { hint: 'Exige YYYY-MM.' });
-    const criada = competenciaSP(new Date(conta.created_at));
-    if (
-      !conta.ativo ||
-      (conta.recorrencia === 'anual' && Number(comp.slice(5, 7)) !== conta.mes_vencimento) ||
-      (conta.recorrencia === 'unica' && comp !== String(conta.data_vencimento).slice(0, 7)) ||
-      (['mensal', 'anual'].includes(conta.recorrencia) && comp < criada)
-    ) {
-      throw new PgError(400, '22023', 'Conta sem ocorrência nesta competência', {
-        hint: 'Exige conta ativa e competência compatível com a recorrência e criação.',
-      });
+    if (!comp || !RE_COMP.test(comp)) throw new PgError(400, '22023', 'Competência inválida', { hint: 'Exige YYYY-MM.' });
+    if (!renda.ativo) throw new PgError(400, '22023', 'Renda inativa', { hint: 'Exige renda ativa.' });
+    if (rowsOf('recebimentos_renda').some((r) => r.renda_id === renda.id && r.competencia === comp && r.user_id === uid)) {
+      throw new PgError(400, 'P0003', 'Competência já recebida', { hint: 'Exige competência sem recebimento.' });
     }
-    if (rowsOf('pagamentos_conta').some((p) => p.conta_id === conta.id && p.competencia === comp && p.user_id === conta.user_id)) {
-      throw new PgError(400, 'P0003', 'Competência já paga', { hint: 'Exige competência sem pagamento.' });
-    }
-    const pagoEm = args.p_pago_em ?? hojeSP();
+    const carteiraId = args.p_carteira_id ?? renda.carteira_id ?? null;
+    const carteira = carteiraId ? carteiraAtivaDe(uid, carteiraId) : null;
+    const recebidoEm = args.p_recebido_em ?? hojeSP();
     const transacao = {
-      id: crypto.randomUUID(), ...DEFAULTS.transacoes(), user_id: conta.user_id, tipo: 'despesa',
-      categoria: conta.categoria, descricao: conta.descricao, valor: conta.valor, data: pagoEm,
-      banco: args.p_banco ?? null, automatico: true,
+      id: crypto.randomUUID(), ...DEFAULTS.transacoes(), user_id: uid, tipo: 'receita', categoria: 'Salário',
+      descricao: renda.descricao, valor: renda.valor, data: recebidoEm, banco: carteira?.nome ?? null,
+      automatico: true, carteira_id: carteira?.id ?? null, ajuste: false,
     };
-    const pagamento = {
-      id: crypto.randomUUID(), conta_id: conta.id, user_id: conta.user_id, competencia: comp,
-      pago_em: pagoEm, transacao_id: transacao.id, created_at: nowIso(),
+    const recebimento = {
+      id: crypto.randomUUID(), renda_id: renda.id, user_id: uid, competencia: comp, recebido_em: recebidoEm,
+      transacao_id: transacao.id, created_at: nowIso(),
     };
     rowsOf('transacoes').push(transacao);
-    rowsOf('pagamentos_conta').push(pagamento);
-    return send(res, 200, pagamento);
+    rowsOf('recebimentos_renda').push(recebimento);
+    return send(res, 200, recebimento);
+  }
+  if (fn === 'desfazer_recebimento') {
+    const renda = rowsOf('rendas').find((r) => r.id === args.p_renda_id && r.user_id === uid);
+    if (!renda) throw new PgError(400, 'P0002', 'Renda não encontrada ou acesso negado');
+    const comp = args.p_competencia;
+    if (!comp || !RE_COMP.test(comp)) throw new PgError(400, '22023', 'Competência inválida', { hint: 'Exige YYYY-MM.' });
+    const rec = rowsOf('recebimentos_renda').find((r) => r.renda_id === renda.id && r.competencia === comp && r.user_id === uid);
+    if (!rec) throw new PgError(400, '22023', 'Recebimento não encontrado nesta competência', { hint: 'Exige competência recebida.' });
+    tables.transacoes = rowsOf('transacoes').filter((t) => !(t.id === rec.transacao_id && t.user_id === uid));
+    tables.recebimentos_renda = rowsOf('recebimentos_renda').filter((r) => r.id !== rec.id);
+    return send(res, 204);
   }
   if (fn === 'desfazer_pagamento') {
     const conta = rowsOf('contas_pagar').find((c) => c.id === args.p_conta_id && c.user_id === uid);
@@ -609,6 +711,10 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/__mock/reset' && req.method === 'POST') {
       reset();
       return send(res, 200, { ok: true });
+    }
+    if (url.pathname === '/__mock/clock' && req.method === 'POST') {
+      clockOffsetMs = body?.now ? Date.parse(body.now) - Date.now() : 0;
+      return send(res, 200, { ok: true, now: nowIso() });
     }
     if (url.pathname === '/__mock/state') {
       return send(res, 200, { users: [...users.values()].map(publicUser), tables });

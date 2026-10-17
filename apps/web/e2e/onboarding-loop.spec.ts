@@ -110,6 +110,10 @@ test('onboarding sem loop: cadastro → onboarding → home', async ({ page }) =
   await campoNome.fill('');
   await digitarComFoco(campoNome, 'Mari');
   await shot('onboarding-nome');
+  // 2º passo (opcional): "Onde fica seu dinheiro?" — em branco, a usuária cadastra depois.
+  await page.getByRole('button', { name: 'Continuar' }).click();
+  await expect(page.getByRole('heading', { name: 'Onde fica seu dinheiro?' })).toBeVisible();
+  await shot('onboarding-carteiras');
   await page.getByRole('button', { name: 'Concluir' }).click();
 
   await page.waitForURL(/\/financas$/);

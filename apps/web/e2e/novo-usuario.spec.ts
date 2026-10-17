@@ -110,6 +110,10 @@ test('novo usuário: cadastro → onboarding → finanças → logout → login'
   await campoNome.fill('');
   await digitarComFoco(campoNome, 'Mari');
   await shot('onboarding-nome');
+  // 2º passo (opcional): "Onde fica seu dinheiro?" — em branco, a usuária cadastra depois.
+  await page.getByRole('button', { name: 'Continuar' }).click();
+  await expect(page.getByRole('heading', { name: 'Onde fica seu dinheiro?' })).toBeVisible();
+  await shot('onboarding-carteiras');
   await page.getByRole('button', { name: 'Concluir' }).click();
 
   await page.waitForURL(/\/financas$/);
@@ -180,9 +184,9 @@ test('novo usuário: cadastro → onboarding → finanças → logout → login'
   await expect(modalConta.getByLabel('Data do vencimento')).toHaveValue('2030-01-15');
   await recorrencia.selectOption('mensal');
   await digitarComFoco(modalConta.getByLabel('Dia do vencimento'), '28');
-  const categoria = modalConta.getByLabel('Categoria');
-  await categoria.fill('');
-  await digitarComFoco(categoria, 'Casa');
+  // Categoria em grade com ícones (radiogroup).
+  await tocar(modalConta.getByRole('radio', { name: 'Casa' }));
+  await expect(modalConta.getByRole('radio', { name: 'Casa' })).toHaveAttribute('aria-checked', 'true');
   await expect(modalConta.getByLabel('Nome')).toHaveValue('Luz');
   await expect(modalConta.getByLabel('Valor (R$)')).toHaveValue('150.75');
   await shot('nova-conta-preenchida');
@@ -260,6 +264,7 @@ test('novo usuário: cadastro → onboarding → finanças → logout → login'
   // ── 9. Drawer: abrir e visitar cada item ───────────────────────────────────
   const itensDrawer: { label: string; url: RegExp; titulo: RegExp }[] = [
     { label: 'Resumo do mês', url: /\/financas$/, titulo: /Finanças/ },
+    { label: 'Bancos e carteira', url: /\/financas\/carteiras$/, titulo: /Bancos e carteira/ },
     { label: 'Contas', url: /\/financas\/contas$/, titulo: /Contas/ },
     { label: 'Orçamento', url: /\/financas\/orcamento$/, titulo: /Orçamento/ },
     { label: 'Assinaturas', url: /\/assinaturas$/, titulo: /Assinaturas/ },
