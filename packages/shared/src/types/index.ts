@@ -54,6 +54,12 @@ export type {
   Selo,
   ContaPagar,
   ContaPagarInsert,
+  TipoCarteira,
+  Carteira,
+  CarteiraInsert,
+  Transferencia,
+  TransferenciaInsert,
+  RecebimentoRenda,
 } from './financas';
 
 export type {
