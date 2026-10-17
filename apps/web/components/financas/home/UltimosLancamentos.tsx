@@ -3,6 +3,7 @@ import { Pencil, Plus, Trash2 } from 'lucide-react';
 import type { Transacao } from '@meudia/shared';
 import { Button, SkeletonList } from '../../ui';
 import { formatBRL, formatDiaMes } from '../../../lib/financas-ui';
+import { CategoriaIcone } from '../CategoriaIcone';
 
 /** Quantos lançamentos a home mostra antes de "Ver todos". */
 export const LANCAMENTOS_VISIVEIS = 5;
@@ -53,6 +54,7 @@ export function UltimosLancamentos({
           <ul className="space-y-2">
             {visiveis.map((t) => (
               <li key={t.id} className="flex items-center gap-3 rounded-card border border-border bg-card p-3">
+                <CategoriaIcone categoria={t.categoria} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[15px] font-medium text-text" title={t.descricao}>
                     {t.descricao}

@@ -54,7 +54,12 @@ describe('Contas — modal "Nova conta"', () => {
     preencher('Nome', 'Luz');
     preencher('Valor (R$)', '180.50');
     preencher('Dia do vencimento', '10');
-    preencher('Categoria', 'Casa');
+    // Categoria em grade (radiogroup com ícone): escolher não tira o foco de lugar nenhum.
+    const grade = screen.getByRole('radiogroup', { name: 'Categoria' });
+    expect(screen.getByRole('radio', { name: 'Contas' }).getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(screen.getByRole('radio', { name: 'Casa' }));
+    expect(screen.getByRole('radio', { name: 'Casa' }).getAttribute('aria-checked')).toBe('true');
+    expect(grade).toBeTruthy();
 
     preencher('Recorrência', 'anual');
     preencher('Mês do vencimento', '3');
@@ -65,7 +70,7 @@ describe('Contas — modal "Nova conta"', () => {
 
     expect(campo('Nome').value).toBe('Luz');
     expect(campo('Valor (R$)').value).toBe('180.50');
-    expect(campo('Categoria').value).toBe('Casa');
+    expect(screen.getByRole('radio', { name: 'Casa' }).getAttribute('aria-checked')).toBe('true');
     expect(campo('Recorrência').value).toBe('unica');
   });
 });

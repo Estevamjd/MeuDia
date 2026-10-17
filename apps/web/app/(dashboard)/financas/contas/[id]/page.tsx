@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { competenciaDe, hojeSP } from '@meudia/shared';
-import { useContaDoMes } from '../../../../../hooks';
+import { useCarteiras, useContaDoMes, usePainelSaldo } from '../../../../../hooks';
 import { Badge, Button, Input, SkeletonCard } from '../../../../../components/ui';
 import { usePagamentoAcoes } from '../../../../../components/financas/usePagamentoAcoes';
+import { SeletorCarteira } from '../../../../../components/financas/SeletorCarteira';
+import { CategoriaIcone } from '../../../../../components/financas/CategoriaIcone';
 import {
   SITUACAO_UI,
   formatBRL,
@@ -37,6 +39,11 @@ function ContaDetalhe({ id }: { id: string }) {
   const { pagarConta, desfazerPagamento, contaOcupada } = usePagamentoAcoes();
   const [pagoEm, setPagoEm] = useState(hoje);
   const [banco, setBanco] = useState('');
+  // Com bancos cadastrados, o seletor substitui o texto livre; padrão = último usado (ou o primeiro).
+  const carteiras = (useCarteiras().data ?? []).filter((c) => !c.arquivada);
+  const padrao = usePainelSaldo(hoje).data?.carteiraPadraoId ?? carteiras[0]?.id ?? null;
+  const [carteiraEscolhida, setCarteira] = useState<string | null>(null);
+  const carteira = carteiraEscolhida ?? padrao;
 
   const voltar = (
     <Link href="/financas" className="inline-flex items-center gap-1 text-sm text-muted hover:text-text">
@@ -76,6 +83,7 @@ function ContaDetalhe({ id }: { id: string }) {
       <header className="space-y-1">
         <p className="text-sm text-muted">{rotuloCompetencia(competencia)}</p>
         <h1 className="flex flex-wrap items-center gap-2 font-syne text-3xl font-bold text-text">
+          <CategoriaIcone categoria={conta.categoria} />
           {conta.descricao}
           <Badge color={ui.color}>{ui.label}</Badge>
         </h1>
@@ -100,13 +108,23 @@ function ContaDetalhe({ id }: { id: string }) {
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
-              pagarConta(alvo, { pago_em: pagoEm || undefined, banco: banco.trim() || null });
+              pagarConta(
+                alvo,
+                carteiras.length && carteira
+                  ? { pago_em: pagoEm || undefined, carteira_id: carteira }
+                  : { pago_em: pagoEm || undefined, banco: banco.trim() || null },
+              );
             }}
           >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Input label="Data do pagamento" type="date" value={pagoEm} max={hoje} onChange={(e) => setPagoEm(e.target.value)} />
-              <Input label="Banco (opcional)" placeholder="Ex: Nubank" value={banco} onChange={(e) => setBanco(e.target.value)} />
+              {carteiras.length === 0 && (
+                <Input label="Banco (opcional)" placeholder="Ex: Nubank" value={banco} onChange={(e) => setBanco(e.target.value)} />
+              )}
             </div>
+            {carteiras.length > 0 && (
+              <SeletorCarteira id="paguei-carteira" label="Pagou com" carteiras={carteiras} value={carteira} onChange={setCarteira} />
+            )}
             <Button type="submit" isLoading={ocupada} className="w-full py-4 text-lg">
               Paguei
             </Button>
