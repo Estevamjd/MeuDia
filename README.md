@@ -97,7 +97,7 @@ pnpm lint
 pnpm type-check
 pnpm test
 pnpm --filter @meudia/web test:e2e
-scripts/verify.sh   # o que o CI roda: type-check, lint, unitários e E2E mock (iPhone 13 WebKit)
+scripts/verify.sh   # o que o CI roda: type-check, lint, unitários, E2E mock (iPhone 13 WebKit) e testes SQL (verify.sh db)
 ```
 
 ## Status

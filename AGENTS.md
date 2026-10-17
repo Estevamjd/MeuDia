@@ -4,7 +4,7 @@ Regras para agentes que mexem neste repo. Curto de propósito: o que pode ser ch
 
 ## Pronto = verificado
 
-Nenhuma entrega está pronta sem `scripts/verify.sh` passando (type-check, lint, unitários e E2E mock no iPhone 13 WebKit). O CI deve rodar o mesmo script (`scripts/verify.sh static` e `scripts/verify.sh e2e`); enquanto o workflow novo não estiver no `main`, rode localmente e cole o resultado no PR. Depois de um deploy, rode `scripts/verify.sh smoke https://meudia.vercel.app`. Passo a passo em `.cursor/skills/verify-meudia/SKILL.md`.
+Nenhuma entrega está pronta sem `scripts/verify.sh` passando (type-check, lint, unitários, E2E mock no iPhone 13 WebKit e, com PostgreSQL local, os testes SQL). O CI deve rodar o mesmo script (`scripts/verify.sh static`, `scripts/verify.sh e2e` e `scripts/verify.sh db`); enquanto o workflow novo não estiver no `main`, rode localmente e cole o resultado no PR. Depois de um deploy, rode `scripts/verify.sh smoke https://meudia.vercel.app`. Passo a passo em `.cursor/skills/verify-meudia/SKILL.md`.
 
 Todo bug corrigido ganha um teste ou checagem que falha sem a correção. Prove que falha antes de dizer que pegou.
 
