@@ -151,3 +151,5 @@ export {
   type EntrouInput,
   type TransferirInput,
 } from './useCarteiras';
+
+export { useVinculosTransacoes } from './useFinancas';

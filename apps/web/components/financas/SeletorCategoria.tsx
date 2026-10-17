@@ -1,5 +1,6 @@
 'use client';
 
+import { radioTeclado } from './radioTeclado';
 import { clsx } from 'clsx';
 import { CATEGORIAS_GASTO, categoriaInfo } from '@meudia/shared';
 import { CategoriaIcone } from './CategoriaIcone';
@@ -40,6 +41,8 @@ export function SeletorCategoria({ value, onChange, label = 'Categoria', id = 's
               type="button"
               role="radio"
               aria-checked={ativo}
+              tabIndex={nome === (opcoes.includes(valorAtual) ? valorAtual : opcoes[0]) ? 0 : -1}
+              onKeyDown={(e) => radioTeclado(e, (i) => onChange(opcoes[i]!))}
               onClick={() => onChange(nome)}
               className={clsx(
                 'flex min-h-[64px] min-w-0 flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 text-[11px] leading-tight transition-colors',

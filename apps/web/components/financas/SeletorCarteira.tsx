@@ -1,5 +1,6 @@
 'use client';
 
+import { radioTeclado } from './radioTeclado';
 import { clsx } from 'clsx';
 import { Banknote, Landmark, PiggyBank } from 'lucide-react';
 import type { Carteira, TipoCarteira } from '@meudia/shared';
@@ -23,6 +24,8 @@ interface SeletorCarteiraProps {
 
 /** Chips grandes (≥ 44px) para escolher o banco/carteira, em radiogroup. */
 export function SeletorCarteira({ carteiras, value, onChange, label, id, desabilitada }: SeletorCarteiraProps) {
+  const habilitadas = carteiras.filter((c) => c.id !== desabilitada);
+  const foco = habilitadas.some((c) => c.id === value) ? value : habilitadas[0]?.id;
   return (
     <div className="flex flex-col gap-1.5">
       <span id={`${id}-label`} className="text-sm font-medium text-muted">
@@ -39,6 +42,8 @@ export function SeletorCarteira({ carteiras, value, onChange, label, id, desabil
               role="radio"
               aria-checked={ativo}
               disabled={off}
+              tabIndex={c.id === foco ? 0 : -1}
+              onKeyDown={(e) => radioTeclado(e, (i) => onChange(habilitadas[i]!.id))}
               onClick={() => onChange(c.id)}
               className={clsx(
                 'inline-flex min-h-[44px] max-w-full items-center gap-2 rounded-full border px-4 text-sm transition-colors',

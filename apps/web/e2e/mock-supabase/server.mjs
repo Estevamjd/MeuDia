@@ -3,6 +3,7 @@
 // Endpoints de apoio: GET /__mock/state (dump), POST /__mock/reset, GET /__mock/health,
 // POST /__mock/clock {"now": ISO | null} (relógio injetável só do mock: datas default, JWT e now()).
 import http from 'node:http';
+import { corrigirSaldo } from './corrigir-saldo.mjs';
 import crypto from 'node:crypto';
 
 const PORT = Number(process.argv[2] || process.env.MOCK_SUPABASE_PORT || 54329);
@@ -638,6 +639,7 @@ function pagarConta(uid, args) {
 
 function handleRpc(req, res, fn, args = {}, uid) {
   if (!uid) throw new PgError(401, '42501', `permission denied for function ${fn}`);
+  if (fn === 'corrigir_saldo') return send(res, 200, corrigirSaldo({ uid, args, rowsOf, carteiraAtivaDe, PgError, hojeSP, defaults: DEFAULTS.transacoes }));
   if (fn === 'pagar_conta') return send(res, 200, pagarConta(uid, args));
   if (fn === 'pagar_conta_v2') {
     // 006: valida a carteira, delega à pagar_conta e vincula a despesa.

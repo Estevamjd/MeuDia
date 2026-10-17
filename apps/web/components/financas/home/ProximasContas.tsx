@@ -23,11 +23,12 @@ export interface ProximasContasProps {
   hojeISO: string;
   /** `contaId` com "Paguei" em andamento. */
   contaOcupada?: string;
+  pagamentoBloqueado?: boolean;
   onPagar: (conta: ContaProxima) => void;
 }
 
 /** "Contas a vencer": lista curta com "Paguei" em 1 toque. */
-export function ProximasContas({ contas, totalMes, hojeISO, contaOcupada, onPagar }: ProximasContasProps) {
+export function ProximasContas({ contas, totalMes, hojeISO, contaOcupada, pagamentoBloqueado, onPagar }: ProximasContasProps) {
   return (
     <section id="proximas-contas" aria-labelledby="proximas-contas-titulo" className="scroll-mt-20 space-y-3">
       <h2 id="proximas-contas-titulo" className="text-[15px] font-semibold text-text">
@@ -57,6 +58,7 @@ export function ProximasContas({ contas, totalMes, hojeISO, contaOcupada, onPaga
               <Button
                 className="shrink-0"
                 onClick={() => onPagar(c)}
+                disabled={pagamentoBloqueado}
                 isLoading={contaOcupada === c.contaId}
                 aria-label={`Paguei ${c.descricao}`}
               >

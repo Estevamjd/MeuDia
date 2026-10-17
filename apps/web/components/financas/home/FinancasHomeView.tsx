@@ -45,6 +45,8 @@ export interface FinancasHomeViewProps {
   avisoLembretes: AvisoLembretesProps | null;
   rendaSheet: RendaSheetProps;
   contaOcupada?: string;
+  pagamentoBloqueado?: boolean;
+  erroPainel?: string;
   onPagar: (conta: ContaProxima) => void;
   lancamentos: Omit<UltimosLancamentosProps, 'transacoes'>;
   dashboard?: DashboardHome | null;
@@ -63,6 +65,8 @@ export function FinancasHomeView({
   avisoLembretes,
   rendaSheet,
   contaOcupada,
+  pagamentoBloqueado,
+  erroPainel,
   onPagar,
   lancamentos,
   dashboard = null,
@@ -96,6 +100,7 @@ export function FinancasHomeView({
 
   return (
     <div className="space-y-5">
+      {erroPainel && <p role="alert" className="rounded-card border border-border bg-card p-4 text-sm text-muted">{erroPainel}</p>}
       {secoes.alerta && <AlertaContas {...secoes.alerta} hojeISO={hojeISO} />}
 
       {avisoLembretes && <AvisoLembretes {...avisoLembretes} />}
@@ -124,7 +129,7 @@ export function FinancasHomeView({
       )}
 
       {secoes.proximasContas && (
-        <ProximasContas {...secoes.proximasContas} hojeISO={hojeISO} contaOcupada={contaOcupada} onPagar={onPagar} />
+        <ProximasContas pagamentoBloqueado={pagamentoBloqueado} {...secoes.proximasContas} hojeISO={hojeISO} contaOcupada={contaOcupada} onPagar={onPagar} />
       )}
 
       {d && !soConvite && (

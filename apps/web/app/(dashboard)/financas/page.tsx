@@ -7,6 +7,7 @@ import type { Transacao, TransacaoInsert } from '@meudia/shared';
 import { competenciaDe, hojeSP } from '@meudia/shared';
 
 import {
+  useCarteiras,
   useCriarTransacao,
   useAtualizarTransacao,
   useExcluirTransacao,
@@ -24,11 +25,17 @@ import { AgentBannerAuto } from '../../../components/agent';
 import { useAppMode } from '../../../components/AppModeProvider';
 import { FinancasHomeView } from '../../../components/financas/home/FinancasHomeView';
 import { useFinancasHome } from '../../../components/financas/home/useFinancasHome';
+import { SeletorCarteira } from '../../../components/financas/SeletorCarteira';
 import { LancamentoRapidoSheet } from '../../../components/financas/LancamentoRapidoSheet';
 import { deslocarCompetencia, rotuloCompetencia } from '../../../lib/financas-ui';
 
 export default function FinancasPage() {
   const toast = useToast();
+  const listaCarteiras = useCarteiras();
+  const carteiras = useMemo(() => (listaCarteiras.data ?? []).filter((c) => !c.arquivada), [listaCarteiras.data]);
+  const [formCarteira, setFormCarteira] = useState<string | null>(null);
+  const carteiraId = carteiras.find((c) => c.id === formCarteira)?.id ?? carteiras[0]?.id;
+
   const mode = useAppMode();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const hoje = useMemo(() => new Date(), []);
@@ -68,6 +75,7 @@ export default function FinancasPage() {
     setFormValor('');
     setFormData(format(hoje, 'yyyy-MM-dd'));
     setFormBanco('');
+    setFormCarteira(null);
   }, [hoje]);
 
   const openAddModal = useCallback(() => {
@@ -82,6 +90,7 @@ export default function FinancasPage() {
     setFormValor(String(t.valor));
     setFormData(t.data);
     setFormBanco(t.banco ?? '');
+    setFormCarteira(t.carteira_id ?? null);
     setEditingTransacao(t);
   }, []);
 
@@ -102,7 +111,8 @@ export default function FinancasPage() {
         descricao: formDescricao,
         valor: parseFloat(formValor),
         data: formData,
-        banco: formBanco || undefined,
+        carteira_id: carteiraId,
+        banco: carteiras.find((c) => c.id === carteiraId)?.nome ?? (formBanco || undefined),
       };
       criarTransacao.mutate(payload, {
         onSuccess: () => {
@@ -115,7 +125,7 @@ export default function FinancasPage() {
         },
       });
     },
-    [formTipo, formCategoria, formDescricao, formValor, formData, formBanco, criarTransacao, toast, resetForm],
+    [carteiraId, carteiras, formTipo, formCategoria, formDescricao, formValor, formData, formBanco, criarTransacao, toast, resetForm],
   );
 
   const handleSubmitEdit = useCallback(
@@ -128,7 +138,8 @@ export default function FinancasPage() {
         descricao: formDescricao,
         valor: parseFloat(formValor),
         data: formData,
-        banco: formBanco || undefined,
+        carteira_id: carteiraId,
+        banco: carteiras.find((c) => c.id === carteiraId)?.nome ?? (formBanco || undefined),
       };
       atualizarTransacao.mutate(
         { id: editingTransacao.id, data: payload },
@@ -144,7 +155,7 @@ export default function FinancasPage() {
         },
       );
     },
-    [formTipo, formCategoria, formDescricao, formValor, formData, formBanco, atualizarTransacao, editingTransacao, toast, resetForm],
+    [carteiraId, carteiras, formTipo, formCategoria, formDescricao, formValor, formData, formBanco, atualizarTransacao, editingTransacao, toast, resetForm],
   );
 
   const handleExcluir = useCallback(() => {
@@ -202,12 +213,12 @@ export default function FinancasPage() {
         value={formData}
         onChange={(e) => setFormData(e.target.value)}
       />
-      <Input
+      {carteiras.length > 0 ? <SeletorCarteira id="lancamento-carteira" label="Banco ou carteira" carteiras={carteiras} value={carteiraId ?? null} onChange={setFormCarteira} /> : <Input
         label="Banco (opcional)"
         placeholder="Ex.: Nubank, Itaú…"
         value={formBanco}
         onChange={(e) => setFormBanco(e.target.value)}
-      />
+      />}
       <div className="flex justify-end gap-3 pt-2">
         <Button
           type="button"
@@ -219,7 +230,7 @@ export default function FinancasPage() {
         >
           Cancelar
         </Button>
-        <Button type="submit" isLoading={isSubmitting}>
+        <Button type="submit" disabled={!listaCarteiras.isSuccess} isLoading={isSubmitting}>
           Salvar
         </Button>
       </div>

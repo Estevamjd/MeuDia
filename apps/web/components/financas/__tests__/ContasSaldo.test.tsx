@@ -175,9 +175,15 @@ describe('onboarding: "Onde fica seu dinheiro?"', () => {
     expect(montarCarteirasOnboarding([
       { nome: ' Nubank ', digitos: '65000' }, { nome: '', digitos: '100' }, { nome: 'Carteira', digitos: '' }, { nome: 'Poupança', digitos: '1' },
     ])).toEqual([
-      { indice: 0, carteira: { nome: 'Nubank', tipo: 'banco', saldo_inicial: 650, ordem: 0 } },
-      { indice: 2, carteira: { nome: 'Carteira', tipo: 'dinheiro', saldo_inicial: 0, ordem: 2 } },
-      { indice: 3, carteira: { nome: 'Poupança', tipo: 'poupanca', saldo_inicial: 0.01, ordem: 3 } },
+      { id: '0', indice: 0, carteira: { nome: 'Nubank', tipo: 'banco', saldo_inicial: 650, ordem: 0 } },
+      { id: '2', indice: 2, carteira: { nome: 'Carteira', tipo: 'dinheiro', saldo_inicial: 0, ordem: 2 } },
+      { id: '3', indice: 3, carteira: { nome: 'Poupança', tipo: 'poupanca', saldo_inicial: 0.01, ordem: 3 } },
     ]);
   });
+});
+
+it('payload preserva sinal colado e chave estável após reordenação', () => {
+  const banco = { id: 'estavel', nome: 'Nu', digitos: '-10000' };
+  expect(montarCarteirasOnboarding([{ id: 'outro', nome: 'Caixa', digitos: '50' }, banco])[1]).toMatchObject({ id: 'estavel', carteira: { saldo_inicial: -100, ordem: 1 } });
+  expect(montarCarteirasOnboarding([banco])[0]).toMatchObject({ id: 'estavel', carteira: { saldo_inicial: -100, ordem: 0 } });
 });

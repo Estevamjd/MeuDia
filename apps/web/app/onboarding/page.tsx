@@ -43,7 +43,7 @@ const defaultData: OnboardingData = {
   meta_peso: '',
   meta_calorias: 2200,
   modulos: ['treinos', 'habitos', 'dieta', 'financas', 'agenda', 'medicamentos', 'assinaturas', 'compras', 'veiculo'],
-  carteiras: [{ nome: '', digitos: '' }],
+  carteiras: [],
 };
 
 export default function OnboardingPage() {
@@ -59,8 +59,20 @@ export default function OnboardingPage() {
   });
   const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  // Índices já gravados: tentar de novo após uma falha não duplica bancos.
-  const [carteirasCriadas, setCarteirasCriadas] = useState<number[]>([]);
+  const [rascunhoCarregado, setRascunhoCarregado] = useState(false);
+  useEffect(() => {
+    if (!user?.id) return;
+    const chave = `onboarding-carteiras:${user.id}`;
+    let linhas: CarteiraOnboarding[] = [];
+    try { linhas = JSON.parse(localStorage.getItem(chave) ?? '[]'); } catch { /* storage indisponível */ }
+    if (!Array.isArray(linhas) || !linhas.every((l) => typeof l.id === 'string' && typeof l.nome === 'string' && typeof l.digitos === 'string')) linhas = [];
+    setData((prev) => ({ ...prev, carteiras: linhas.length ? linhas : [{ id: crypto.randomUUID(), nome: '', digitos: '' }] }));
+    setRascunhoCarregado(true);
+  }, [user?.id]);
+  useEffect(() => {
+    if (!user?.id || !rascunhoCarregado) return;
+    try { localStorage.setItem(`onboarding-carteiras:${user.id}`, JSON.stringify(data.carteiras)); } catch { /* sem storage */ }
+  }, [data.carteiras, user?.id, rascunhoCarregado]);
 
   // Quando o user carregar, preencher o nome
   useEffect(() => {
@@ -94,7 +106,7 @@ export default function OnboardingPage() {
 
     // Upsert: cria a linha se o perfil não existir (senão o dashboard voltaria para cá).
     const perfil = montarPerfilOnboarding(user, data, { modoFinancas, pular });
-    const { error } = await supabase.from('profiles').upsert(perfil, { onConflict: 'id' });
+    const { error } = await supabase.from('profiles').upsert({ ...perfil, onboarding_feito: false }, { onConflict: 'id' });
 
     if (error) {
       setSaving(false);
@@ -104,22 +116,25 @@ export default function OnboardingPage() {
 
     // "Onde fica seu dinheiro?": cria os bancos depois do perfil (carteiras.user_id → profiles).
     if (modoFinancas && !pular) {
-      const criadas = [...carteirasCriadas];
       try {
-        for (const { indice, carteira } of montarCarteirasOnboarding(data.carteiras)) {
-          if (criadas.includes(indice)) continue;
-          await carteirasService.criarCarteira(user.id, carteira);
-          criadas.push(indice);
+        for (const { id, carteira } of montarCarteirasOnboarding(data.carteiras)) {
+          await carteirasService.criarCarteiraOnboarding(user.id, id, carteira);
         }
       } catch {
-        setCarteirasCriadas(criadas);
         setSaving(false);
         setErro('Não foi possível salvar seus bancos. Verifique sua conexão e tente novamente.');
         return;
       }
-      setCarteirasCriadas(criadas);
     }
 
+    const { error: erroConclusao } = await supabase.from('profiles').upsert(perfil, { onConflict: 'id' });
+    if (erroConclusao) {
+      setSaving(false);
+      setErro(MENSAGEM_ERRO_ONBOARDING);
+      return;
+    }
+
+    try { localStorage.removeItem(`onboarding-carteiras:${user.id}`); } catch { /* sem storage */ }
     // Atualiza o cache antes de navegar: o layout do dashboard lê ['profile', id].
     const key = profileKey(user.id);
     queryClient.setQueryData<Profile | null>(key, (old) => aplicarOnboardingNoCache(old, perfil));

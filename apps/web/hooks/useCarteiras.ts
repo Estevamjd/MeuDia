@@ -117,8 +117,9 @@ export function useCorrigirSaldo(hojeISO: string) {
   const { user } = useAuth();
   const invalidar = useInvalidarSaldo();
   return useMutation({
-    mutationFn: (data: { carteira_id: string; saldo_real: number }) =>
-      carteirasService.corrigirSaldo(requireUserId(user?.id), data, hojeISO),
+    onMutate: (data: { carteira_id: string; saldo_real: number; chave?: string }) => { data.chave = crypto.randomUUID(); },
+    mutationFn: (data: { carteira_id: string; saldo_real: number; chave?: string }) =>
+      carteirasService.corrigirSaldo(requireUserId(user?.id), data, hojeISO, data.chave),
     onSuccess: invalidar,
   });
 }

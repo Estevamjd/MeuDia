@@ -220,6 +220,19 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   expect(meus('transacoes').map((t: { categoria: string; valor: number }) => `${t.categoria}:${Number(t.valor)}`).sort())
     .toEqual(['Comida:25', 'Entrada extra:100', 'Salário:900']);
 
+  // A receita vinculada oferece desfazer, sem exclusão comum que deixaria a competência recebida.
+  const desfazer = page.getByRole('button', { name: 'Desfazer recebimento Renda principal' });
+  await expect(desfazer).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Excluir lançamento Renda principal' })).toHaveCount(0);
+  await tocar(desfazer);
+  await confirmarToast('Recebimento desfeito');
+  await expect(hoje).toHaveText(brl('775,00'));
+  await tocar(page.getByRole('button', { name: 'Recebi Renda principal' }));
+  await modalRecebi.getByRole('radio', { name: 'Nubank' }).click();
+  await modalRecebi.getByRole('button', { name: /Confirmar/ }).click();
+  await confirmarToast('Recebido: Renda principal');
+  await expect(hoje).toHaveText(brl('1.675,00'));
+
   // Gaveta → Bancos e carteira.
   await page.getByRole('button', { name: 'Abrir menu' }).click();
   await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Bancos e carteira' }).click();
@@ -230,6 +243,17 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await expect(page.getByRole('listitem').filter({ hasText: 'Caixa' })).toContainText(/R\$\s100,00/);
   await semScrollHorizontal();
   await shot('07-carteiras.png');
+
+  await tocar(page.getByRole('button', { name: 'Corrigir saldo de Nubank' }));
+  const correcao = page.getByRole('dialog', { name: 'Corrigir saldo', exact: true });
+  await correcao.getByLabel('Quanto o banco mostra agora?').fill('150000');
+  await correcao.getByRole('button', { name: 'Corrigir', exact: true }).click();
+  await confirmarToast('Saldo corrigido');
+  await expect(lista).toContainText(/R\$\s1\.500,00/);
+  const corrigido = await (await fetch(`${MOCK_URL}/__mock/state`)).json();
+  const ajustes = corrigido.tables.transacoes.filter((t: { user_id: string; ajuste: boolean }) => t.user_id === uid && t.ajuste);
+  expect(ajustes).toHaveLength(1);
+  expect(ajustes[0]).toMatchObject({ valor: 75, tipo: 'despesa', chave_ajuste: expect.stringMatching(/^[0-9a-f-]{36}$/) });
 
   expect(erros, 'erros na página ou respostas HTTP ≥ 400').toEqual([]);
 });

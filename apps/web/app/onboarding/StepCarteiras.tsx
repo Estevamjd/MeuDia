@@ -6,6 +6,8 @@ import { mascaraBRL } from '../../lib/financas-ui';
 import type { OnboardingData } from './page';
 
 export interface CarteiraOnboarding {
+  id: string;
+  negativo?: boolean;
   nome: string;
   /** Dígitos da máscara BRL (centavos). */
   digitos: string;
@@ -34,7 +36,7 @@ export function StepCarteiras({ data, onChange }: StepCarteirasProps) {
       </div>
       <ul className="space-y-4">
         {linhas.map((l, i) => (
-          <li key={i} className="space-y-3 rounded-lg border border-border bg-card2/50 p-3">
+          <li key={l.id} className="space-y-3 rounded-lg border border-border bg-card2/50 p-3">
             <Input
               id={`onb-carteira-nome-${i}`}
               label={`Banco ou carteira ${i + 1}`}
@@ -43,6 +45,10 @@ export function StepCarteiras({ data, onChange }: StepCarteirasProps) {
               maxLength={60}
               onChange={(e) => set(i, { nome: e.target.value })}
             />
+            <label className="flex min-h-[44px] items-center gap-2 text-sm text-muted">
+              <input type="checkbox" checked={!!l.negativo} onChange={(e) => set(i, { negativo: e.target.checked })} />
+              Está negativo
+            </label>
             <div className="flex items-end gap-2">
               <div className="min-w-0 flex-1">
                 <Input
@@ -53,7 +59,7 @@ export function StepCarteiras({ data, onChange }: StepCarteirasProps) {
                   autoComplete="off"
                   placeholder="R$ 0,00"
                   value={mascaraBRL(l.digitos).exibicao}
-                  onChange={(e) => set(i, { digitos: mascaraBRL(e.target.value).digitos })}
+                  onChange={(e) => set(i, { digitos: mascaraBRL(e.target.value).digitos, negativo: e.target.value.includes('-') || l.negativo })}
                 />
               </div>
               {linhas.length > 1 && (
@@ -73,7 +79,7 @@ export function StepCarteiras({ data, onChange }: StepCarteirasProps) {
       {linhas.length < MAX_CARTEIRAS_ONBOARDING && (
         <button
           type="button"
-          onClick={() => onChange({ carteiras: [...linhas, { nome: '', digitos: '' }] })}
+          onClick={() => onChange({ carteiras: [...linhas, { id: crypto.randomUUID(), nome: '', digitos: '' }] })}
           className="inline-flex min-h-[44px] items-center gap-2 text-sm font-medium text-accent hover:underline"
         >
           <Plus size={16} aria-hidden="true" /> adicionar outro

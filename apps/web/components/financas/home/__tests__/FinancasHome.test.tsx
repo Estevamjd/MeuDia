@@ -430,3 +430,15 @@ describe('FinancasHomeView', () => {
     expect(onTentarDeNovo).toHaveBeenCalled();
   });
 });
+
+it('erro amigável do painel mantém resumo e bloqueia Paguei enquanto bancos não carregam', () => {
+  const pagar = vi.fn();
+  render(<FinancasHomeView {...viewProps({ erroPainel: 'O MeuDia está terminando uma atualização. Tente de novo em alguns minutos.', pagamentoBloqueado: true, onPagar: pagar })} />);
+  expect(screen.getAllByRole('alert').some((alerta) => alerta.textContent?.includes('terminando uma atualização'))).toBe(true);
+  expect(texto()).toContain('Sobra do mês');
+  for (const botao of screen.getAllByRole('button', { name: /^Paguei / })) {
+    expect((botao as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(botao);
+  }
+  expect(pagar).not.toHaveBeenCalled();
+});

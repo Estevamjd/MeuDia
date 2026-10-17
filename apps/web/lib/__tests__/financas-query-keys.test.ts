@@ -41,6 +41,7 @@ describe('chavesAfetadasPorPagamento', () => {
       ['conta-mes', 'u1', 'c1'],
       ['resumo-financeiro-mes'],
       ['resumo-mensal'],
+      ['vinculos-transacoes'],
       ['transacoes'],
       ['transacoes-mes'],
       ['assinaturas'],

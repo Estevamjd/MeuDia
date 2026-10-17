@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Competencia, Transacao } from '@meudia/shared';
 import {
+  useVinculosTransacoes,
+  useDesfazerRecebimento,
   useContas,
   useContasMes,
   useCriarRenda,
@@ -48,11 +50,13 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
   const contas = useContasMes(competencia);
   const orcamento = useOrcamento();
   const transacoes = useTransacoesMes(ano, mes);
+  const vinculos = useVinculosTransacoes((transacoes.data ?? []).map((t) => t.id));
+  const desfazerRecebimento = useDesfazerRecebimento();
   const rendas = useRendas();
   const contasCadastradas = useContas();
   const push = usePushLembretes();
   const criarRenda = useCriarRenda();
-  const { pagarConta, contaOcupada } = usePagamentoAcoes();
+  const { pagarConta, desfazerPagamento, contaOcupada } = usePagamentoAcoes();
   const painel = usePainelSaldo(hojeISO);
   const receber = useReceberRenda();
   const [recebendo, setRecebendo] = useState<RendaAReceberItem | null>(null);
@@ -84,7 +88,8 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
     [competencia, hojeISO, painel.data, transacoes.data],
   );
   const carteirasAtivas = painel.data?.carteiras.map((s) => s.carteira) ?? [];
-  const carteiraPadrao = painel.data?.carteiraPadraoId ?? null;
+  const carteiraPadrao = carteirasAtivas.find((c) => c.id === painel.data?.carteiraPadraoId)?.id ?? carteirasAtivas[0]?.id ?? null;
+  const podePagar = !!painel.data && !painel.isError && !painel.isLoading;
 
   // Falha em qualquer consulta que alimenta as seções, o onboarding ou o aviso vira erro (nada de lista vazia silenciosa).
   const consultas = [resumo, contas, orcamento, transacoes, rendas, contasCadastradas];
@@ -146,9 +151,13 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
         ),
     },
     contaOcupada,
+    pagamentoBloqueado: !podePagar,
+    erroPainel: painel.isError ? ((painel.error as { code?: string })?.code === 'SCHEMA_DESATUALIZADO'
+      ? 'O MeuDia está terminando uma atualização. Tente de novo em alguns minutos.'
+      : 'Não foi possível carregar seus bancos. Tente de novo.') : undefined,
     // "Paguei" em 1 toque: debita do último banco usado (ou do primeiro), se houver.
     onPagar: (c) =>
-      pagarConta({ contaId: c.contaId, competencia: c.competencia, descricao: c.descricao }, carteiraPadrao ? { carteira_id: carteiraPadrao } : {}),
+      podePagar && pagarConta({ contaId: c.contaId, competencia: c.competencia, descricao: c.descricao }, carteiraPadrao ? { carteira_id: carteiraPadrao } : {}),
     // Painel indisponível (ex.: carregando ou falha): a home segue com o resumo do mês.
     dashboard: dados
       ? {
@@ -188,6 +197,23 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
       : null,
     lancamentos: {
       ...acoes,
+      vinculos: Object.fromEntries([
+        ...(vinculos.data?.recebimentos ?? []).filter((r) => r.transacao_id).map((r) => [r.transacao_id!, 'recebimento']),
+        ...(vinculos.data?.pagamentos ?? []).filter((p) => p.transacao_id).map((p) => [p.transacao_id!, 'pagamento']),
+      ]) as Record<string, 'recebimento' | 'pagamento'>,
+      acoesBloqueadas: !vinculos.isSuccess,
+      onDesfazer: (t) => {
+        const r = vinculos.data?.recebimentos.find((r) => r.transacao_id === t.id);
+        if (r) {
+          desfazerRecebimento.mutate({ rendaId: r.renda_id, competencia: r.competencia }, {
+            onSuccess: () => { void vinculos.refetch(); toast.success('Recebimento desfeito'); },
+            onError: () => toast.error('Não foi possível desfazer o recebimento. Tente de novo.'),
+          });
+          return;
+        }
+        const p = vinculos.data?.pagamentos.find((p) => p.transacao_id === t.id);
+        if (p) desfazerPagamento({ contaId: p.conta_id, competencia: p.competencia, descricao: t.descricao });
+      },
       carregando: transacoes.isLoading,
       expandido,
       onAlternarExpandido: () => setExpandido((v) => !v),

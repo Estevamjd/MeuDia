@@ -30,3 +30,14 @@ Todo bug corrigido ganha um teste ou checagem que falha sem a correção. Prove 
 | Lint em `ai`, `api` e `mobile` | Nada ainda. Dívida antiga; fora do `verify.sh` até ser limpa (ver PLANO-PIRAMIDE) |
 
 Quando o dono corrigir um agente, conserte e adicione a linha aqui. Se a regra já estava e nada a garantia, suba o conserto para código, tipo, lint ou teste na mesma mudança.
+
+| Regra da revisão de contas/saldo | O que garante |
+| --- | --- |
+| Histórico de saldo é paginado; schema sem 006 tem erro identificável | `carteiras.repository.test.ts` (>1000 movimentos em duas páginas, códigos de schema), ordem de deploy no README |
+| Lançamento vinculado usa desfazer; nunca edição/exclusão comum | `financas.service.test.ts`, `LancamentosVinculados.test.tsx`, `contas-saldo.spec.ts` |
+| Paguei aguarda carteiras e sempre usa uma ativa quando existir | `useFinancasHome.test.ts`, `ProximasContas` desabilita o botão |
+| Corrigir saldo usa RPC atômica e chave UUID mantida em retry | `carteiras.service.test.ts`, `useCorrigirSaldo.test.tsx`, `corrigir-saldo.test.ts` |
+| Ajustes não contam no resumo nem nas dicas do agente | `financas.service.test.ts`, `financas.analyzer.test.ts` |
+| Onboarding conclui após bancos, com UUID estável e saldo negativo | `Onboarding.test.tsx`, `carteiras.repository.test.ts` |
+| Seletores de carteira/categoria navegam por teclado com um único Tab | `RevisaoTeclado.test.tsx` |
+| Novo lançamento escolhe carteira ativa quando existir | `NovoLancamento.test.tsx` |

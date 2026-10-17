@@ -36,6 +36,8 @@ const preparar = (
 };
 
 const m = vi.hoisted(() => ({
+  pagar: vi.fn(),
+  painel: { data: undefined as unknown, isLoading: false, isError: false, error: null as unknown },
   push: { estado: 'inativo', ocupado: false, ativar: vi.fn(() => Promise.resolve()) },
   criarRenda: { mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false },
   toast: { error: vi.fn(), success: vi.fn() },
@@ -50,16 +52,19 @@ vi.mock('../../../../hooks', () => ({
   useRendas: () => q.rendas,
   usePushLembretes: () => m.push,
   useCriarRenda: () => m.criarRenda,
-  usePainelSaldo: () => ({ data: undefined, isLoading: false, isError: false }),
+  usePainelSaldo: () => m.painel,
+  useVinculosTransacoes: () => ({ data: { recebimentos: [], pagamentos: [] }, isSuccess: true }),
+  useDesfazerRecebimento: () => ({ mutate: vi.fn() }),
   useReceberRenda: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false }),
 }));
 vi.mock('../../../ui', () => ({ useToast: () => m.toast }));
-vi.mock('../../usePagamentoAcoes', () => ({ usePagamentoAcoes: () => ({ pagarConta: vi.fn(), contaOcupada: null }) }));
+vi.mock('../../usePagamentoAcoes', () => ({ usePagamentoAcoes: () => ({ pagarConta: m.pagar, desfazerPagamento: vi.fn(), contaOcupada: null }) }));
 
 const DISPENSADO_KEY = 'meudia:aviso-lembretes-dispensado';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  m.painel = { data: undefined, isLoading: false, isError: false, error: null };
   m.push.estado = 'inativo';
   m.criarRenda.isError = false;
   localStorage.clear();
@@ -189,4 +194,36 @@ describe('useFinancasHome: aviso de lembretes', () => {
     cleanup();
     expect(usar().avisoLembretes).toBeNull();
   });
+});
+
+it.each(['carregando', 'erro'])('Paguei bloqueado com painel %s, inclusive chamada direta', (estado) => {
+  preparar();
+  m.painel.isLoading = estado === 'carregando';
+  m.painel.isError = estado === 'erro';
+  const home = usar();
+  expect(home.pagamentoBloqueado).toBe(true);
+  home.onPagar({ contaId: 'c', competencia: '2026-10', descricao: 'Luz', valor: 10, vencimento: '2026-10-17', situacao: 'pendente' });
+  expect(m.pagar).not.toHaveBeenCalled();
+});
+it('schema desatualizado exibe mensagem amigável e mantém home', () => {
+  preparar();
+  m.painel.isError = true;
+  m.painel.error = { code: 'SCHEMA_DESATUALIZADO' };
+  const home = usar();
+  expect(home.estado).toBe('pronto');
+  expect(home.erroPainel).toContain('terminando uma atualização');
+});
+it.each([null, 'inexistente', 'segunda'])('Paguei usa sempre carteira ativa (padrão %s)', (padrao) => {
+  preparar();
+  m.painel.data = {
+    carteiras: [{ carteira: { id: 'primeira', nome: 'Nubank' }, saldo: 100 }, { carteira: { id: 'segunda', nome: 'Caixa' }, saldo: 50 }],
+    carteiraPadraoId: padrao,
+    hojeISO: '2026-10-16', competencia: '2026-10', saldoHoje: 150, comecouMes: null,
+    arquivadas: [], rendasAReceber: [], transacoesCarteiras: [], transferencias: [],
+    previsao7: { itens: [], valor: 150 }, previsaoFim: { itens: [], valor: 150 },
+  };
+  const home = usar();
+  expect(home.pagamentoBloqueado).toBe(false);
+  home.onPagar({ contaId: 'c', competencia: '2026-10', descricao: 'Luz', valor: 10, vencimento: '2026-10-17', situacao: 'pendente' });
+  expect(m.pagar).toHaveBeenCalledWith(expect.anything(), { carteira_id: padrao === 'segunda' ? 'segunda' : 'primeira' });
 });

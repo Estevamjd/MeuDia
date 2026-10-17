@@ -96,3 +96,12 @@ export function useExcluirTransacao() {
     },
   });
 }
+
+export function useVinculosTransacoes(ids: string[]) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['vinculos-transacoes', user?.id, ids],
+    queryFn: () => financasService.vinculosTransacoes(user!.id, ids),
+    enabled: !!user?.id && ids.length > 0,
+  });
+}

@@ -44,7 +44,7 @@ export function chavesAfetadasPorOrcamento(): QueryKey[] {
 
 /** Qualquer lançamento/transferência/recebimento muda saldo, previsão, resumo e listas do mês. */
 export function chavesAfetadasPorLancamento(): QueryKey[] {
-  return [['transacoes'], ['transacoes-mes'], ['resumo-mensal'], resumoKeys.todas, carteirasKeys.todas];
+  return [['vinculos-transacoes'], ['transacoes'], ['transacoes-mes'], ['resumo-mensal'], resumoKeys.todas, carteirasKeys.todas];
 }
 
 /** Chaves afetadas ao pagar/desfazer uma conta numa competência. */
@@ -60,6 +60,7 @@ export function chavesAfetadasPorPagamento(
     ['resumo-financeiro-mes'],
     ['resumo-mensal'],
     // A transação usa `pago_em`, que pode cair fora do mês da competência.
+    ['vinculos-transacoes'],
     ['transacoes'],
     ['transacoes-mes'],
     ['assinaturas'],
