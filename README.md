@@ -106,4 +106,4 @@ Projeto em desenvolvimento ativo, com base preparada para evoluir como assistent
 
 ## Ordem de deploy
 
-Aplicar a migração `packages/database/migrations/006_carteiras.sql` antes do deploy do código de carteiras e saldo. Confirmar tabelas, colunas, grants e RPCs da 006 no banco de destino antes de publicar. A aplicação da migração e o deploy exigem OK do dono.
+Aplicar a migração `packages/database/migrations/006_carteiras.sql` antes do deploy do código de carteiras e saldo. Confirmar tabelas, colunas, grants e RPCs da 006 no banco de destino antes de publicar. A aplicação da migração e o deploy exigem OK do dono. O `006_carteiras_down.sql` apaga dados (carteiras, transferências, recebimentos e os ajustes de saldo): só com backup.

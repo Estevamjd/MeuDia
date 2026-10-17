@@ -33,11 +33,19 @@ Quando o dono corrigir um agente, conserte e adicione a linha aqui. Se a regra j
 
 | Regra da revisão de contas/saldo | O que garante |
 | --- | --- |
-| Histórico de saldo é paginado; schema sem 006 tem erro identificável | `carteiras.repository.test.ts` (>1000 movimentos em duas páginas, códigos de schema), ordem de deploy no README |
-| Lançamento vinculado usa desfazer; nunca edição/exclusão comum | `financas.service.test.ts`, `LancamentosVinculados.test.tsx`, `contas-saldo.spec.ts` |
+| Histórico de saldo é paginado por chave (data,id) em lotes de 500; schema sem 006 tem erro identificável e logado | `carteiras.repository.test.ts` (várias páginas, max-rows menor, inserção retroativa entre páginas, códigos de schema + log), ordem de deploy no README |
+| Lançamento vinculado usa desfazer; nunca edição/exclusão comum, nem direto no banco | `financas.service.test.ts`, `LancamentosVinculados.test.tsx`, `contas-saldo.spec.ts`; triggers da 006 (55000) + `tests/006_carteiras.sql` (UPDATE/DELETE direto bloqueado, desfazer_* da 005/006 ok) em `verify.sh db` |
 | Paguei aguarda carteiras e sempre usa uma ativa quando existir | `useFinancasHome.test.ts`, `ProximasContas` desabilita o botão |
-| Corrigir saldo usa RPC atômica e chave UUID mantida em retry | `carteiras.service.test.ts`, `useCorrigirSaldo.test.tsx`, `corrigir-saldo.test.ts` |
+| Corrigir saldo usa RPC atômica e chave UUID mantida em retry; chave com outro valor e diferença acima de DECIMAL(10,2) são 400 | `carteiras.service.test.ts`, `useCorrigirSaldo.test.tsx`, `corrigir-saldo.test.ts`, `tests/006_carteiras.sql`, `carteiras.repository.test.ts` (P0002→404, 22023→400) |
 | Ajustes não contam no resumo nem nas dicas do agente | `financas.service.test.ts`, `financas.analyzer.test.ts` |
 | Onboarding conclui após bancos, com UUID estável e saldo negativo | `Onboarding.test.tsx`, `carteiras.repository.test.ts` |
 | Seletores de carteira/categoria navegam por teclado com um único Tab | `RevisaoTeclado.test.tsx` |
 | Novo lançamento escolhe carteira ativa quando existir | `NovoLancamento.test.tsx` |
+| Editar lançamento antigo (sem carteira) não troca carteira/banco; Salvar não trava se a consulta de carteiras falhar | `NovoLancamento.test.tsx` |
+| Previsão só desconta contas vencidas a partir da âncora mais antiga das carteiras ativas | `saldo.test.ts`, `carteiras.service.test.ts` |
+| Ajuste de saldo fora de "Gastos por Categoria" do Início | `inicio/__tests__/GastosPorCategoria.test.tsx` |
+| Recebi sempre com carteira ativa (padrão arquivada cai na primeira ativa, no front e no banco) | `RecebiSheet.test.tsx`, `useFinancasHome.test.ts`, `tests/006_carteiras.sql` |
+| Carteira não se apaga (sem DELETE para authenticated; REVOKE ALL antes dos GRANTs) | `tests/006_carteiras.sql` (com default privileges do Supabase simulados), `carteiras.repository.test.ts` |
+| Down da 006 apaga os ajustes antes do DROP COLUMN (exige backup) | `tests/006_carteiras.sql` |
+| Onboarding não rebaixa perfil concluído; banco sem id ganha UUID | `Onboarding.test.tsx`, `onboarding.test.ts` |
+| E2E não depende da hora real (sessão do mock vale no relógio fixado e no real) | `newSession` em `e2e/mock-supabase/server.mjs` + `contas-saldo.spec.ts` |
