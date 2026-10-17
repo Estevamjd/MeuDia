@@ -1,18 +1,16 @@
 import type { Transferencia, TransferenciaInsert } from '@meudia/shared';
 import { AppError } from '@meudia/shared';
-import { paginas } from './cron-pagination';
+import { paginasPorChave } from './cron-pagination';
 import { erroDb } from './erros-db';
 import { getSupabase } from './supabase';
 
 const COLUMNS = 'id, user_id, origem_id, destino_id, valor, data, descricao, created_at';
 
-/** Paginado em ordem estável (data, id) até esgotar: o PostgREST corta em 1.000 linhas por resposta. */
+/** Paginado por chave (data, id) até esgotar: o PostgREST corta cada resposta no `max-rows` do projeto. */
 export async function findDesde(userId: string, desde: string): Promise<Transferencia[]> {
-  const rows = await paginas(
-    () => getSupabase().from('transferencias').select(COLUMNS)
-      .eq('user_id', userId).gte('data', desde).order('data', { ascending: true }).order('id', { ascending: true }),
+  const rows = await paginasPorChave(
+    () => getSupabase().from('transferencias').select(COLUMNS).eq('user_id', userId).gte('data', desde),
     erroDb,
-    1000,
   );
   return rows as unknown as Transferencia[];
 }

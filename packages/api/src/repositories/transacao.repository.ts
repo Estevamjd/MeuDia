@@ -1,5 +1,5 @@
 import type { Transacao, TransacaoInsert } from '@meudia/shared';
-import { paginas } from './cron-pagination';
+import { paginasPorChave } from './cron-pagination';
 import { erroDb } from './erros-db';
 import { getSupabase } from './supabase';
 
@@ -94,15 +94,13 @@ export async function findByIds(userId: string, ids: string[]): Promise<Transaca
 
 /**
  * Lançamentos com carteira a partir de `desde` (a âncora mais antiga): base do saldo.
- * Paginado em ordem estável (data, id) até esgotar: o PostgREST corta em 1.000 linhas por resposta.
+ * Paginado por chave (data, id) até esgotar: o PostgREST corta cada resposta no `max-rows` do projeto.
  */
 export async function findComCarteiraDesde(userId: string, desde: string): Promise<Transacao[]> {
-  const rows = await paginas(
+  const rows = await paginasPorChave(
     () => getSupabase().from('transacoes').select(COLUMNS)
-      .eq('user_id', userId).not('carteira_id', 'is', null).gte('data', desde)
-      .order('data', { ascending: true }).order('id', { ascending: true }),
+      .eq('user_id', userId).not('carteira_id', 'is', null).gte('data', desde),
     erroDb,
-    1000,
   );
   return rows as unknown as Transacao[];
 }

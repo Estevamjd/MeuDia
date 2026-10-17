@@ -4,13 +4,14 @@ import * as transferencias from '../transferencias.repository';
 import * as recebimentos from '../recebimentos-renda.repository';
 import * as transacoes from '../transacao.repository';
 import * as pagamentos from '../pagamentos-conta.repository';
+import { TAMANHO_PAGINA } from '../cron-pagination';
 
 const { getSupabase } = vi.hoisted(() => ({ getSupabase: vi.fn() }));
 vi.mock('../supabase', () => ({ getSupabase }));
 
 function mockClient(result: { data?: unknown; error?: unknown } = { data: [], error: null }) {
   const query: Record<string, unknown> = {};
-  for (const m of ['range', 'select', 'eq', 'in', 'not', 'gte', 'order', 'single', 'insert', 'update', 'delete']) query[m] = vi.fn(() => query);
+  for (const m of ['range', 'select', 'eq', 'in', 'not', 'gte', 'order', 'or', 'limit', 'single', 'insert', 'update', 'delete']) query[m] = vi.fn(() => query);
   query.then = (resolve: (v: unknown) => unknown) => Promise.resolve({ data: null, error: null, ...result }).then(resolve);
   const client = { from: vi.fn(() => query), rpc: vi.fn().mockResolvedValue({ data: null, error: null, ...result }) };
   getSupabase.mockReturnValue(client);
@@ -43,16 +44,58 @@ describe('repositórios de carteiras, transferências e recebimentos (sem banco)
     expect(query.not).toHaveBeenCalledWith('carteira_id', 'is', null);
     expect(query.gte).toHaveBeenCalledWith('data', '2026-09-20');
   });
-  it.each([transacoes.findComCarteiraDesde, transferencias.findDesde])('pagina histórico com movimento mais recente no final', async (buscar) => {
+  /**
+   * Banco em memória com a semântica do PostgREST: filtro `or` de cursor (data,id), ordem (data,id) e corte em
+   * `maxRows` por resposta. `aoPaginar` roda entre páginas (ex.: inserção com data retroativa).
+   */
+  function historicoPaginado(linhas: { id: string; data: string }[], maxRows = 1000, aoPaginar?: (pagina: number) => void) {
     const { query } = mockClient();
-    const linhas = Array.from({ length: 1001 }, (_, i) => ({ id: String(i), data: '2026-10-17' }));
-    query.range!.mockImplementation((inicio: number, fim: number) => Promise.resolve({ data: linhas.slice(inicio, fim + 1), error: null }));
+    let cursor: { data: string; id: string } | null = null;
+    let pagina = 0;
+    query.or = vi.fn((filtro: string) => {
+      const m = /^data\.gt\.([^,]+),and\(data\.eq\.([^,]+),id\.gt\.([^)]+)\)$/.exec(filtro);
+      if (!m || m[1] !== m[2]) throw new Error(`cursor inesperado: ${filtro}`);
+      cursor = { data: m[1]!, id: m[3]! };
+      return query;
+    });
+    query.limit = vi.fn((n: number) => {
+      const ordenadas = [...linhas].sort((a, b) => a.data.localeCompare(b.data) || a.id.localeCompare(b.id));
+      const c = cursor;
+      const resto = c ? ordenadas.filter((l) => l.data > c.data || (l.data === c.data && l.id > c.id)) : ordenadas;
+      cursor = null;
+      aoPaginar?.(pagina++);
+      return Promise.resolve({ data: resto.slice(0, Math.min(n, maxRows)), error: null });
+    });
+    return query;
+  }
+  const id = (i: number) => `id-${String(i).padStart(5, '0')}`;
+  const buscas = [transacoes.findComCarteiraDesde, transferencias.findDesde];
+
+  it.each(buscas)('pagina por chave (data,id) em lotes de TAMANHO_PAGINA até esgotar', async (buscar) => {
+    const linhas = Array.from({ length: 1201 }, (_, i) => ({ id: id(i), data: i < 600 ? '2026-10-16' : '2026-10-17' }));
+    const query = historicoPaginado(linhas);
     const resultado = await buscar('u', '2026-10-01');
-    expect(resultado).toHaveLength(1001);
-    expect(resultado.at(-1)?.id).toBe('1000');
-    expect(query.range).toHaveBeenCalledTimes(2);
-    expect(query.range).toHaveBeenLastCalledWith(1000, 1999);
+    expect(resultado.map((l) => l.id)).toEqual(linhas.map((l) => l.id));
+    expect(query.limit).toHaveBeenCalledWith(TAMANHO_PAGINA);
+    expect(query.limit).toHaveBeenCalledTimes(4); // 500 + 500 + 201 + página vazia
+    expect(query.or).toHaveBeenNthCalledWith(1, `data.gt.2026-10-16,and(data.eq.2026-10-16,id.gt.${id(499)})`);
+    expect(query.order).toHaveBeenCalledWith('data', { ascending: true });
     expect(query.order).toHaveBeenCalledWith('id', { ascending: true });
+    expect(query.range).not.toHaveBeenCalled();
+  });
+  it.each(buscas)('max-rows do projeto menor que a página não trunca o histórico', async (buscar) => {
+    const linhas = Array.from({ length: 1000 }, (_, i) => ({ id: id(i), data: '2026-10-17' }));
+    historicoPaginado(linhas, 300);
+    expect(await buscar('u', '2026-10-01')).toHaveLength(1000);
+  });
+  it.each(buscas)('inserção retroativa entre páginas não duplica nem pula linhas existentes', async (buscar) => {
+    const linhas = Array.from({ length: 700 }, (_, i) => ({ id: id(i), data: '2026-10-17' }));
+    historicoPaginado(linhas, 1000, (pagina) => {
+      if (pagina === 1) linhas.push({ id: 'id-retro', data: '2026-10-02' });
+    });
+    const ids = (await buscar('u', '2026-10-01')).map((l) => l.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toEqual(expect.arrayContaining(Array.from({ length: 700 }, (_, i) => id(i))));
   });
   it.each(['42703', '42P01', 'PGRST204'])('schema antigo %s retorna erro amigável', async (code) => {
     mockClient({ error: { code, message: 'fixture' } });

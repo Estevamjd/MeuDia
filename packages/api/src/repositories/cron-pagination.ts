@@ -25,3 +25,32 @@ export async function paginas(
     if (!data || data.length < tamanho) return rows;
   }
 }
+
+type Linha = Record<string, unknown> & { data: string; id: string };
+type ChaveQuery = {
+  or(filtro: string): ChaveQuery;
+  order(coluna: string, opcoes: { ascending: boolean }): ChaveQuery;
+  limit(n: number): PromiseLike<{ data: Record<string, unknown>[] | null; error: ErroDb | null }>;
+};
+
+/**
+ * Paginação por chave (data, id) > última linha lida, em ordem (data, id). Estável com inserções retroativas entre
+ * páginas (offset duplicaria ou pularia linhas) e só para na página vazia: um `max-rows` do projeto menor que
+ * `tamanho` encurta as páginas, mas não trunca o resultado. `query` traz só os filtros; a ordem é definida aqui.
+ */
+export async function paginasPorChave(
+  query: () => ChaveQuery,
+  onError: (error: ErroDb) => never,
+  tamanho = TAMANHO_PAGINA,
+): Promise<Linha[]> {
+  const rows: Linha[] = [];
+  for (let ultima: Linha | undefined; ;) {
+    let q = query();
+    if (ultima) q = q.or(`data.gt.${ultima.data},and(data.eq.${ultima.data},id.gt.${ultima.id})`);
+    const { data, error } = await q.order('data', { ascending: true }).order('id', { ascending: true }).limit(tamanho);
+    if (error) onError(error);
+    if (!data?.length) return rows;
+    rows.push(...(data as Linha[]));
+    ultima = rows[rows.length - 1];
+  }
+}
