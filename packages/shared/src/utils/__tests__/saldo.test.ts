@@ -178,7 +178,7 @@ describe('bordas do saldo', () => {
 
   it('conta vencida não paga entra; paga não entra', () => {
     const contas = [conta('v', 'Água', 80, 5)];
-    const base = { hojeISO: HOJE, alvoISO: '2026-10-24', saldoHoje: 500, ancoraISO: HOJE, rendas: [], recebimentos: [], contas };
+    const base = { hojeISO: HOJE, alvoISO: '2026-10-24', saldoHoje: 500, ancoraISO: '2026-10-01', rendas: [], recebimentos: [], contas };
     const p = previsao({ ...base, pagamentos: [] });
     expect(p.valor).toBe(420);
     expect(p.itens[0]?.vencida).toBe(true);
@@ -217,14 +217,28 @@ describe('bordas do saldo', () => {
     const ancora = ancoraPrevisao([carteira('nu', 'Nubank', 2000), carteira('old', 'Arquivada', 0, { arquivada: true, saldo_inicial_em: '2025-01-01T12:00:00Z' })]);
     expect(ancora).toBe(HOJE);
     const p = previsao({ hojeISO: HOJE, alvoISO: '2026-10-24', saldoHoje: 2000, ancoraISO: ancora, rendas: [], recebimentos: [], contas: [aluguel], pagamentos: [] });
-    expect(p.itens.map((i) => i.competencia)).toEqual(['2026-10']);
-    expect(p.valor).toBe(1500);
-    // Âncora em agosto: setembro e outubro contam; nada antes de agosto mesmo com a conta de 2025.
+    // Nem o de 10/10: venceu antes da âncora (17/10).
+    expect(p.itens).toEqual([]);
+    expect(p.valor).toBe(2000);
+    // Âncora em 20/08: o de 10/08 fica de fora; setembro e outubro contam; nada antes mesmo com a conta de 2025.
     const agosto = previsao({ hojeISO: HOJE, alvoISO: '2026-10-24', saldoHoje: 2000, ancoraISO: '2026-08-20', rendas: [], recebimentos: [], contas: [aluguel], pagamentos: [] });
-    expect(agosto.itens.map((i) => i.competencia)).toEqual(['2026-08', '2026-09', '2026-10']);
+    expect(agosto.itens.map((i) => i.competencia)).toEqual(['2026-09', '2026-10']);
+    const agostoInicio = previsao({ hojeISO: HOJE, alvoISO: '2026-10-24', saldoHoje: 2000, ancoraISO: '2026-08-01', rendas: [], recebimentos: [], contas: [aluguel], pagamentos: [] });
+    expect(agostoInicio.itens.map((i) => i.competencia)).toEqual(['2026-08', '2026-09', '2026-10']);
     // Sem carteira ativa não há âncora: só o mês corrente.
     expect(ancoraPrevisao([])).toBeNull();
     expect(competenciasPrevisao(HOJE, '2026-10-24', null).contas).toEqual(['2026-10']);
+  });
+
+  it('âncora no meio do mês: vencida antes da âncora não desconta; vencida depois desconta', () => {
+    // Saldo informado em 17/10: a conta de 05/10 sem "Paguei" já pode estar paga nele; a de 18/10 não.
+    const base = { hojeISO: '2026-10-20', alvoISO: '2026-10-24', saldoHoje: 1000, ancoraISO: HOJE, rendas: [], recebimentos: [], pagamentos: [] };
+    const antes = previsao({ ...base, contas: [conta('a', 'Água', 80, 5)] });
+    expect(antes.itens).toEqual([]);
+    expect(antes.valor).toBe(1000);
+    const depoisDaAncora = previsao({ ...base, contas: [conta('l', 'Luz', 120, 18)] });
+    expect(depoisDaAncora.itens.map((i) => [i.data, i.vencida])).toEqual([['2026-10-18', true]]);
+    expect(depoisDaAncora.valor).toBe(880);
   });
 
   it('rendas antigas não recebidas não entram na previsão (só do mês corrente em diante)', () => {

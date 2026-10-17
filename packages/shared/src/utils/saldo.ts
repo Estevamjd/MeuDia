@@ -192,7 +192,8 @@ export function competenciasPrevisao(hojeISO: string, alvoISO: string, ancoraISO
 /**
  * R10: saldo de hoje + rendas ativas ainda não recebidas com dia ≤ alvo (do mês corrente até o do alvo)
  * − ocorrências de contas não pagas com vencimento ≤ alvo, inclusive as vencidas de até
- * `MESES_CONTAS_VENCIDAS` meses atrás, nunca antes da competência da âncora nem (recorrentes) da criação da conta.
+ * `MESES_CONTAS_VENCIDAS` meses atrás, nunca com vencimento antes da data da âncora nem (recorrentes) antes da
+ * criação da conta.
  * Limites de orçamento não entram.
  */
 export function previsao({ hojeISO, alvoISO, saldoHoje: hoje, ancoraISO, rendas, recebimentos, contas, pagamentos }: EntradaPrevisao): Previsao {
@@ -204,6 +205,8 @@ export function previsao({ hojeISO, alvoISO, saldoHoje: hoje, ancoraISO, rendas,
     for (const conta of contas) {
       const ocorrencia = ocorrenciaDaConta(conta, competencia);
       if (!ocorrencia || ocorrencia.vencimento > alvoISO || pagas.has(`${conta.id}|${competencia}`)) continue;
+      // Vencida antes da âncora já pode estar paga no saldo informado; segue na lista de contas para o "Paguei".
+      if (ancoraISO && ocorrencia.vencimento < ancoraISO) continue;
       itens.push({
         tipo: 'conta', id: conta.id, descricao: conta.descricao, categoria: conta.categoria, valor: -Number(conta.valor),
         data: ocorrencia.vencimento, competencia, vencida: ocorrencia.vencimento < hojeISO,

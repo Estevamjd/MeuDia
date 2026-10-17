@@ -174,10 +174,12 @@ describe('painelSaldo', () => {
     ]);
     vi.mocked(contas.findAll).mockResolvedValue([
       { id: 'al', descricao: 'Aluguel', categoria: 'Moradia', valor: 500, recorrencia: 'mensal', dia_vencimento: 10, ativo: true, created_at: '2025-01-01T12:00:00Z' },
+      { id: 'lz', descricao: 'Luz', categoria: 'Contas', valor: 200, recorrencia: 'mensal', dia_vencimento: 20, ativo: true, created_at: '2025-01-01T12:00:00Z' },
     ] as never);
     const p = await service.painelSaldo('u', HOJE);
-    expect(p.previsaoFim.itens.map((i) => i.competencia)).toEqual(['2026-10']);
-    expect(p.previsaoFim.valor).toBe(500);
+    // Aluguel de 10/10 venceu antes da âncora (17/10): pode já estar no saldo informado. Luz de 20/10 conta.
+    expect(p.previsaoFim.itens.map((i) => [i.descricao, i.competencia])).toEqual([['Luz', '2026-10']]);
+    expect(p.previsaoFim.valor).toBe(800);
     expect(pagamentos.findByCompetencias).toHaveBeenCalledWith('u', ['2026-10']);
   });
 });
