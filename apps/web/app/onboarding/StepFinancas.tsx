@@ -8,7 +8,7 @@ interface StepFinancasProps {
   onChange: (partial: Partial<OnboardingData>) => void;
 }
 
-/** Único passo do onboarding no modo Finanças (sem objetivo/peso/módulos). */
+/** 1º passo do onboarding no modo Finanças (sem objetivo/peso/módulos); depois vem "Onde fica seu dinheiro?". */
 export function StepFinancas({ data, onChange }: StepFinancasProps) {
   return (
     <div className="space-y-6">
@@ -26,7 +26,8 @@ export function StepFinancas({ data, onChange }: StepFinancasProps) {
         autoComplete="given-name"
       />
       <ol className="list-decimal space-y-1 pl-5 text-sm text-muted">
-        <li>Cadastre sua renda em Orçamento.</li>
+        <li>Diga onde fica seu dinheiro e quanto tem hoje.</li>
+        <li>Cadastre sua renda.</li>
         <li>Adicione suas contas e assinaturas com o dia do vencimento.</li>
         <li>Ative os lembretes para ser avisada antes de vencer.</li>
       </ol>

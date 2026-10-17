@@ -3,7 +3,7 @@ import { assinaturaRepository, contasPagarRepository } from '../repositories';
 import { assinaturaInsertSchema } from '../validators';
 
 /** Prefixos de query afetados, inclusive selo/resumo e todas as competências. */
-export const ASSINATURA_INVALIDACOES = [['assinaturas'], ['total-mensal'], ['contas-mes'], ['conta-mes'], ['resumo-financeiro-mes'], ['resumo-mensal']] as const;
+export const ASSINATURA_INVALIDACOES = [['assinaturas'], ['total-mensal'], ['contas-mes'], ['conta-mes'], ['resumo-financeiro-mes'], ['resumo-mensal'], ['carteiras']] as const;
 function usuario(userId: string) {
   if (!userId) throw new AppError('userId é obrigatório', 'VALIDATION_ERROR', 400);
 }

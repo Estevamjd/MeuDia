@@ -70,7 +70,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       {/* Mobile: acima da BottomNav fixa (md:hidden); desktop no canto. */}
       <div
-        className="fixed bottom-[calc(5.5rem_+_env(safe-area-inset-bottom))] right-4 z-[60] flex flex-col gap-2 md:bottom-4"
+        className="fixed bottom-[calc(5.5rem_+_env(safe-area-inset-bottom))] right-4 z-toast flex flex-col gap-2 md:bottom-4"
       >
         {toasts.map((toast) => (
           <div

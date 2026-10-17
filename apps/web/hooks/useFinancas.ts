@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { financasService } from '@meudia/api';
 import type { TransacaoInsert } from '@meudia/shared';
 import { useAuth } from './useAuth';
-import { resumoKeys } from '../lib/financas-query-keys';
+import { chavesAfetadasPorLancamento } from '../lib/financas-query-keys';
 import { withOfflineSupport } from '../lib/offline-mutation';
 
 export function useTransacoes() {
@@ -54,10 +54,7 @@ export function useCriarTransacao() {
       },
     ),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['transacoes'] });
-      void queryClient.invalidateQueries({ queryKey: ['transacoes-mes'] });
-      void queryClient.invalidateQueries({ queryKey: ['resumo-mensal'] });
-      void queryClient.invalidateQueries({ queryKey: resumoKeys.todas });
+      for (const queryKey of chavesAfetadasPorLancamento()) void queryClient.invalidateQueries({ queryKey });
     },
   });
 }
@@ -76,10 +73,7 @@ export function useAtualizarTransacao() {
       ({ id, data }) => ({ userId: user?.id, id, data }),
     ),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['transacoes'] });
-      void queryClient.invalidateQueries({ queryKey: ['transacoes-mes'] });
-      void queryClient.invalidateQueries({ queryKey: ['resumo-mensal'] });
-      void queryClient.invalidateQueries({ queryKey: resumoKeys.todas });
+      for (const queryKey of chavesAfetadasPorLancamento()) void queryClient.invalidateQueries({ queryKey });
     },
   });
 }
@@ -98,10 +92,16 @@ export function useExcluirTransacao() {
       (id) => ({ userId: user?.id, id }),
     ),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['transacoes'] });
-      void queryClient.invalidateQueries({ queryKey: ['transacoes-mes'] });
-      void queryClient.invalidateQueries({ queryKey: ['resumo-mensal'] });
-      void queryClient.invalidateQueries({ queryKey: resumoKeys.todas });
+      for (const queryKey of chavesAfetadasPorLancamento()) void queryClient.invalidateQueries({ queryKey });
     },
+  });
+}
+
+export function useVinculosTransacoes(ids: string[]) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['vinculos-transacoes', user?.id, ids],
+    queryFn: () => financasService.vinculosTransacoes(user!.id, ids),
+    enabled: !!user?.id && ids.length > 0,
   });
 }

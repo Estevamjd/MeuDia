@@ -24,3 +24,6 @@ export * as rendasRepository from './rendas.repository';
 export * as orcamentoRepository from './orcamento.repository';
 export * as pushSubscriptionsRepository from './push-subscriptions.repository';
 export * as lembretesEnviadosRepository from './lembretes-enviados.repository';
+export * as carteirasRepository from './carteiras.repository';
+export * as transferenciasRepository from './transferencias.repository';
+export * as recebimentosRendaRepository from './recebimentos-renda.repository';

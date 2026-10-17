@@ -103,7 +103,7 @@ export function NavDrawer({ id, isOpen, onClose, onSignOut, returnFocusRef }: Na
   return createPortal(
     <div className="md:hidden">
       <div
-        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+        className="fixed inset-0 z-modal bg-black/50 backdrop-blur-sm"
         aria-hidden="true"
         onClick={onClose}
         data-testid="nav-drawer-overlay"
@@ -114,7 +114,7 @@ export function NavDrawer({ id, isOpen, onClose, onSignOut, returnFocusRef }: Na
         role="dialog"
         aria-modal="true"
         aria-labelledby={`${id}-titulo`}
-        className="fixed inset-y-0 left-0 z-50 flex w-[min(85vw,300px)] flex-col overflow-y-auto border-r border-border bg-surface shadow-2xl"
+        className="fixed inset-y-0 left-0 z-modal flex w-[min(85vw,300px)] flex-col overflow-y-auto border-r border-border bg-surface shadow-2xl"
         style={{
           paddingTop: 'max(1rem, env(safe-area-inset-top))',
           paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',

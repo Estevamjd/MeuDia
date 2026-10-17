@@ -66,7 +66,9 @@ export async function pagarConta(userId: string, id: string, data: unknown, clie
   validarUsuario(userId);
   const parsed = pagarContaSchema.parse(data);
   await contasPagarRepository.findById(id, userId, client);
-  return contasPagarRepository.rpcPagar(id, parsed.competencia, parsed.pago_em, parsed.banco, client);
+  return parsed.carteira_id
+    ? contasPagarRepository.rpcPagar(id, parsed.competencia, parsed.pago_em, parsed.banco, client, parsed.carteira_id)
+    : contasPagarRepository.rpcPagar(id, parsed.competencia, parsed.pago_em, parsed.banco, client);
 }
 
 export async function desfazerPagamento(userId: string, id: string, competencia: string) {

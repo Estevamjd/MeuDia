@@ -2,11 +2,12 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import type { Transacao, TransacaoInsert } from '@meudia/shared';
 import { competenciaDe, hojeSP } from '@meudia/shared';
 
 import {
+  useCarteiras,
   useCriarTransacao,
   useAtualizarTransacao,
   useExcluirTransacao,
@@ -24,10 +25,16 @@ import { AgentBannerAuto } from '../../../components/agent';
 import { useAppMode } from '../../../components/AppModeProvider';
 import { FinancasHomeView } from '../../../components/financas/home/FinancasHomeView';
 import { useFinancasHome } from '../../../components/financas/home/useFinancasHome';
+import { SeletorCarteira } from '../../../components/financas/SeletorCarteira';
+import { LancamentoRapidoSheet } from '../../../components/financas/LancamentoRapidoSheet';
 import { deslocarCompetencia, rotuloCompetencia } from '../../../lib/financas-ui';
 
 export default function FinancasPage() {
   const toast = useToast();
+  const listaCarteiras = useCarteiras();
+  const carteiras = useMemo(() => (listaCarteiras.data ?? []).filter((c) => !c.arquivada), [listaCarteiras.data]);
+  const [formCarteira, setFormCarteira] = useState<string | null>(null);
+
   const mode = useAppMode();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const hoje = useMemo(() => new Date(), []);
@@ -48,6 +55,13 @@ export default function FinancasPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingTransacao, setEditingTransacao] = useState<Transacao | null>(null);
   const [deletingTransacao, setDeletingTransacao] = useState<Transacao | null>(null);
+  // Novo: carteira escolhida ou a primeira ativa. Edição: exatamente a do lançamento (NULL em lançamento antigo =
+  // "Sem carteira"); nunca cai na primeira carteira por conta própria.
+  const carteiraId = editingTransacao
+    ? formCarteira
+    : carteiras.find((c) => c.id === formCarteira)?.id ?? carteiras[0]?.id ?? null;
+  // Desktop: a BottomNav (com o "+") só existe no mobile.
+  const [acoesAbertas, setAcoesAbertas] = useState(false);
 
   // --- Form state ---
   const [formTipo, setFormTipo] = useState<'receita' | 'despesa'>('despesa');
@@ -65,6 +79,7 @@ export default function FinancasPage() {
     setFormValor('');
     setFormData(format(hoje, 'yyyy-MM-dd'));
     setFormBanco('');
+    setFormCarteira(null);
   }, [hoje]);
 
   const openAddModal = useCallback(() => {
@@ -79,6 +94,7 @@ export default function FinancasPage() {
     setFormValor(String(t.valor));
     setFormData(t.data);
     setFormBanco(t.banco ?? '');
+    setFormCarteira(t.carteira_id ?? null);
     setEditingTransacao(t);
   }, []);
 
@@ -99,7 +115,8 @@ export default function FinancasPage() {
         descricao: formDescricao,
         valor: parseFloat(formValor),
         data: formData,
-        banco: formBanco || undefined,
+        carteira_id: carteiraId ?? undefined,
+        banco: carteiras.find((c) => c.id === carteiraId)?.nome ?? (formBanco || undefined),
       };
       criarTransacao.mutate(payload, {
         onSuccess: () => {
@@ -112,7 +129,7 @@ export default function FinancasPage() {
         },
       });
     },
-    [formTipo, formCategoria, formDescricao, formValor, formData, formBanco, criarTransacao, toast, resetForm],
+    [carteiraId, carteiras, formTipo, formCategoria, formDescricao, formValor, formData, formBanco, criarTransacao, toast, resetForm],
   );
 
   const handleSubmitEdit = useCallback(
@@ -125,8 +142,15 @@ export default function FinancasPage() {
         descricao: formDescricao,
         valor: parseFloat(formValor),
         data: formData,
-        banco: formBanco || undefined,
       };
+      if (carteiras.length === 0) {
+        // Sem carteiras (ou consulta falhou): só o campo texto do banco está na tela.
+        if (formBanco) payload.banco = formBanco;
+      } else if (carteiraId !== (editingTransacao.carteira_id ?? null)) {
+        // Só quando o usuário trocou: senão carteira_id e o banco digitado (ex.: "Itaú") ficam como estavam.
+        payload.carteira_id = carteiraId;
+        payload.banco = carteiras.find((c) => c.id === carteiraId)?.nome ?? null;
+      }
       atualizarTransacao.mutate(
         { id: editingTransacao.id, data: payload },
         {
@@ -141,7 +165,7 @@ export default function FinancasPage() {
         },
       );
     },
-    [formTipo, formCategoria, formDescricao, formValor, formData, formBanco, atualizarTransacao, editingTransacao, toast, resetForm],
+    [carteiraId, carteiras, formTipo, formCategoria, formDescricao, formValor, formData, formBanco, atualizarTransacao, editingTransacao, toast, resetForm],
   );
 
   const handleExcluir = useCallback(() => {
@@ -199,12 +223,17 @@ export default function FinancasPage() {
         value={formData}
         onChange={(e) => setFormData(e.target.value)}
       />
-      <Input
+      {carteiras.length > 0 ? (
+        <SeletorCarteira
+          id="lancamento-carteira" label="Banco ou carteira" carteiras={carteiras} value={carteiraId} onChange={setFormCarteira}
+          onSemCarteira={editingTransacao && !editingTransacao.carteira_id ? () => setFormCarteira(null) : undefined}
+        />
+      ) : <Input
         label="Banco (opcional)"
         placeholder="Ex.: Nubank, Itaú…"
         value={formBanco}
         onChange={(e) => setFormBanco(e.target.value)}
-      />
+      />}
       <div className="flex justify-end gap-3 pt-2">
         <Button
           type="button"
@@ -216,7 +245,8 @@ export default function FinancasPage() {
         >
           Cancelar
         </Button>
-        <Button type="submit" isLoading={isSubmitting}>
+        {/* Espera só enquanto carrega; se a consulta falhar, o lançamento segue pelo campo texto do banco. */}
+        <Button type="submit" disabled={listaCarteiras.isPending} isLoading={isSubmitting}>
           Salvar
         </Button>
       </div>
@@ -228,6 +258,10 @@ export default function FinancasPage() {
       {/* Cabeçalho: título + seletor de mês compacto */}
       <div className="flex items-center justify-between gap-2">
         <h1 className="font-syne text-3xl font-bold text-text">Finanças</h1>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setAcoesAbertas(true)} className="hidden md:inline-flex">
+            <Plus size={16} aria-hidden="true" /> Lançar
+          </Button>
         <div className="flex items-center">
           <button
             onClick={mesAnterior}
@@ -247,7 +281,10 @@ export default function FinancasPage() {
             <ChevronRight size={18} />
           </button>
         </div>
+        </div>
       </div>
+
+      <LancamentoRapidoSheet open={acoesAbertas} onClose={() => setAcoesAbertas(false)} />
 
       {/* Agente IA (fala de todos os módulos; fora do modo Finanças) */}
       {mode !== 'financas' && <AgentBannerAuto />}

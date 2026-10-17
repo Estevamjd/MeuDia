@@ -101,10 +101,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </div>
 
-      {/* Modo Finanças: BottomNav antes do painel, para o painel do agente cobri-la no mobile. */}
       {financas && <BottomNav onOpenChat={() => setAgentOpen(true)} chatAberto={agentOpen} />}
 
-      {/* Agente IA (no modo Finanças o "Chat" da BottomNav substitui o FAB no mobile) */}
+      {/* Agente IA (no modo Finanças o "Chat" da BottomNav substitui o FAB no mobile).
+          O painel vai em portal no body com z-agente: fica acima de BottomNav/banner/modais em qualquer ordem. */}
       <AgentFAB onClick={() => setAgentOpen(true)} className={financas ? 'hidden md:flex' : undefined} />
       <AgentPanel isOpen={agentOpen} onClose={() => setAgentOpen(false)} />
 

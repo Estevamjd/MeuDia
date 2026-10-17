@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chavesAfetadasPorOrcamento, chavesAfetadasPorPagamento, contasKeys, orcamentoKeys } from '../financas-query-keys';
+import { carteirasKeys, chavesAfetadasPorLancamento, chavesAfetadasPorOrcamento, chavesAfetadasPorPagamento, contasKeys, orcamentoKeys } from '../financas-query-keys';
 
 describe('orcamentoKeys', () => {
   it('lista do orçamento fica sob o prefixo invalidado por chavesAfetadasPorOrcamento', () => {
@@ -13,6 +13,7 @@ describe('orcamentoKeys', () => {
       ['rendas'],
       ['orcamento-categorias'],
       ['resumo-financeiro-mes'],
+      ['carteiras'],
     ]);
   });
 });
@@ -40,9 +41,11 @@ describe('chavesAfetadasPorPagamento', () => {
       ['conta-mes', 'u1', 'c1'],
       ['resumo-financeiro-mes'],
       ['resumo-mensal'],
+      ['vinculos-transacoes'],
       ['transacoes'],
       ['transacoes-mes'],
       ['assinaturas'],
+      ['carteiras'],
     ]);
   });
 
@@ -50,5 +53,13 @@ describe('chavesAfetadasPorPagamento', () => {
     const chaves = chavesAfetadasPorPagamento('u1', 'c1', '2026-10');
     expect(chaves).not.toContainEqual(['contas-mes', 'u1', '2026-11']);
     expect(chaves).not.toContainEqual(['contas-mes']);
+  });
+});
+
+describe('carteirasKeys', () => {
+  it('lista e painel ficam sob o prefixo invalidado por lançamentos', () => {
+    expect(carteirasKeys.painel('u1', '2026-10-17')).toEqual(['carteiras', 'u1', 'painel', '2026-10-17']);
+    expect(chavesAfetadasPorLancamento()).toContainEqual(carteirasKeys.lista('u1').slice(0, 1));
+    expect(chavesAfetadasPorLancamento()).toContainEqual(['transacoes-mes']);
   });
 });

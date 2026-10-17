@@ -3,6 +3,7 @@ import { Pencil, Plus, Trash2 } from 'lucide-react';
 import type { Transacao } from '@meudia/shared';
 import { Button, SkeletonList } from '../../ui';
 import { formatBRL, formatDiaMes } from '../../../lib/financas-ui';
+import { CategoriaIcone } from '../CategoriaIcone';
 
 /** Quantos lançamentos a home mostra antes de "Ver todos". */
 export const LANCAMENTOS_VISIVEIS = 5;
@@ -11,6 +12,9 @@ export interface UltimosLancamentosProps {
   /** Lançamentos do mês, mais recentes primeiro. */
   transacoes: Transacao[];
   carregando?: boolean;
+  vinculos?: Record<string, 'recebimento' | 'pagamento'>;
+  acoesBloqueadas?: boolean;
+  onDesfazer?: (t: Transacao) => void;
   expandido: boolean;
   onAlternarExpandido: () => void;
   onNovo: () => void;
@@ -21,6 +25,9 @@ export interface UltimosLancamentosProps {
 /** "Últimos lançamentos": 5 mais recentes + "Ver todos", com editar/excluir. */
 export function UltimosLancamentos({
   transacoes,
+  vinculos = {},
+  acoesBloqueadas = false,
+  onDesfazer,
   carregando = false,
   expandido,
   onAlternarExpandido,
@@ -53,6 +60,7 @@ export function UltimosLancamentos({
           <ul className="space-y-2">
             {visiveis.map((t) => (
               <li key={t.id} className="flex items-center gap-3 rounded-card border border-border bg-card p-3">
+                <CategoriaIcone categoria={t.categoria} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[15px] font-medium text-text" title={t.descricao}>
                     {t.descricao}
@@ -72,21 +80,23 @@ export function UltimosLancamentos({
                   {formatBRL(Number(t.valor))}
                 </span>
                 <div className="flex shrink-0 items-center">
-                  <button
+                  {!vinculos[t.id] && <button
                     type="button"
+                    disabled={acoesBloqueadas}
                     onClick={() => onEditar(t)}
                     className="rounded-lg p-2 text-muted transition-colors hover:bg-card2 hover:text-text"
                     aria-label={`Editar lançamento ${t.descricao}`}
                   >
                     <Pencil size={14} />
-                  </button>
+                  </button>}
                   <button
                     type="button"
-                    onClick={() => onExcluir(t)}
+                    disabled={acoesBloqueadas}
+                    onClick={() => vinculos[t.id] ? onDesfazer?.(t) : onExcluir(t)}
                     className="rounded-lg p-2 text-muted transition-colors hover:bg-red/[0.14] hover:text-red"
-                    aria-label={`Excluir lançamento ${t.descricao}`}
+                    aria-label={`${vinculos[t.id] ? `Desfazer ${vinculos[t.id]}` : 'Excluir lançamento'} ${t.descricao}`}
                   >
-                    <Trash2 size={14} />
+                    {vinculos[t.id] ? <span className="text-xs">Desfazer {vinculos[t.id]}</span> : <Trash2 size={14} /> }
                   </button>
                 </div>
               </li>

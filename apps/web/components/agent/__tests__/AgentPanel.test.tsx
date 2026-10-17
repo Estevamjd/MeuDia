@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { NotificacaoAgente } from '@meudia/shared';
 import { AppModeProvider } from '../../AppModeProvider';
-import { AgentPanel } from '../AgentPanel';
+import { AgentPanel, LIMIAR_ARRASTE_FECHAR } from '../AgentPanel';
 
 const push = vi.fn();
 const marcarLida = vi.fn();
@@ -117,5 +117,100 @@ describe('AgentPanel por APP_MODE', () => {
     expect(screen.getByText('Aviso treino')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Marcar todas como lidas/ }));
     expect(marcarTodasLidas).toHaveBeenCalledOnce();
+  });
+});
+
+describe('AgentPanel: fechar e camadas (bug do X inalcançável no iPhone)', () => {
+  // jsdom não tem PointerEvent: sem isto o fireEvent perde clientY/pointerType.
+  beforeAll(() => {
+    if (typeof window.PointerEvent === 'function') return;
+    class PointerEventFake extends MouseEvent {
+      pointerId: number;
+      pointerType: string;
+      constructor(type: string, init: PointerEventInit = {}) {
+        super(type, init);
+        this.pointerId = init.pointerId ?? 0;
+        this.pointerType = init.pointerType ?? 'mouse';
+      }
+    }
+    window.PointerEvent = PointerEventFake as unknown as typeof PointerEvent;
+  });
+
+  const abrir = () => {
+    const onClose = vi.fn();
+    const utils = render(
+      <AppModeProvider mode="financas" vapidPublicKey={null}>
+        <AgentPanel isOpen onClose={onClose} />
+      </AppModeProvider>,
+    );
+    return { onClose, ...utils };
+  };
+
+  it('renderiza em portal no body, na camada z-agente, como bottom sheet que não cobre o topo', () => {
+    const { container } = abrir();
+    const dialog = screen.getByRole('dialog', { name: 'Agente MeuDia' });
+    expect(container.contains(dialog)).toBe(false);
+    const raiz = dialog.parentElement!;
+    expect(raiz.parentElement).toBe(document.body);
+    expect(raiz.className).toContain('z-agente');
+    expect(dialog.className).toContain('agente-sheet');
+    expect(dialog.className).not.toMatch(/\bh-screen\b/);
+  });
+
+  it('X: rótulo "Fechar assistente", 44x44 e fecha', () => {
+    const { onClose } = abrir();
+    const x = screen.getByRole('button', { name: 'Fechar assistente' });
+    expect(x.className).toMatch(/\bh-11\b/);
+    expect(x.className).toMatch(/\bw-11\b/);
+    fireEvent.click(x);
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('Esc fecha', () => {
+    const { onClose } = abrir();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('toque no backdrop fecha; toque dentro do painel não', () => {
+    const { onClose } = abrir();
+    fireEvent.click(screen.getByRole('dialog', { name: 'Agente MeuDia' }));
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('agente-backdrop'));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('arrastar a alça para baixo além do limiar fecha; arraste curto não', () => {
+    const { onClose } = abrir();
+    const alca = screen.getByTestId('agente-alca');
+    const arrastar = (dy: number) => {
+      fireEvent.pointerDown(alca, { pointerType: 'touch', pointerId: 1, clientY: 100 });
+      fireEvent.pointerMove(alca, { pointerType: 'touch', pointerId: 1, clientY: 100 + dy });
+      fireEvent.pointerUp(alca, { pointerType: 'touch', pointerId: 1, clientY: 100 + dy });
+    };
+    arrastar(LIMIAR_ARRASTE_FECHAR - 20);
+    expect(onClose).not.toHaveBeenCalled();
+    arrastar(LIMIAR_ARRASTE_FECHAR + 20);
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('trava o scroll do body enquanto aberto e devolve o foco ao gatilho ao fechar', () => {
+    const gatilho = document.createElement('button');
+    document.body.appendChild(gatilho);
+    gatilho.focus();
+    const { rerender } = abrir();
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(document.body.style.position).toBe('fixed');
+
+    rerender(
+      <AppModeProvider mode="financas" vapidPublicKey={null}>
+        <AgentPanel isOpen={false} onClose={vi.fn()} />
+      </AppModeProvider>,
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.body.style.overflow).toBe('');
+    expect(document.body.style.position).toBe('');
+    expect(document.activeElement).toBe(gatilho);
+    gatilho.remove();
   });
 });

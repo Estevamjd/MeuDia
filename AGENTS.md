@@ -4,7 +4,7 @@ Regras para agentes que mexem neste repo. Curto de propósito: o que pode ser ch
 
 ## Pronto = verificado
 
-Nenhuma entrega está pronta sem `scripts/verify.sh` passando (type-check, lint, unitários e E2E mock no iPhone 13 WebKit). O CI deve rodar o mesmo script (`scripts/verify.sh static` e `scripts/verify.sh e2e`); enquanto o workflow novo não estiver no `main`, rode localmente e cole o resultado no PR. Depois de um deploy, rode `scripts/verify.sh smoke https://meudia.vercel.app`. Passo a passo em `.cursor/skills/verify-meudia/SKILL.md`.
+Nenhuma entrega está pronta sem `scripts/verify.sh` passando (type-check, lint, unitários, E2E mock no iPhone 13 WebKit e, com PostgreSQL local, os testes SQL). O CI deve rodar o mesmo script (`scripts/verify.sh static`, `scripts/verify.sh e2e` e `scripts/verify.sh db`); enquanto o workflow novo não estiver no `main`, rode localmente e cole o resultado no PR. Depois de um deploy, rode `scripts/verify.sh smoke https://meudia.vercel.app`. Passo a passo em `.cursor/skills/verify-meudia/SKILL.md`.
 
 Todo bug corrigido ganha um teste ou checagem que falha sem a correção. Prove que falha antes de dizer que pegou.
 
@@ -23,9 +23,29 @@ Todo bug corrigido ganha um teste ou checagem que falha sem a correção. Prove 
 | Modal não rouba foco ao digitar | `onClose` em ref em `components/ui/Modal.tsx` + `Modal.test.tsx`, `ContasPage.test.tsx` |
 | Banner de instalação não cobre a barra inferior | `e2e/novo-usuario.spec.ts` (compara as caixas do banner e da BottomNav) |
 | Modais e drawer ficam acima da barra inferior e do banner | portal no `body` em `Modal.tsx`/`NavDrawer.tsx` + clique em Salvar com banner visível em `e2e/novo-usuario.spec.ts` |
+| z-index vem de uma escala só; assistente fica acima de BottomNav, banner, header e modais, com X tocável no iPhone | `lib/camadas.ts` (classes `z-<camada>` do Tailwind) + `lib/__tests__/camadas.test.ts` (barra `z-40`/`z-[60]` solto em fixed/sticky) + portal e bottom sheet em `AgentPanel.tsx` + `AgentPanel.test.tsx` + `e2e/assistente.spec.ts` (X no viewport, não coberto, ≥ 44px) |
 | SW não recarrega a página na 1ª instalação | Parcial. `e2e/novo-usuario.spec.ts` digita com checagem de foco, mas não há teste dedicado da 1ª instalação do SW |
 | Termos e privacidade abrem logado | `lib/__tests__/supabase-middleware.test.ts` |
 | Versão do pnpm tem uma fonte só (`packageManager`) | Workflow sem `version:` no `pnpm/action-setup`; com duas fontes o CI quebra com "Multiple versions of pnpm specified" |
 | Lint em `ai`, `api` e `mobile` | Nada ainda. Dívida antiga; fora do `verify.sh` até ser limpa (ver PLANO-PIRAMIDE) |
 
 Quando o dono corrigir um agente, conserte e adicione a linha aqui. Se a regra já estava e nada a garantia, suba o conserto para código, tipo, lint ou teste na mesma mudança.
+
+| Regra da revisão de contas/saldo | O que garante |
+| --- | --- |
+| Histórico de saldo é paginado por chave (data,id) em lotes de 500; schema sem 006 tem erro identificável e logado | `carteiras.repository.test.ts` (várias páginas, max-rows menor, inserção retroativa entre páginas, códigos de schema + log), ordem de deploy no README |
+| Lançamento vinculado usa desfazer; nunca edição/exclusão comum, nem direto no banco | `financas.service.test.ts`, `LancamentosVinculados.test.tsx`, `contas-saldo.spec.ts`; triggers da 006 (55000) + `tests/006_carteiras.sql` (UPDATE/DELETE direto bloqueado, desfazer_* da 005/006 ok) em `verify.sh db` |
+| Paguei aguarda carteiras e sempre usa uma ativa quando existir | `useFinancasHome.test.ts`, `ProximasContas` desabilita o botão |
+| Corrigir saldo usa RPC atômica e chave UUID mantida em retry; chave com outro valor e diferença acima de DECIMAL(10,2) são 400 | `carteiras.service.test.ts`, `useCorrigirSaldo.test.tsx`, `corrigir-saldo.test.ts`, `tests/006_carteiras.sql`, `carteiras.repository.test.ts` (P0002→404, 22023→400) |
+| Ajustes não contam no resumo nem nas dicas do agente | `financas.service.test.ts`, `financas.analyzer.test.ts` |
+| Onboarding conclui após bancos, com UUID estável e saldo negativo | `Onboarding.test.tsx`, `carteiras.repository.test.ts` |
+| Seletores de carteira/categoria navegam por teclado com um único Tab | `RevisaoTeclado.test.tsx` |
+| Novo lançamento escolhe carteira ativa quando existir | `NovoLancamento.test.tsx` |
+| Editar lançamento antigo (sem carteira) não troca carteira/banco; Salvar não trava se a consulta de carteiras falhar | `NovoLancamento.test.tsx` |
+| Previsão só desconta contas vencidas a partir da âncora mais antiga das carteiras ativas | `saldo.test.ts`, `carteiras.service.test.ts` |
+| Ajuste de saldo fora de "Gastos por Categoria" do Início | `inicio/__tests__/GastosPorCategoria.test.tsx` |
+| Recebi sempre com carteira ativa (padrão arquivada cai na primeira ativa, no front e no banco) | `RecebiSheet.test.tsx`, `useFinancasHome.test.ts`, `tests/006_carteiras.sql` |
+| Carteira não se apaga (sem DELETE para authenticated; REVOKE ALL antes dos GRANTs) | `tests/006_carteiras.sql` (com default privileges do Supabase simulados), `carteiras.repository.test.ts` |
+| Down da 006 apaga os ajustes antes do DROP COLUMN (exige backup) | `tests/006_carteiras.sql` |
+| Onboarding não rebaixa perfil concluído; banco sem id ganha UUID | `Onboarding.test.tsx`, `onboarding.test.ts` |
+| E2E não depende da hora real (sessão do mock vale no relógio fixado e no real) | `newSession` em `e2e/mock-supabase/server.mjs` + `contas-saldo.spec.ts` |

@@ -19,6 +19,8 @@ import {
   useToast,
 } from '../../../../components/ui';
 import { LembretesPush } from '../../../../components/financas/LembretesPush';
+import { CategoriaIcone } from '../../../../components/financas/CategoriaIcone';
+import { SeletorCategoria } from '../../../../components/financas/SeletorCategoria';
 import {
   CONTA_FORM_VAZIO,
   RECORRENCIA_LABEL,
@@ -136,9 +138,10 @@ function ContasConteudo() {
         <ul className="space-y-2">
           {contas.map((conta) => (
             <li key={conta.id} className="flex flex-wrap items-center gap-3 rounded-card border border-border bg-card p-4">
+              <CategoriaIcone categoria={conta.categoria} />
               <Link
                 href={`/financas/contas/${conta.id}?competencia=${competencia}`}
-                className="min-w-0 flex-1 basis-full sm:basis-0 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                className="min-w-0 flex-1 basis-[calc(100%-3.25rem)] sm:basis-0 rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
               >
                 {/* Selos quebram de linha em vez de serem cortados (375px). */}
                 <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-text">
@@ -221,7 +224,7 @@ function ContasConteudo() {
             {form.recorrencia === 'unica' && (
               <Input label="Data do vencimento" type="date" value={form.data} onChange={(e) => set({ data: e.target.value })} required />
             )}
-            <Input label="Categoria" placeholder="Ex: Casa, Transporte..." value={form.categoria} onChange={(e) => set({ categoria: e.target.value })} />
+            <SeletorCategoria id="conta-categoria" value={form.categoria} onChange={(categoria) => set({ categoria })} />
             {erro && (
               <p role="alert" className="text-sm text-red">
                 {erro}

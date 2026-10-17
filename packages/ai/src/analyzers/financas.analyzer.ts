@@ -2,6 +2,7 @@
  * Dados de transação para análise financeira.
  */
 interface TransacaoAnalise {
+  ajuste?: boolean;
   tipo: 'receita' | 'despesa';
   categoria: string;
   valor: number;
@@ -25,6 +26,7 @@ interface AnaliseFinanceira {
  * Analisa as transações do mês e retorna insights.
  */
 export function analisarFinancasMes(transacoes: TransacaoAnalise[]): AnaliseFinanceira {
+  transacoes = transacoes.filter((t) => !t.ajuste);
   if (transacoes.length === 0) {
     return {
       totalReceitas: 0,

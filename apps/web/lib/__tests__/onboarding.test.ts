@@ -3,6 +3,7 @@ import type { Profile } from '@meudia/shared';
 import {
   aplicarOnboardingNoCache,
   deveRedirecionarOnboarding,
+  montarCarteirasOnboarding,
   montarPerfilOnboarding,
   precisaOnboarding,
   profileKey,
@@ -132,4 +133,11 @@ describe('aplicarOnboardingNoCache', () => {
     expect(novo).toEqual({ id: 'u1', onboarding_feito: true });
     expect(precisaOnboarding(novo)).toBe(false);
   });
+});
+
+it('linha sem id ganha UUID (nunca o índice, que quebraria com 22P02 no banco)', () => {
+  const [a, b] = montarCarteirasOnboarding([{ nome: 'Nu', digitos: '' }, { nome: 'Caixa', digitos: '' }]);
+  expect(a!.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  expect(b!.id).not.toBe(a!.id);
+  expect(montarCarteirasOnboarding([{ id: 'fixo', nome: 'Nu', digitos: '' }])[0]!.id).toBe('fixo');
 });

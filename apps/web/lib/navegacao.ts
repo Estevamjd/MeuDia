@@ -42,6 +42,7 @@ const SECOES_PADRAO: NavSection[] = [
 // Modo Finanças: só finanças (as subrotas ganham item próprio).
 const ITENS_FINANCAS: NavItem[] = [
   { href: '/financas', label: 'Resumo do mês', emoji: '💸', exato: true },
+  { href: '/financas/carteiras', label: 'Bancos e carteira', emoji: '🏦' },
   { href: '/financas/contas', label: 'Contas', emoji: '🧾' },
   { href: '/financas/orcamento', label: 'Orçamento', emoji: '📊' },
   { href: '/assinaturas', label: 'Assinaturas', emoji: '💳' },
@@ -90,13 +91,14 @@ export const HREF_NOVA_CONTA = '/financas/contas?nova=1';
 
 export type ItemBottomFinancas =
   | ({ tipo: 'link' } & NavItem)
-  | ({ tipo: 'nova-conta' } & NavItem)
+  // "+" abre a folha Gastei · Entrou dinheiro · Transferir (sem rota própria).
+  | { tipo: 'acoes'; label: string; emoji: string; href?: never }
   | { tipo: 'chat'; label: string; emoji: string; href?: never };
 
 const BOTTOM_FINANCAS: ItemBottomFinancas[] = [
   { tipo: 'link', href: '/financas', label: 'Início', emoji: '🏠', exato: true },
   { tipo: 'link', href: '/financas/contas', label: 'Contas', emoji: '🧾' },
-  { tipo: 'nova-conta', href: HREF_NOVA_CONTA, label: 'Nova conta', emoji: '+' },
+  { tipo: 'acoes', label: 'Lançar', emoji: '+' },
   { tipo: 'link', href: '/financas/orcamento', label: 'Orçamento', emoji: '📊' },
   // Chat abre o AgentPanel do layout (sem rota própria).
   { tipo: 'chat', label: 'Chat', emoji: '💬' },

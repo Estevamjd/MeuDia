@@ -3,6 +3,7 @@ import { clsx } from 'clsx';
 import type { Competencia, SituacaoOcorrencia } from '@meudia/shared';
 import { Button } from '../../ui';
 import { formatBRL, textoVencimento } from '../../../lib/financas-ui';
+import { CategoriaIcone } from '../CategoriaIcone';
 
 export interface ContaProxima {
   contaId: string;
@@ -11,6 +12,7 @@ export interface ContaProxima {
   valor: number;
   vencimento: string;
   situacao: SituacaoOcorrencia;
+  categoria?: string;
 }
 
 export interface ProximasContasProps {
@@ -21,15 +23,16 @@ export interface ProximasContasProps {
   hojeISO: string;
   /** `contaId` com "Paguei" em andamento. */
   contaOcupada?: string;
+  pagamentoBloqueado?: boolean;
   onPagar: (conta: ContaProxima) => void;
 }
 
-/** "Próximas contas": lista curta com "Paguei" em 1 toque. */
-export function ProximasContas({ contas, totalMes, hojeISO, contaOcupada, onPagar }: ProximasContasProps) {
+/** "Contas a vencer": lista curta com "Paguei" em 1 toque. */
+export function ProximasContas({ contas, totalMes, hojeISO, contaOcupada, pagamentoBloqueado, onPagar }: ProximasContasProps) {
   return (
     <section id="proximas-contas" aria-labelledby="proximas-contas-titulo" className="scroll-mt-20 space-y-3">
       <h2 id="proximas-contas-titulo" className="text-[15px] font-semibold text-text">
-        Próximas contas
+        Contas a vencer
       </h2>
 
       {contas.length === 0 ? (
@@ -40,6 +43,7 @@ export function ProximasContas({ contas, totalMes, hojeISO, contaOcupada, onPaga
         <ul className="space-y-2">
           {contas.map((c) => (
             <li key={c.contaId} className="flex items-center gap-3 rounded-card border border-border bg-card p-3">
+              <CategoriaIcone categoria={c.categoria ?? 'Contas'} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[15px] font-medium text-text" title={c.descricao}>
                   {c.descricao}
@@ -54,6 +58,7 @@ export function ProximasContas({ contas, totalMes, hojeISO, contaOcupada, onPaga
               <Button
                 className="shrink-0"
                 onClick={() => onPagar(c)}
+                disabled={pagamentoBloqueado}
                 isLoading={contaOcupada === c.contaId}
                 aria-label={`Paguei ${c.descricao}`}
               >

@@ -97,9 +97,13 @@ pnpm lint
 pnpm type-check
 pnpm test
 pnpm --filter @meudia/web test:e2e
-scripts/verify.sh   # o que o CI roda: type-check, lint, unitários e E2E mock (iPhone 13 WebKit)
+scripts/verify.sh   # o que o CI roda: type-check, lint, unitários, E2E mock (iPhone 13 WebKit) e testes SQL (verify.sh db)
 ```
 
 ## Status
 
 Projeto em desenvolvimento ativo, com base preparada para evoluir como assistente pessoal multiplataforma.
+
+## Ordem de deploy
+
+Aplicar a migração `packages/database/migrations/006_carteiras.sql` antes do deploy do código de carteiras e saldo. Confirmar tabelas, colunas, grants e RPCs da 006 no banco de destino antes de publicar. A aplicação da migração e o deploy exigem OK do dono. O `006_carteiras_down.sql` apaga dados (carteiras, transferências, recebimentos e os ajustes de saldo): só com backup.

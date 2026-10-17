@@ -200,7 +200,8 @@ export function linhasOrcamento(
 ): LinhaOrcamento[] {
   const gastos = new Map<string, number>();
   for (const t of transacoes) {
-    if (t.tipo !== 'despesa') continue;
+    // Ajuste de saldo (R9) não é gasto: fica fora de limites e dicas.
+    if (t.tipo !== 'despesa' || t.ajuste) continue;
     gastos.set(t.categoria, (gastos.get(t.categoria) ?? 0) + Number(t.valor));
   }
 

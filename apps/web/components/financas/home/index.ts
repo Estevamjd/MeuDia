@@ -2,7 +2,7 @@ export { AlertaContas, type AlertaContasProps, type ContaAlerta } from './Alerta
 export { AvisoLembretes, type AvisoLembretesProps, mostrarAvisoLembretes, AVISO_LEMBRETES_DISPENSADO_KEY } from './AvisoLembretes';
 export { BoasVindasFinancas, type BoasVindasFinancasProps } from './BoasVindasFinancas';
 export { EntradasSaidas, type EntradasSaidasProps } from './EntradasSaidas';
-export { FinancasHomeView, type FinancasHomeViewProps } from './FinancasHomeView';
+export { FinancasHomeView, type FinancasHomeViewProps, type DashboardHome } from './FinancasHomeView';
 export { HeroSobra, type HeroSobraProps } from './HeroSobra';
 export { IndicadoresMes, type IndicadoresMesProps } from './IndicadoresMes';
 export { montarHome, type DadosHome, type ResumoHome, type SecoesHome } from './montarHome';

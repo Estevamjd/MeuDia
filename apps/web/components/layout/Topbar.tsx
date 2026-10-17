@@ -45,7 +45,7 @@ export function Topbar({ onSignOut }: TopbarProps) {
   return (
     <>
       <nav
-        className="sticky top-0 z-20 border-b border-border"
+        className="sticky top-0 z-header border-b border-border"
         style={{
           background: 'rgba(16,16,26,0.95)',
           backdropFilter: 'blur(12px)',

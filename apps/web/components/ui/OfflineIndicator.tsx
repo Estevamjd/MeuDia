@@ -41,7 +41,7 @@ export function OfflineIndicator({
   }
 
   return (
-    <div className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4">
+    <div className="fixed bottom-4 left-1/2 z-toast -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4">
       {/* Offline */}
       {!isOnline && (
         <div className="flex items-center gap-2 rounded-xl bg-amber-500/90 px-4 py-2.5 text-sm font-medium text-white shadow-lg backdrop-blur-sm">

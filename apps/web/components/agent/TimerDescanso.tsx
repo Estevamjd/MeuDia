@@ -102,7 +102,7 @@ export function TimerDescanso({
   else if (seconds <= 30) timerColor = 'text-yellow';
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center">
+    <div className="fixed inset-0 z-sobreposicao flex items-center justify-center">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/85" />
 

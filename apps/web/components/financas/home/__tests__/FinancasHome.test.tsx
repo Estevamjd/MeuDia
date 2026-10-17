@@ -375,7 +375,7 @@ describe('montarHome', () => {
 describe('FinancasHomeView', () => {
   it('com dados: todas as seções, sem "real / previsto" nem "igual ao mês anterior"', () => {
     render(<FinancasHomeView {...viewProps()} />);
-    for (const titulo of ['Sobra do mês', 'Entrou', 'Saiu', 'Próximas contas', 'Orçamento', 'Renda comprometida', 'Últimos lançamentos']) {
+    for (const titulo of ['Sobra do mês', 'Entrou', 'Saiu', 'Contas a vencer', 'Orçamento', 'Renda comprometida', 'Últimos lançamentos']) {
       expect(texto()).toContain(titulo);
     }
     expect(screen.getByRole('alert').textContent).toContain('2 contas pedem atenção');
@@ -413,7 +413,7 @@ describe('FinancasHomeView', () => {
     expect(props.secoes?.vazio).toBe(true);
     expect(texto()).toContain('Vamos montar seu mês');
     expect(texto()).not.toContain('R$');
-    expect(texto()).not.toMatch(/Sobra do mês|Próximas contas|Últimos lançamentos|Renda comprometida/);
+    expect(texto()).not.toMatch(/Sobra do mês|Contas a vencer|Últimos lançamentos|Renda comprometida/);
     expect(texto()).toContain('Passo 1 de 2');
     fireEvent.click(screen.getByRole('button', { name: 'Cadastrar minha renda' }));
     expect(onCadastrarRenda).toHaveBeenCalled();
@@ -429,4 +429,16 @@ describe('FinancasHomeView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
     expect(onTentarDeNovo).toHaveBeenCalled();
   });
+});
+
+it('erro amigável do painel mantém resumo e bloqueia Paguei enquanto bancos não carregam', () => {
+  const pagar = vi.fn();
+  render(<FinancasHomeView {...viewProps({ erroPainel: 'O MeuDia está terminando uma atualização. Tente de novo em alguns minutos.', pagamentoBloqueado: true, onPagar: pagar })} />);
+  expect(screen.getAllByRole('alert').some((alerta) => alerta.textContent?.includes('terminando uma atualização'))).toBe(true);
+  expect(texto()).toContain('Sobra do mês');
+  for (const botao of screen.getAllByRole('button', { name: /^Paguei / })) {
+    expect((botao as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(botao);
+  }
+  expect(pagar).not.toHaveBeenCalled();
 });

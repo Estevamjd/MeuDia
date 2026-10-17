@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { contasPagarRepository, contasPagarService } from '@meudia/api';
 import type { Competencia, ContaPagarInsert } from '@meudia/shared';
 import { useAuth } from './useAuth';
-import { chavesAfetadasPorPagamento, contasKeys } from '../lib/financas-query-keys';
+import { carteirasKeys, chavesAfetadasPorPagamento, contasKeys } from '../lib/financas-query-keys';
 
 interface PagamentoVars {
   contaId: string;
@@ -14,6 +14,7 @@ interface PagamentoVars {
 interface PagarVars extends PagamentoVars {
   pago_em?: string;
   banco?: string | null;
+  carteira_id?: string | null;
 }
 
 function requireUserId(userId: string | undefined): string {
@@ -58,6 +59,8 @@ function useInvalidarContas() {
     void queryClient.invalidateQueries({ queryKey: contasKeys.todas });
     void queryClient.invalidateQueries({ queryKey: contasKeys.contaTodas });
     void queryClient.invalidateQueries({ queryKey: ['resumo-financeiro-mes'] });
+    // Contas a pagar entram na previsão de saldo (7 dias / fim do mês).
+    void queryClient.invalidateQueries({ queryKey: carteirasKeys.todas });
   };
 }
 
@@ -108,8 +111,8 @@ export function usePagarConta() {
   const invalidar = useInvalidarPagamento();
 
   return useMutation({
-    mutationFn: ({ contaId, competencia, pago_em, banco }: PagarVars) =>
-      contasPagarService.pagarConta(requireUserId(user?.id), contaId, { competencia, pago_em, banco }),
+    mutationFn: ({ contaId, competencia, pago_em, banco, carteira_id }: PagarVars) =>
+      contasPagarService.pagarConta(requireUserId(user?.id), contaId, { competencia, pago_em, banco, carteira_id }),
     // Também no erro: 409 "já paga" (outra aba/aparelho) precisa refletir o estado real.
     onSettled: (_data, _error, vars) => invalidar(vars),
   });

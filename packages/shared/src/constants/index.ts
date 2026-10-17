@@ -45,3 +45,4 @@ export const AGUA = {
 } as const;
 
 export const APP_NAME = 'MeuDia';
+export * from './categorias';

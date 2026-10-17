@@ -31,4 +31,5 @@ export const pagarContaSchema = z.object({
   competencia: competenciaSchema,
   pago_em: dataISOSchema.optional(),
   banco: z.string().max(100).nullable().optional(),
+  carteira_id: z.string().uuid().nullable().optional(),
 });

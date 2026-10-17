@@ -13,9 +13,10 @@ Na raiz do repo, com dependências instaladas (`pnpm install --frozen-lockfile`)
 
 ```bash
 export COREPACK_HOME="$HOME/.cache/corepack"   # só se o corepack não tiver escrita em /usr/local/share
-scripts/verify.sh            # static + e2e, o mesmo que o CI deve rodar
+scripts/verify.sh            # static + e2e (+ db se houver PostgreSQL local), o mesmo que o CI deve rodar
 scripts/verify.sh static     # type-check, lint (web, shared) e unitários
 scripts/verify.sh e2e        # E2E mock
+scripts/verify.sh db         # Postgres descartável: stub + testes SQL da 005/006 e concorrência do corrigir_saldo (PG_BIN opcional)
 ```
 
 O `e2e` sobe sozinho, pelo `webServer` de `apps/web/playwright.mock.config.ts`:
