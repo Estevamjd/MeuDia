@@ -13,6 +13,10 @@ export interface Transacao {
   banco: string | null;
   automatico: boolean;
   created_at: string;
+  /** Carteira de onde saiu/para onde entrou; `null` = legado (fora de qualquer saldo). */
+  carteira_id?: UUID | null;
+  /** Correção de saldo: entra no saldo, mas fica fora de renda/gasto/gráficos. */
+  ajuste?: boolean;
 }
 
 export interface TransacaoInsert {
@@ -23,6 +27,8 @@ export interface TransacaoInsert {
   data?: string;
   banco?: string | null;
   automatico?: boolean;
+  carteira_id?: UUID | null;
+  ajuste?: boolean;
 }
 
 export interface Assinatura {
@@ -110,8 +116,64 @@ export interface Renda {
   valor: number;
   dia_recebimento: number | null;
   ativo: boolean;
+  /** Onde o salário costuma cair (padrão do "Recebi"). */
+  carteira_id?: UUID | null;
   created_at: string | null;
   updated_at: string | null;
+}
+
+export type TipoCarteira = 'banco' | 'dinheiro' | 'poupanca';
+
+/** "Bancos e carteira": saldo informado (`saldo_inicial`) vale no instante `saldo_inicial_em`. */
+export interface Carteira {
+  id: UUID;
+  user_id: UUID;
+  nome: string;
+  tipo: TipoCarteira;
+  saldo_inicial: number;
+  saldo_inicial_em: string;
+  incluir_no_total: boolean;
+  arquivada: boolean;
+  ordem: number;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface CarteiraInsert {
+  nome: string;
+  tipo?: TipoCarteira;
+  saldo_inicial?: number;
+  incluir_no_total?: boolean;
+  ordem?: number;
+}
+
+export interface Transferencia {
+  id: UUID;
+  user_id: UUID;
+  origem_id: UUID;
+  destino_id: UUID;
+  valor: number;
+  data: string;
+  descricao: string | null;
+  created_at: string | null;
+}
+
+export interface TransferenciaInsert {
+  origem_id: UUID;
+  destino_id: UUID;
+  valor: number;
+  data: string;
+  descricao?: string | null;
+}
+
+export interface RecebimentoRenda {
+  id: UUID;
+  renda_id: UUID;
+  user_id: UUID;
+  competencia: Competencia;
+  recebido_em: string;
+  transacao_id: UUID | null;
+  created_at: string | null;
 }
 
 export interface OrcamentoCategoria {

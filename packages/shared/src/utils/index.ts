@@ -3,3 +3,4 @@ export { logger } from './logger';
 export * from './vencimentos';
 export * from './ocorrencia-conta';
 export * from './selo';
+export * from './saldo';
