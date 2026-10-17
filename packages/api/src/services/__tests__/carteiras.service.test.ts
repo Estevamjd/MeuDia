@@ -164,6 +164,20 @@ describe('painelSaldo', () => {
     expect(p.saldoHoje).toBe(0);
     expect(p.carteiraPadraoId).toBeNull();
     expect(transacoes.findComCarteiraDesde).not.toHaveBeenCalled();
-    expect(pagamentos.findByCompetencias).toHaveBeenCalledWith('u', expect.arrayContaining(['2025-10', '2026-09', '2026-10', '2026-11']));
+    // Sem âncora não há como saber o que já foi pago: só competências do mês corrente em diante.
+    expect(pagamentos.findByCompetencias).toHaveBeenCalledWith('u', ['2026-10', '2026-11']);
+  });
+  it('previsão parte da âncora mais antiga das carteiras ativas: conta antiga sem Paguei não é descontada de novo', async () => {
+    vi.mocked(carteiras.findAll).mockResolvedValue([
+      carteira(NU, 'Nubank', 1000),
+      carteira('arq', 'Antiga', 0, { arquivada: true, saldo_inicial_em: '2025-01-01T12:00:00Z' }),
+    ]);
+    vi.mocked(contas.findAll).mockResolvedValue([
+      { id: 'al', descricao: 'Aluguel', categoria: 'Moradia', valor: 500, recorrencia: 'mensal', dia_vencimento: 10, ativo: true, created_at: '2025-01-01T12:00:00Z' },
+    ] as never);
+    const p = await service.painelSaldo('u', HOJE);
+    expect(p.previsaoFim.itens.map((i) => i.competencia)).toEqual(['2026-10']);
+    expect(p.previsaoFim.valor).toBe(500);
+    expect(pagamentos.findByCompetencias).toHaveBeenCalledWith('u', ['2026-10']);
   });
 });

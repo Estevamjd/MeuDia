@@ -3,6 +3,7 @@ import {
   AppError,
   CATEGORIA_ENTRADA_EXTRA,
   alvosPrevisao,
+  ancoraPrevisao,
   competenciaDe,
   competenciasPrevisao,
   comecouMesCom,
@@ -156,8 +157,9 @@ export async function painelSaldo(userId: string, hojeISO = hojeSP()) {
   usuario(userId);
   const competencia = competenciaDe(hojeISO);
   const alvos = alvosPrevisao(hojeISO);
-  const periodo = competenciasPrevisao(hojeISO, alvos.seteDias);
   const carteiras = await carteirasRepository.findAll(userId);
+  const ancoraISO = ancoraPrevisao(carteiras);
+  const periodo = competenciasPrevisao(hojeISO, alvos.seteDias, ancoraISO);
   const desde = carteiras.map(dataAncora).sort()[0];
   const [transacoes, transferencias, rendas, recebimentos, contas, pagamentos] = await Promise.all([
     desde ? transacaoRepository.findComCarteiraDesde(userId, desde) : Promise.resolve([] as Transacao[]),
@@ -169,7 +171,7 @@ export async function painelSaldo(userId: string, hojeISO = hojeSP()) {
   ]);
   const saldos = saldosCarteiras(carteiras, transacoes, transferencias, hojeISO);
   const total = saldoHoje(carteiras, transacoes, transferencias, hojeISO);
-  const base = { hojeISO, saldoHoje: total, rendas, recebimentos, contas, pagamentos };
+  const base = { hojeISO, saldoHoje: total, ancoraISO, rendas, recebimentos, contas, pagamentos };
   const recebidas = new Set(recebimentos.filter((r) => r.competencia === competencia).map((r) => r.renda_id));
   const rendasAReceber: RendaAReceber[] = rendas
     .filter((r) => r.ativo && !recebidas.has(r.id))

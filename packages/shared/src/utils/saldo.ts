@@ -151,6 +151,8 @@ export interface EntradaPrevisao {
   hojeISO: string;
   alvoISO: string;
   saldoHoje: number;
+  /** Âncora mais antiga das carteiras ativas (`ancoraPrevisao`); `null` sem carteira ativa. */
+  ancoraISO: string | null;
   rendas: readonly Renda[];
   recebimentos: readonly Pick<RecebimentoRenda, 'renda_id' | 'competencia'>[];
   contas: readonly ContaPagar[];
@@ -167,27 +169,37 @@ export interface Previsao {
 /** Quantos meses antes do corrente a previsão ainda procura contas vencidas sem "Paguei". */
 export const MESES_CONTAS_VENCIDAS = 12;
 
+/** Data (SP) da âncora mais antiga entre as carteiras ativas: antes dela o saldo informado já reflete o que foi pago. */
+export function ancoraPrevisao(carteiras: readonly Pick<Carteira, 'saldo_inicial_em' | 'arquivada'>[]): string | null {
+  return carteiras.filter((c) => !c.arquivada).map(dataAncora).sort()[0] ?? null;
+}
+
 /**
  * Competências que a previsão lê: contas desde `MESES_CONTAS_VENCIDAS` meses atrás (dívida vencida
- * não some na virada do mês) e rendas só do mês corrente em diante (renda antiga não recebida não é dinheiro a entrar).
+ * não some na virada do mês), mas nunca antes da competência da âncora (conta paga antes de o usuário informar
+ * o saldo já está nele; sem âncora, só o mês corrente), e rendas só do mês corrente em diante (renda antiga não
+ * recebida não é dinheiro a entrar).
  */
-export function competenciasPrevisao(hojeISO: string, alvoISO: string): { contas: string[]; rendas: string[] } {
+export function competenciasPrevisao(hojeISO: string, alvoISO: string, ancoraISO: string | null): { contas: string[]; rendas: string[] } {
   const atual = competenciaDe(hojeISO);
   const fim = competenciaDe(alvoISO);
-  return { contas: competenciasEntre(competenciaDeslocada(atual, -MESES_CONTAS_VENCIDAS), fim), rendas: competenciasEntre(atual, fim) };
+  const limite = competenciaDeslocada(atual, -MESES_CONTAS_VENCIDAS);
+  const ancora = ancoraISO ? competenciaDe(ancoraISO) : atual;
+  const inicio = [limite, ancora < atual ? ancora : atual].sort().at(-1)!;
+  return { contas: competenciasEntre(inicio, fim), rendas: competenciasEntre(atual, fim) };
 }
 
 /**
  * R10: saldo de hoje + rendas ativas ainda não recebidas com dia ≤ alvo (do mês corrente até o do alvo)
  * − ocorrências de contas não pagas com vencimento ≤ alvo, inclusive as vencidas de até
- * `MESES_CONTAS_VENCIDAS` meses atrás (recorrentes nunca antes da criação da conta, como em pagar_conta).
+ * `MESES_CONTAS_VENCIDAS` meses atrás, nunca antes da competência da âncora nem (recorrentes) da criação da conta.
  * Limites de orçamento não entram.
  */
-export function previsao({ hojeISO, alvoISO, saldoHoje: hoje, rendas, recebimentos, contas, pagamentos }: EntradaPrevisao): Previsao {
+export function previsao({ hojeISO, alvoISO, saldoHoje: hoje, ancoraISO, rendas, recebimentos, contas, pagamentos }: EntradaPrevisao): Previsao {
   const recebidas = new Set(recebimentos.map((r) => `${r.renda_id}|${r.competencia}`));
   const pagas = new Set(pagamentos.map((p) => `${p.conta_id}|${p.competencia}`));
   const itens: ItemPrevisao[] = [];
-  const periodo = competenciasPrevisao(hojeISO, alvoISO);
+  const periodo = competenciasPrevisao(hojeISO, alvoISO, ancoraISO);
   for (const competencia of periodo.contas) {
     for (const conta of contas) {
       const ocorrencia = ocorrenciaDaConta(conta, competencia);
