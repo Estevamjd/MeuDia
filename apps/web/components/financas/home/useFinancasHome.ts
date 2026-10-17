@@ -175,8 +175,11 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
           recebiSheet: {
             renda: recebendo,
             carteiras: carteirasAtivas,
+            // Carteira da renda só se ainda estiver ativa (arquivada daria P0002 no receber_renda).
             carteiraPadrao:
-              (recebendo && painel.data?.rendasAReceber.find((x) => x.renda.id === recebendo.rendaId)?.renda.carteira_id) || carteiraPadrao,
+              carteirasAtivas.find(
+                (c) => recebendo && c.id === painel.data?.rendasAReceber.find((x) => x.renda.id === recebendo.rendaId)?.renda.carteira_id,
+              )?.id ?? carteiraPadrao,
             salvando: receber.isPending,
             onClose: () => setRecebendo(null),
             onConfirmar: (carteiraId) => {

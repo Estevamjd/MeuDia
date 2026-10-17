@@ -227,3 +227,20 @@ it.each([null, 'inexistente', 'segunda'])('Paguei usa sempre carteira ativa (pad
   home.onPagar({ contaId: 'c', competencia: '2026-10', descricao: 'Luz', valor: 10, vencimento: '2026-10-17', situacao: 'pendente' });
   expect(m.pagar).toHaveBeenCalledWith(expect.anything(), { carteira_id: padrao === 'segunda' ? 'segunda' : 'primeira' });
 });
+it.each([['arquivada', 'primeira'], ['segunda', 'segunda'], [null, 'primeira']])(
+  'Recebi abre com carteira ativa (carteira da renda %s → %s)', (daRenda, esperada) => {
+    preparar();
+    const item = { rendaId: 'r1', competencia: '2026-10', descricao: 'Salário', valor: 900, data: '2026-10-05' };
+    m.painel.data = {
+      carteiras: [{ carteira: { id: 'primeira', nome: 'Nubank' }, saldo: 100 }, { carteira: { id: 'segunda', nome: 'Caixa' }, saldo: 50 }],
+      carteiraPadraoId: 'primeira',
+      hojeISO: '2026-10-16', competencia: '2026-10', saldoHoje: 150, comecouMes: null,
+      arquivadas: [{ id: 'arquivada', nome: 'Antiga', arquivada: true }],
+      rendasAReceber: [{ renda: { id: 'r1', descricao: 'Salário', valor: 900, carteira_id: daRenda }, competencia: '2026-10', data: '2026-10-05' }],
+      transacoesCarteiras: [], transferencias: [],
+      previsao7: { itens: [], valor: 150 }, previsaoFim: { itens: [], valor: 150 },
+    };
+    const result = montar();
+    act(() => result.current.dashboard!.onRecebi(item as never));
+    expect(result.current.dashboard!.recebiSheet.carteiraPadrao).toBe(esperada);
+  });

@@ -28,20 +28,22 @@ export function RecebiSheet({ renda, carteiras, carteiraPadrao, salvando, onClos
 function Form({ renda, carteiras, padrao, salvando, onConfirmar }: {
   renda: RendaAReceberItem; carteiras: RecebiSheetProps['carteiras']; padrao: string | null; salvando: boolean; onConfirmar: (id: string | null) => void;
 }) {
-  const [carteira, setCarteira] = useState<string | null>(padrao ?? carteiras[0]?.id ?? null);
+  const [carteira, setCarteira] = useState<string | null>(padrao);
+  // Sempre uma carteira ativa quando existir: padrão fora da lista (ex.: arquivada) cai na primeira; sem nenhuma, null.
+  const escolhida = carteiras.find((c) => c.id === carteira)?.id ?? carteiras[0]?.id ?? null;
   return (
     <form
       className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
-        onConfirmar(carteira);
+        onConfirmar(escolhida);
       }}
     >
       <p className="text-[15px] text-muted">
         {renda.descricao}: <span className="font-semibold tabular-nums text-text">{formatBRL(renda.valor)}</span>
       </p>
       {carteiras.length > 0 ? (
-        <SeletorCarteira id="recebi-carteira" label="Caiu em" carteiras={carteiras} value={carteira} onChange={setCarteira} />
+        <SeletorCarteira id="recebi-carteira" label="Caiu em" carteiras={carteiras} value={escolhida} onChange={setCarteira} />
       ) : (
         <p className="text-[13px] text-muted">Sem banco cadastrado, o salário entra na renda do mês, mas não em um saldo.</p>
       )}
