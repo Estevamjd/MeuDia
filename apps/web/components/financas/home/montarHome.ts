@@ -11,6 +11,8 @@ import type { ContaProxima } from './ProximasContas';
 export interface ResumoHome {
   rendaPrevista: number;
   rendaReal: number;
+  /** R11: receitas lançadas + rendas fixas sem "Recebi" (ausente em resumos antigos). */
+  rendaDoMes?: number;
   gastoReal: number;
   gastoPrevisto: number;
   sobraPrevista: number;
@@ -51,6 +53,7 @@ const paraContaProxima = (oc: OcorrenciaConta): ContaProxima => ({
   valor: Number(oc.conta.valor),
   vencimento: oc.vencimento,
   situacao: oc.situacao,
+  categoria: oc.conta.categoria,
 });
 
 /** Dados dos hooks → props das seções da home (puro, sem React). */
@@ -69,7 +72,8 @@ export function montarHome({ competencia, hojeISO, resumo, ocorrencias, orcament
       sobraPrevista: resumo.sobraPrevista,
       selo: resumo.selo,
       gastoReal: resumo.gastoReal,
-      rendaBase: resumo.rendaReal || resumo.rendaPrevista,
+      // Mesma base da sobra (R11): a entrada extra soma, não substitui a renda fixa.
+      rendaBase: resumo.rendaDoMes ?? (resumo.rendaReal || resumo.rendaPrevista),
     },
     entradasSaidas: {
       rendaReal: resumo.rendaReal,

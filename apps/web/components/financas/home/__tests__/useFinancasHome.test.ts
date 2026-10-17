@@ -50,6 +50,8 @@ vi.mock('../../../../hooks', () => ({
   useRendas: () => q.rendas,
   usePushLembretes: () => m.push,
   useCriarRenda: () => m.criarRenda,
+  usePainelSaldo: () => ({ data: undefined, isLoading: false, isError: false }),
+  useReceberRenda: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false }),
 }));
 vi.mock('../../../ui', () => ({ useToast: () => m.toast }));
 vi.mock('../../usePagamentoAcoes', () => ({ usePagamentoAcoes: () => ({ pagarConta: vi.fn(), contaOcupada: null }) }));

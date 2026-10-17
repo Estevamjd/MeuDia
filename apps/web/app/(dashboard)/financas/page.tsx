@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import type { Transacao, TransacaoInsert } from '@meudia/shared';
 import { competenciaDe, hojeSP } from '@meudia/shared';
 
@@ -24,6 +24,7 @@ import { AgentBannerAuto } from '../../../components/agent';
 import { useAppMode } from '../../../components/AppModeProvider';
 import { FinancasHomeView } from '../../../components/financas/home/FinancasHomeView';
 import { useFinancasHome } from '../../../components/financas/home/useFinancasHome';
+import { LancamentoRapidoSheet } from '../../../components/financas/LancamentoRapidoSheet';
 import { deslocarCompetencia, rotuloCompetencia } from '../../../lib/financas-ui';
 
 export default function FinancasPage() {
@@ -48,6 +49,8 @@ export default function FinancasPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingTransacao, setEditingTransacao] = useState<Transacao | null>(null);
   const [deletingTransacao, setDeletingTransacao] = useState<Transacao | null>(null);
+  // Desktop: a BottomNav (com o "+") só existe no mobile.
+  const [acoesAbertas, setAcoesAbertas] = useState(false);
 
   // --- Form state ---
   const [formTipo, setFormTipo] = useState<'receita' | 'despesa'>('despesa');
@@ -228,6 +231,10 @@ export default function FinancasPage() {
       {/* Cabeçalho: título + seletor de mês compacto */}
       <div className="flex items-center justify-between gap-2">
         <h1 className="font-syne text-3xl font-bold text-text">Finanças</h1>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setAcoesAbertas(true)} className="hidden md:inline-flex">
+            <Plus size={16} aria-hidden="true" /> Lançar
+          </Button>
         <div className="flex items-center">
           <button
             onClick={mesAnterior}
@@ -247,7 +254,10 @@ export default function FinancasPage() {
             <ChevronRight size={18} />
           </button>
         </div>
+        </div>
       </div>
+
+      <LancamentoRapidoSheet open={acoesAbertas} onClose={() => setAcoesAbertas(false)} />
 
       {/* Agente IA (fala de todos os módulos; fora do modo Finanças) */}
       {mode !== 'financas' && <AgentBannerAuto />}

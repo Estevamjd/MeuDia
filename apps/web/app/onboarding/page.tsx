@@ -10,6 +10,9 @@ import { StepObjetivo } from './StepObjetivo';
 import { StepPerfil } from './StepPerfil';
 import { StepModulos } from './StepModulos';
 import { StepFinancas } from './StepFinancas';
+import { StepCarteiras, type CarteiraOnboarding } from './StepCarteiras';
+import { carteirasService } from '@meudia/api';
+import { montarCarteirasOnboarding } from '../../lib/onboarding';
 import { useAppMode } from '../../components/AppModeProvider';
 import { rotaInicial } from '../../lib/app-mode';
 import {
@@ -28,6 +31,8 @@ export interface OnboardingData {
   meta_peso: string;
   meta_calorias: number;
   modulos: string[];
+  /** Modo Finanças: "Onde fica seu dinheiro?" (linhas em branco são ignoradas). */
+  carteiras: CarteiraOnboarding[];
 }
 
 const defaultData: OnboardingData = {
@@ -38,6 +43,7 @@ const defaultData: OnboardingData = {
   meta_peso: '',
   meta_calorias: 2200,
   modulos: ['treinos', 'habitos', 'dieta', 'financas', 'agenda', 'medicamentos', 'assinaturas', 'compras', 'veiculo'],
+  carteiras: [{ nome: '', digitos: '' }],
 };
 
 export default function OnboardingPage() {
@@ -53,6 +59,8 @@ export default function OnboardingPage() {
   });
   const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // Índices já gravados: tentar de novo após uma falha não duplica bancos.
+  const [carteirasCriadas, setCarteirasCriadas] = useState<number[]>([]);
 
   // Quando o user carregar, preencher o nome
   useEffect(() => {
@@ -94,6 +102,24 @@ export default function OnboardingPage() {
       return;
     }
 
+    // "Onde fica seu dinheiro?": cria os bancos depois do perfil (carteiras.user_id → profiles).
+    if (modoFinancas && !pular) {
+      const criadas = [...carteirasCriadas];
+      try {
+        for (const { indice, carteira } of montarCarteirasOnboarding(data.carteiras)) {
+          if (criadas.includes(indice)) continue;
+          await carteirasService.criarCarteira(user.id, carteira);
+          criadas.push(indice);
+        }
+      } catch {
+        setCarteirasCriadas(criadas);
+        setSaving(false);
+        setErro('Não foi possível salvar seus bancos. Verifique sua conexão e tente novamente.');
+        return;
+      }
+      setCarteirasCriadas(criadas);
+    }
+
     // Atualiza o cache antes de navegar: o layout do dashboard lê ['profile', id].
     const key = profileKey(user.id);
     queryClient.setQueryData<Profile | null>(key, (old) => aplicarOnboardingNoCache(old, perfil));
@@ -121,7 +147,7 @@ export default function OnboardingPage() {
   }
 
   const steps = modoFinancas
-    ? [<StepFinancas key="fin" data={data} onChange={updateData} />]
+    ? [<StepFinancas key="fin" data={data} onChange={updateData} />, <StepCarteiras key="cart" data={data} onChange={updateData} />]
     : [
         <StepObjetivo key="obj" data={data} onChange={updateData} />,
         <StepPerfil key="perf" data={data} onChange={updateData} />,

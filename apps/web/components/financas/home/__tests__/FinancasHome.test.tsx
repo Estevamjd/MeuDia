@@ -375,7 +375,7 @@ describe('montarHome', () => {
 describe('FinancasHomeView', () => {
   it('com dados: todas as seções, sem "real / previsto" nem "igual ao mês anterior"', () => {
     render(<FinancasHomeView {...viewProps()} />);
-    for (const titulo of ['Sobra do mês', 'Entrou', 'Saiu', 'Próximas contas', 'Orçamento', 'Renda comprometida', 'Últimos lançamentos']) {
+    for (const titulo of ['Sobra do mês', 'Entrou', 'Saiu', 'Contas a vencer', 'Orçamento', 'Renda comprometida', 'Últimos lançamentos']) {
       expect(texto()).toContain(titulo);
     }
     expect(screen.getByRole('alert').textContent).toContain('2 contas pedem atenção');
@@ -413,7 +413,7 @@ describe('FinancasHomeView', () => {
     expect(props.secoes?.vazio).toBe(true);
     expect(texto()).toContain('Vamos montar seu mês');
     expect(texto()).not.toContain('R$');
-    expect(texto()).not.toMatch(/Sobra do mês|Próximas contas|Últimos lançamentos|Renda comprometida/);
+    expect(texto()).not.toMatch(/Sobra do mês|Contas a vencer|Últimos lançamentos|Renda comprometida/);
     expect(texto()).toContain('Passo 1 de 2');
     fireEvent.click(screen.getByRole('button', { name: 'Cadastrar minha renda' }));
     expect(onCadastrarRenda).toHaveBeenCalled();

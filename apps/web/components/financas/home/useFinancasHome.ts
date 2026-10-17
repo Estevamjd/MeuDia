@@ -6,6 +6,8 @@ import {
   useContas,
   useContasMes,
   useCriarRenda,
+  usePainelSaldo,
+  useReceberRenda,
   useOrcamento,
   usePushLembretes,
   useRendas,
@@ -18,6 +20,9 @@ import { usePagamentoAcoes } from '../usePagamentoAcoes';
 import { AVISO_LEMBRETES_DISPENSADO_KEY, mostrarAvisoLembretes } from './AvisoLembretes';
 import type { FinancasHomeViewProps } from './FinancasHomeView';
 import { montarHome } from './montarHome';
+import { montarDashboard } from './montarDashboard';
+import type { RendaAReceberItem } from './CardRendaAReceber';
+import { lerEsconderValores, salvarEsconderValores } from '../../../lib/carteiras-ui';
 
 const RENDA_PADRAO = 'Renda principal';
 
@@ -48,6 +53,11 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
   const push = usePushLembretes();
   const criarRenda = useCriarRenda();
   const { pagarConta, contaOcupada } = usePagamentoAcoes();
+  const painel = usePainelSaldo(hojeISO);
+  const receber = useReceberRenda();
+  const [recebendo, setRecebendo] = useState<RendaAReceberItem | null>(null);
+  const [escondido, setEscondido] = useState(false);
+  useEffect(() => setEscondido(lerEsconderValores()), []);
   const [expandido, setExpandido] = useState(false);
   const [rendaAberta, setRendaAberta] = useState(false);
   // Começa dispensado até ler o localStorage (no cliente): evita piscar o aviso.
@@ -68,6 +78,13 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
         : null,
     [competencia, hojeISO, resumo.data, contas.data, orcamento.data, transacoes.data],
   );
+
+  const dados = useMemo(
+    () => (painel.data ? montarDashboard(competencia, hojeISO, painel.data, transacoes.data ?? []) : null),
+    [competencia, hojeISO, painel.data, transacoes.data],
+  );
+  const carteirasAtivas = painel.data?.carteiras.map((s) => s.carteira) ?? [];
+  const carteiraPadrao = painel.data?.carteiraPadraoId ?? null;
 
   // Falha em qualquer consulta que alimenta as seções, o onboarding ou o aviso vira erro (nada de lista vazia silenciosa).
   const consultas = [resumo, contas, orcamento, transacoes, rendas, contasCadastradas];
@@ -129,7 +146,46 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
         ),
     },
     contaOcupada,
-    onPagar: (c) => pagarConta({ contaId: c.contaId, competencia: c.competencia, descricao: c.descricao }),
+    // "Paguei" em 1 toque: debita do último banco usado (ou do primeiro), se houver.
+    onPagar: (c) =>
+      pagarConta({ contaId: c.contaId, competencia: c.competencia, descricao: c.descricao }, carteiraPadrao ? { carteira_id: carteiraPadrao } : {}),
+    // Painel indisponível (ex.: carregando ou falha): a home segue com o resumo do mês.
+    dashboard: dados
+      ? {
+          ...dados,
+          escondido,
+          onAlternarOlho: () =>
+            setEscondido((v) => {
+              salvarEsconderValores(!v);
+              return !v;
+            }),
+          onRecebi: (r) => {
+            receber.reset();
+            setRecebendo(r);
+          },
+          recebiSheet: {
+            renda: recebendo,
+            carteiras: carteirasAtivas,
+            carteiraPadrao:
+              (recebendo && painel.data?.rendasAReceber.find((x) => x.renda.id === recebendo.rendaId)?.renda.carteira_id) || carteiraPadrao,
+            salvando: receber.isPending,
+            onClose: () => setRecebendo(null),
+            onConfirmar: (carteiraId) => {
+              if (!recebendo) return;
+              receber.mutate(
+                { rendaId: recebendo.rendaId, competencia: recebendo.competencia, carteira_id: carteiraId },
+                {
+                  onSuccess: () => {
+                    toast.success(`Recebido: ${recebendo.descricao}`);
+                    setRecebendo(null);
+                  },
+                  onError: () => toast.error('Não foi possível registrar o recebimento. Tente de novo.'),
+                },
+              );
+            },
+          },
+        }
+      : null,
     lancamentos: {
       ...acoes,
       carregando: transacoes.isLoading,

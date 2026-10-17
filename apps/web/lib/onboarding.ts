@@ -77,3 +77,16 @@ export function aplicarOnboardingNoCache(
 
 export const MENSAGEM_ERRO_ONBOARDING =
   'Não foi possível salvar. Verifique sua conexão e tente novamente.';
+
+/** Linhas do passo "Onde fica seu dinheiro?" → carteiras a criar (sem nome = ignorada). */
+export function montarCarteirasOnboarding(
+  linhas: readonly { nome: string; digitos: string }[],
+): { indice: number; carteira: { nome: string; tipo: 'banco' | 'dinheiro' | 'poupanca'; saldo_inicial: number; ordem: number } }[] {
+  return linhas.flatMap((l, indice) => {
+    const nome = l.nome.trim().slice(0, 60);
+    if (!nome) return [];
+    const digitos = l.digitos.replace(/\D/g, '');
+    const tipo = /carteira|dinheiro|esp[eé]cie/i.test(nome) ? 'dinheiro' : /poupan[cç]a/i.test(nome) ? 'poupanca' : 'banco';
+    return [{ indice, carteira: { nome, tipo, saldo_inicial: digitos ? Number(digitos) / 100 : 0, ordem: indice } }];
+  });
+}
