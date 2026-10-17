@@ -253,7 +253,8 @@ export default function InicioPage() {
           <div className="stitle">📊 Gastos por Categoria</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 4 }}>
             {(() => {
-              const despesasList = transacoesMes?.filter((t) => t.tipo === 'despesa') ?? [];
+              // Ajuste de saldo (Corrigir saldo) não é gasto: fica fora, como no resumo e nas dicas do agente.
+              const despesasList = transacoesMes?.filter((t) => t.tipo === 'despesa' && !t.ajuste) ?? [];
               if (despesasList.length === 0) {
                 return (
                   <p style={{ fontSize: 13, color: 'var(--muted)', padding: '12px 0' }}>
