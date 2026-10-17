@@ -206,8 +206,12 @@ function publicUser(u) {
   return rest;
 }
 function newSession(u, sessionId = crypto.randomUUID()) {
-  const iat = agoraSeg();
-  const exp = iat + ACCESS_TTL;
+  // Sessão válida nos dois relógios: o do teste (page.clock/__mock/clock, ex.: 17/10/2026 15:00Z) e o real do
+  // `next start`. Só com o relógio do mock, rodar o E2E mais de 1h depois do instante fixado fazia o middleware
+  // ver o token vencido, girar o refresh token e derrubar a sessão do navegador ("Refresh Token Not Found").
+  const real = Math.floor(Date.now() / 1000);
+  const iat = Math.min(agoraSeg(), real);
+  const exp = Math.max(agoraSeg(), real) + ACCESS_TTL;
   const access_token = signJwt({
     aud: 'authenticated', exp, iat, iss: `http://127.0.0.1:${PORT}/auth/v1`, sub: u.id, email: u.email,
     phone: '', app_metadata: u.app_metadata, user_metadata: u.user_metadata, role: 'authenticated',
@@ -216,7 +220,7 @@ function newSession(u, sessionId = crypto.randomUUID()) {
   const refresh_token = crypto.randomBytes(16).toString('hex');
   refreshTokens.set(refresh_token, { userId: u.id, sessionId, revoked: false });
   u.last_sign_in_at = nowIso();
-  return { access_token, token_type: 'bearer', expires_in: ACCESS_TTL, expires_at: exp, refresh_token, user: publicUser(u) };
+  return { access_token, token_type: 'bearer', expires_in: exp - agoraSeg(), expires_at: exp, refresh_token, user: publicUser(u) };
 }
 const authErr = (status, error_code, msg) => ({ status, body: { code: status, error_code, msg } });
 
