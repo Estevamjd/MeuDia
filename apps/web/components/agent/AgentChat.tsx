@@ -47,7 +47,7 @@ export function AgentChat({
   return (
     <div className="flex h-full flex-col">
       {/* Mensagens */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-4 py-3 space-y-3">
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 size={20} className="animate-spin text-muted" />

@@ -41,7 +41,7 @@ function BottomNavFinancas({ onOpenChat, chatAberto }: BottomNavProps) {
     <LancamentoRapidoSheet open={acoesAbertas} onClose={() => setAcoesAbertas(false)} />
     <nav
       aria-label="Navegação principal"
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-card/95 backdrop-blur-xl md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-nav border-t border-white/10 bg-card/95 backdrop-blur-xl md:hidden"
       style={{
         paddingBottom: 'env(safe-area-inset-bottom)',
         paddingLeft: 'env(safe-area-inset-left)',
@@ -118,7 +118,7 @@ function BottomNavPadrao() {
       {/* Overlay do menu Mais */}
       {maisAberto && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-modal bg-black/50 backdrop-blur-sm md:hidden"
           onClick={() => setMaisAberto(false)}
         />
       )}
@@ -126,7 +126,7 @@ function BottomNavPadrao() {
       {/* Menu Mais expandido */}
       {maisAberto && (
         <div
-          className="fixed bottom-16 left-0 right-0 z-50 mx-4 mb-2 rounded-2xl border border-white/10 bg-card p-3 shadow-2xl md:hidden"
+          className="fixed bottom-16 left-0 right-0 z-modal mx-4 mb-2 rounded-2xl border border-white/10 bg-card p-3 shadow-2xl md:hidden"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           <div className="grid grid-cols-3 gap-2">
@@ -151,7 +151,7 @@ function BottomNavPadrao() {
 
       {/* Bottom Navigation Bar */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-card/95 backdrop-blur-xl md:hidden"
+        className="fixed bottom-0 left-0 right-0 z-nav border-t border-white/10 bg-card/95 backdrop-blur-xl md:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="flex items-center justify-around px-2 py-1">

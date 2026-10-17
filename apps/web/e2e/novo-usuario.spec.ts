@@ -258,7 +258,7 @@ test('novo usuário: cadastro → onboarding → finanças → logout → login'
   }).toBeGreaterThan(0);
   await expect(entrada).toBeEnabled();
   await shot('chat-resposta');
-  await painel.getByRole('button', { name: 'Fechar painel' }).click();
+  await painel.getByRole('button', { name: 'Fechar assistente' }).click();
   await expect(painel).toBeHidden();
 
   // ── 9. Drawer: abrir e visitar cada item ───────────────────────────────────

@@ -23,6 +23,7 @@ Todo bug corrigido ganha um teste ou checagem que falha sem a correção. Prove 
 | Modal não rouba foco ao digitar | `onClose` em ref em `components/ui/Modal.tsx` + `Modal.test.tsx`, `ContasPage.test.tsx` |
 | Banner de instalação não cobre a barra inferior | `e2e/novo-usuario.spec.ts` (compara as caixas do banner e da BottomNav) |
 | Modais e drawer ficam acima da barra inferior e do banner | portal no `body` em `Modal.tsx`/`NavDrawer.tsx` + clique em Salvar com banner visível em `e2e/novo-usuario.spec.ts` |
+| z-index vem de uma escala só; assistente fica acima de BottomNav, banner, header e modais, com X tocável no iPhone | `lib/camadas.ts` (classes `z-<camada>` do Tailwind) + `lib/__tests__/camadas.test.ts` (barra `z-40`/`z-[60]` solto em fixed/sticky) + portal e bottom sheet em `AgentPanel.tsx` + `AgentPanel.test.tsx` + `e2e/assistente.spec.ts` (X no viewport, não coberto, ≥ 44px) |
 | SW não recarrega a página na 1ª instalação | Parcial. `e2e/novo-usuario.spec.ts` digita com checagem de foco, mas não há teste dedicado da 1ª instalação do SW |
 | Termos e privacidade abrem logado | `lib/__tests__/supabase-middleware.test.ts` |
 | Versão do pnpm tem uma fonte só (`packageManager`) | Workflow sem `version:` no `pnpm/action-setup`; com duas fontes o CI quebra com "Multiple versions of pnpm specified" |

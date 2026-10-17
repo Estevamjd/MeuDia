@@ -83,12 +83,12 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
 
   if (!isOpen || !montado) return null;
 
-  // Portal: o layout do dashboard cria stacking context (z-10); dentro dele o z-50 do modal
+  // Portal: o layout do dashboard cria stacking context (z-10); dentro dele o z-modal
   // ficava abaixo da BottomNav e do InstallPrompt (fixos na raiz), que cobriam campos e botões.
   return createPortal(
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-modal flex items-center justify-center p-4"
       onClick={(e) => e.target === overlayRef.current && onClose()}
       role="dialog"
       aria-modal="true"

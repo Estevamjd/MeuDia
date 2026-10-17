@@ -42,6 +42,17 @@
   ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
 }
 
+@layer components {
+  /* Bottom sheet do assistente (AgentPanel): nunca cobre o topo (status bar/notch + 56px de backdrop tocável).
+     vh antes de dvh: fallback para iOS < 15.4. No md+ vira painel lateral (md:h-auto/md:max-h-none). */
+  .agente-sheet {
+    height: calc(100vh - env(safe-area-inset-top) - 56px);
+    height: calc(100dvh - env(safe-area-inset-top) - 56px);
+    max-height: calc(100vh - env(safe-area-inset-top) - 56px);
+    max-height: calc(100dvh - env(safe-area-inset-top) - 56px);
+  }
+}
+
 @layer utilities {
   .glow-accent  { box-shadow: 0 0 20px rgba(124,106,255,0.3); }
   .glow-orange  { box-shadow: 0 0 20px rgba(255,159,74,0.3); }

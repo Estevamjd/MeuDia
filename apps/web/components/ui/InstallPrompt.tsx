@@ -20,10 +20,10 @@ function detectPlatform(): Platform {
   return 'desktop';
 }
 
-// z-30: abaixo da BottomNav/AgentPanel (z-40) e dos modais (z-50), que não podem ficar cobertos.
+// z-banner (lib/camadas.ts): abaixo da BottomNav, dos modais e do assistente, que não podem ficar cobertos.
 // No mobile sobe acima da BottomNav (fixa no rodapé).
 const CONTAINER =
-  'fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-4 right-4 z-30 md:bottom-4 md:left-auto md:right-6';
+  'fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-4 right-4 z-banner md:bottom-4 md:left-auto md:right-6';
 
 function isStandalone(): boolean {
   if (typeof window === 'undefined') return false;

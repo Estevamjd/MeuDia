@@ -1,4 +1,5 @@
 import type { Config } from 'tailwindcss';
+import { zIndexTailwind } from './lib/camadas';
 
 const config: Config = {
   content: [
@@ -30,6 +31,8 @@ const config: Config = {
       borderRadius: {
         card: '16px',
       },
+      // Escala única de camadas (lib/camadas.ts): z-header, z-banner, z-nav, z-modal, z-agente, z-toast, z-sobreposicao.
+      zIndex: zIndexTailwind,
       keyframes: {
         fadeSlide: {
           '0%': { opacity: '0', transform: 'translateY(10px)' },
@@ -38,6 +41,10 @@ const config: Config = {
         slideIn: {
           '0%': { transform: 'translateX(100%)' },
           '100%': { transform: 'translateX(0)' },
+        },
+        slideUp: {
+          '0%': { transform: 'translateY(100%)' },
+          '100%': { transform: 'translateY(0)' },
         },
         slideOut: {
           '0%': { transform: 'translateX(0)' },
@@ -48,6 +55,7 @@ const config: Config = {
         fadeSlide: 'fadeSlide 0.35s ease',
         slideIn: 'slideIn 0.3s ease',
         slideOut: 'slideOut 0.3s ease',
+        slideUp: 'slideUp 0.3s ease',
       },
     },
   },

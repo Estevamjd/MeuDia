@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type PointerEvent as ReactPointerEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
 import { X, Bot, Bell, LayoutDashboard, CheckCheck } from 'lucide-react';
@@ -23,6 +24,7 @@ import {
 import { useAuth } from '../../hooks/useAuth';
 import { useProfile, useTreinos, useSessoesSemana, useHabitos, useRegistrosHoje, useResumoMensal } from '../../hooks';
 import { useCriarCompromisso } from '../../hooks/useAgenda';
+import { useTravaScroll } from '../../hooks/useTravaScroll';
 import { useAppMode } from '../AppModeProvider';
 import {
   abaInicialAgente,
@@ -37,6 +39,9 @@ import { AgentChat } from './AgentChat';
 import { NotificacaoItem } from './NotificacaoItem';
 
 type Tab = AbaAgente;
+
+/** Arrastar o topo do sheet mais que isso para baixo fecha o painel (px). */
+export const LIMIAR_ARRASTE_FECHAR = 80;
 
 interface AgentPanelProps {
   isOpen: boolean;
@@ -79,19 +84,56 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
     onCloseRef.current = onClose;
   }, [onClose]);
 
-  // ESC para fechar
+  // Portal só no cliente (após montar): sem `document` no SSR.
+  const [montado, setMontado] = useState(false);
+  useEffect(() => setMontado(true), []);
+
+  const painelRef = useRef<HTMLDivElement>(null);
+  useTravaScroll(isOpen);
+
+  // Esc fecha; foco vai para o painel ao abrir e volta para o gatilho (ex.: "Chat" da BottomNav) ao fechar.
+  // Só depende de `isOpen`: não re-roda a cada render (não rouba o foco de quem está digitando no chat).
   useEffect(() => {
     if (!isOpen) return;
+    const gatilho = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCloseRef.current();
     };
     document.addEventListener('keydown', handler);
-    document.body.style.overflow = 'hidden';
+    const timer = setTimeout(() => {
+      if (!painelRef.current?.contains(document.activeElement)) painelRef.current?.focus();
+    }, 0);
     return () => {
       document.removeEventListener('keydown', handler);
-      document.body.style.overflow = '';
+      clearTimeout(timer);
+      if (gatilho?.isConnected) gatilho.focus();
     };
   }, [isOpen]);
+
+  // Arrastar para baixo pelo topo do sheet (alça + cabeçalho). Só toque/caneta e fora de botões;
+  // o conteúdo rolável não tem esses handlers, então o scroll interno segue normal.
+  const [arraste, setArraste] = useState(0);
+  const inicioArraste = useRef<number | null>(null);
+  const iniciarArraste = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse' || (e.target as HTMLElement).closest('button')) return;
+    inicioArraste.current = e.clientY;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // Ponteiro sintético/inválido: segue sem captura.
+    }
+  };
+  const moverArraste = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (inicioArraste.current === null) return;
+    setArraste(Math.max(0, e.clientY - inicioArraste.current));
+  };
+  const terminarArraste = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (inicioArraste.current === null) return;
+    const dy = e.clientY - inicioArraste.current;
+    inicioArraste.current = null;
+    setArraste(0);
+    if (e.type === 'pointerup' && dy > LIMIAR_ARRASTE_FECHAR) onCloseRef.current();
+  };
 
   // Contexto do usuário
   const contexto: ContextoUsuario = useMemo(() => {
@@ -226,7 +268,7 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
   // Modo Finanças: o contador do servidor inclui módulos ocultos; conta só as visíveis.
   const naoLidas = mode === 'padrao' ? (countNaoLidas ?? 0) : notificacoesModo.filter((n) => !n.lida).length;
 
-  if (!isOpen) return null;
+  if (!isOpen || !montado) return null;
 
   const todasTabs: { id: Tab; label: string; icon: typeof LayoutDashboard; badge?: number }[] = [
     { id: 'resumo', label: 'Resumo', icon: LayoutDashboard },
@@ -235,44 +277,71 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
   ];
   const tabs = todasTabs.filter((tab) => abasAgente(mode).includes(tab.id));
 
-  return (
-    <>
-      {/* Backdrop */}
+  // Portal no body + camada `z-agente` (lib/camadas.ts): acima de Topbar, banner de instalação, BottomNav
+  // e modais. No mobile é um bottom sheet que nunca cobre o topo (`.agente-sheet` em globals.css):
+  // o X fica sempre visível e a faixa de cima do backdrop continua tocável para fechar.
+  return createPortal(
+    <div className="fixed inset-0 z-agente">
       <div
-        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
+        data-testid="agente-backdrop"
       />
 
-      {/* Panel */}
       <div
+        ref={painelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="agent-panel-titulo"
-        className="fixed right-0 top-0 z-40 flex h-screen w-full max-w-[380px] flex-col border-l border-border bg-surface animate-[slideIn_0.3s_ease]"
+        tabIndex={-1}
+        className={clsx(
+          'agente-sheet absolute inset-x-0 bottom-0 flex flex-col overflow-hidden rounded-t-2xl border-t border-border bg-surface shadow-2xl outline-none',
+          'md:inset-x-auto md:inset-y-0 md:right-0 md:h-auto md:max-h-none md:w-[380px] md:rounded-none md:border-l md:border-t-0',
+          'animate-slideUp md:animate-slideIn',
+          // Durante o arraste o sheet segue o dedo; ao soltar sem fechar, volta com transição.
+          arraste === 0 && 'transition-transform duration-200',
+        )}
+        style={{
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          transform: arraste > 0 ? `translateY(${arraste}px)` : undefined,
+        }}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent2">
-              <Bot size={16} className="text-white" />
-            </div>
-            <div>
-              <h2 id="agent-panel-titulo" className="text-sm font-semibold text-text">Agente MeuDia</h2>
-              <p className="text-[11px] text-muted">{obterSaudacao(now.getHours())}</p>
-            </div>
+        {/* Topo fixo: alça de arrastar + cabeçalho com o X */}
+        <div
+          className="shrink-0 touch-none select-none"
+          onPointerDown={iniciarArraste}
+          onPointerMove={moverArraste}
+          onPointerUp={terminarArraste}
+          onPointerCancel={terminarArraste}
+          data-testid="agente-alca"
+        >
+          <div className="flex justify-center pb-1 pt-2 md:hidden" aria-hidden="true">
+            <span className="h-1.5 w-10 rounded-full bg-white/20" />
           </div>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-muted transition-colors hover:bg-card2 hover:text-text"
-            aria-label="Fechar painel"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center justify-between border-b border-border py-1 pl-4 pr-2 md:py-2">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent2">
+                <Bot size={16} className="text-white" />
+              </div>
+              <div>
+                <h2 id="agent-panel-titulo" className="text-sm font-semibold text-text">Agente MeuDia</h2>
+                <p className="text-[11px] text-muted">{obterSaudacao(now.getHours())}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-11 w-11 items-center justify-center rounded-lg text-muted transition-colors hover:bg-card2 hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+              aria-label="Fechar assistente"
+            >
+              <X size={20} aria-hidden="true" />
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-border">
+        <div className="flex shrink-0 border-b border-border">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -298,8 +367,8 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
           })}
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-hidden">
+        {/* Conteúdo: só ele rola (cada aba tem o próprio overflow-y-auto) */}
+        <div className="min-h-0 flex-1 overflow-hidden">
           {activeTab === 'resumo' && (
             <ResumoTab resumo={resumo} onAcao={handleAcao} />
           )}
@@ -334,7 +403,8 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
           )}
         </div>
       </div>
-    </>
+    </div>,
+    document.body,
   );
 }
 
@@ -356,7 +426,7 @@ function ResumoTab({
   };
 
   return (
-    <div className="h-full overflow-y-auto px-4 py-4 space-y-4">
+    <div className="h-full overflow-y-auto overscroll-contain px-4 py-4 space-y-4">
       {/* Saudação */}
       <div>
         <p className="font-syne text-base font-bold text-text">{resumo.saudacao}</p>
@@ -432,7 +502,7 @@ function AlertasTab({
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full overflow-y-auto overscroll-contain">
       {/* Header com marcar todas */}
       {countNaoLidas > 0 && (
         <div className="flex items-center justify-between px-4 py-2 border-b border-border">
