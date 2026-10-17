@@ -34,7 +34,6 @@ export default function FinancasPage() {
   const listaCarteiras = useCarteiras();
   const carteiras = useMemo(() => (listaCarteiras.data ?? []).filter((c) => !c.arquivada), [listaCarteiras.data]);
   const [formCarteira, setFormCarteira] = useState<string | null>(null);
-  const carteiraId = carteiras.find((c) => c.id === formCarteira)?.id ?? carteiras[0]?.id;
 
   const mode = useAppMode();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -56,6 +55,11 @@ export default function FinancasPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingTransacao, setEditingTransacao] = useState<Transacao | null>(null);
   const [deletingTransacao, setDeletingTransacao] = useState<Transacao | null>(null);
+  // Novo: carteira escolhida ou a primeira ativa. Edição: exatamente a do lançamento (NULL em lançamento antigo =
+  // "Sem carteira"); nunca cai na primeira carteira por conta própria.
+  const carteiraId = editingTransacao
+    ? formCarteira
+    : carteiras.find((c) => c.id === formCarteira)?.id ?? carteiras[0]?.id ?? null;
   // Desktop: a BottomNav (com o "+") só existe no mobile.
   const [acoesAbertas, setAcoesAbertas] = useState(false);
 
@@ -111,7 +115,7 @@ export default function FinancasPage() {
         descricao: formDescricao,
         valor: parseFloat(formValor),
         data: formData,
-        carteira_id: carteiraId,
+        carteira_id: carteiraId ?? undefined,
         banco: carteiras.find((c) => c.id === carteiraId)?.nome ?? (formBanco || undefined),
       };
       criarTransacao.mutate(payload, {
@@ -138,9 +142,15 @@ export default function FinancasPage() {
         descricao: formDescricao,
         valor: parseFloat(formValor),
         data: formData,
-        carteira_id: carteiraId,
-        banco: carteiras.find((c) => c.id === carteiraId)?.nome ?? (formBanco || undefined),
       };
+      if (carteiras.length === 0) {
+        // Sem carteiras (ou consulta falhou): só o campo texto do banco está na tela.
+        if (formBanco) payload.banco = formBanco;
+      } else if (carteiraId !== (editingTransacao.carteira_id ?? null)) {
+        // Só quando o usuário trocou: senão carteira_id e o banco digitado (ex.: "Itaú") ficam como estavam.
+        payload.carteira_id = carteiraId;
+        payload.banco = carteiras.find((c) => c.id === carteiraId)?.nome ?? null;
+      }
       atualizarTransacao.mutate(
         { id: editingTransacao.id, data: payload },
         {
@@ -213,7 +223,12 @@ export default function FinancasPage() {
         value={formData}
         onChange={(e) => setFormData(e.target.value)}
       />
-      {carteiras.length > 0 ? <SeletorCarteira id="lancamento-carteira" label="Banco ou carteira" carteiras={carteiras} value={carteiraId ?? null} onChange={setFormCarteira} /> : <Input
+      {carteiras.length > 0 ? (
+        <SeletorCarteira
+          id="lancamento-carteira" label="Banco ou carteira" carteiras={carteiras} value={carteiraId} onChange={setFormCarteira}
+          onSemCarteira={editingTransacao && !editingTransacao.carteira_id ? () => setFormCarteira(null) : undefined}
+        />
+      ) : <Input
         label="Banco (opcional)"
         placeholder="Ex.: Nubank, Itaú…"
         value={formBanco}
@@ -230,7 +245,8 @@ export default function FinancasPage() {
         >
           Cancelar
         </Button>
-        <Button type="submit" disabled={!listaCarteiras.isSuccess} isLoading={isSubmitting}>
+        {/* Espera só enquanto carrega; se a consulta falhar, o lançamento segue pelo campo texto do banco. */}
+        <Button type="submit" disabled={listaCarteiras.isPending} isLoading={isSubmitting}>
           Salvar
         </Button>
       </div>
