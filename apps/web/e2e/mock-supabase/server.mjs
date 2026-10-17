@@ -569,6 +569,14 @@ function handleRest(req, res, url, body) {
     return finalize(req, res, table, affected, url, 201);
   }
 
+  // 006: lançamento vinculado a Recebi/Paguei só muda pelas RPCs desfazer_* (trigger 55000); carteira não se apaga.
+  const vinculada = (t) => rowsOf('recebimentos_renda').some((r) => r.transacao_id === t.id)
+    || rowsOf('pagamentos_conta').some((p) => p.transacao_id === t.id);
+  if (table === 'transacoes' && (req.method === 'PATCH' || req.method === 'DELETE') && matching().some(vinculada)) {
+    throw new PgError(400, '55000', 'Lançamento vinculado a Recebi/Paguei não pode ser alterado');
+  }
+  if (table === 'carteiras' && req.method === 'DELETE') throw new PgError(403, '42501', 'permission denied for table carteiras');
+
   if (req.method === 'PATCH') {
     const rows = matching();
     const patch = body ?? {};
@@ -660,8 +668,12 @@ function handleRpc(req, res, fn, args = {}, uid) {
     if (rowsOf('recebimentos_renda').some((r) => r.renda_id === renda.id && r.competencia === comp && r.user_id === uid)) {
       throw new PgError(400, 'P0003', 'Competência já recebida', { hint: 'Exige competência sem recebimento.' });
     }
-    const carteiraId = args.p_carteira_id ?? renda.carteira_id ?? null;
-    const carteira = carteiraId ? carteiraAtivaDe(uid, carteiraId) : null;
+    // Carteira padrão arquivada: primeira ativa (ordem, criação, id) ou nenhuma; explícita arquivada é P0002.
+    const ativaDoUsuario = (id) => rowsOf('carteiras').find((c) => c.id === id && c.user_id === uid && !c.arquivada);
+    const primeiraAtiva = () => rowsOf('carteiras').filter((c) => c.user_id === uid && !c.arquivada)
+      .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0) || String(a.created_at).localeCompare(String(b.created_at)) || a.id.localeCompare(b.id))[0] ?? null;
+    const carteira = args.p_carteira_id ? carteiraAtivaDe(uid, args.p_carteira_id)
+      : renda.carteira_id ? ativaDoUsuario(renda.carteira_id) ?? primeiraAtiva() : null;
     const recebidoEm = args.p_recebido_em ?? hojeSP();
     const transacao = {
       id: crypto.randomUUID(), ...DEFAULTS.transacoes(), user_id: uid, tipo: 'receita', categoria: 'Salário',

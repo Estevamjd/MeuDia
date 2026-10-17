@@ -8,6 +8,7 @@ export function corrigirSaldo({ uid, args, rowsOf, carteiraAtivaDe, PgError, hoj
     const anterior = rowsOf('transacoes').find((t) => t.user_id === uid && t.chave_ajuste === chave);
     if (anterior) {
       if (anterior.carteira_id !== id) throw new PgError(400, '22023', 'Chave já usada em outra carteira');
+      if (Number(anterior.ajuste_valor_real) !== real) throw new PgError(400, '22023', 'Chave já usada com outro valor');
       return [anterior];
     }
     const diaAncora = new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo' }).format(new Date(carteira.saldo_inicial_em));
@@ -17,7 +18,8 @@ export function corrigirSaldo({ uid, args, rowsOf, carteiraAtivaDe, PgError, hoj
       + rowsOf('transferencias').filter((t) => (t.origem_id === id || t.destino_id === id) && posterior(t)).reduce((v, t) => v + (t.destino_id === id ? 1 : -1) * Number(t.valor), 0);
     const diferenca = Math.round((real - saldo) * 100) / 100;
     if (!diferenca) return [];
-    const ajuste = { id: crypto.randomUUID(), ...defaults(), user_id: uid, carteira_id: id, banco: carteira.nome, tipo: diferenca > 0 ? 'receita' : 'despesa', categoria: 'Ajuste de saldo', descricao: 'Correção de saldo', valor: Math.abs(diferenca), data: hojeSP(), ajuste: true, chave_ajuste: chave };
+    if (Math.abs(diferenca) > 99999999.99) throw new PgError(400, '22023', 'Diferença grande demais para um ajuste');
+    const ajuste = { id: crypto.randomUUID(), ...defaults(), user_id: uid, carteira_id: id, banco: carteira.nome, tipo: diferenca > 0 ? 'receita' : 'despesa', categoria: 'Ajuste de saldo', descricao: 'Correção de saldo', valor: Math.abs(diferenca), data: hojeSP(), ajuste: true, chave_ajuste: chave, ajuste_valor_real: real };
     rowsOf('transacoes').push(ajuste);
     return [ajuste];
 }

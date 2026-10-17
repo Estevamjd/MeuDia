@@ -37,3 +37,10 @@ it('não cria ajuste sem diferença e rejeita valor/chave inválidos', () => {
   expect(() => executar(20, '')).toThrow();
   expect(tabelas.transacoes).toHaveLength(1);
 });
+it('chave repetida com outro valor e diferença acima de DECIMAL(10,2) são 22023 (como na 006)', () => {
+  const { tabelas, executar } = preparar();
+  executar(80, 'k');
+  expect(() => executar(81, 'k')).toThrow('outro valor');
+  expect(() => executar(100000100, 'k2')).toThrow('grande demais');
+  expect(tabelas.transacoes).toHaveLength(1);
+});
