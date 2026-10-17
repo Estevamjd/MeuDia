@@ -19,7 +19,9 @@ const eixoY = { tick: { fill: TINTA_MUTED, fontSize: 11 }, tickLine: false, axis
  * Um eixo Y por gráfico (nada de eixo duplo: saldo e gasto têm escalas diferentes).
  */
 export default function EvolucaoMesChart({ pontos }: { pontos: PontoEvolucao[] }) {
-  const temSaldo = pontos.some((p) => p.saldo !== null);
+  // Linha só com 2+ dias de saldo; barras só com algum gasto (sem eixo vazio).
+  const temSaldo = pontos.filter((p) => p.saldo !== null).length >= 2;
+  const temGasto = pontos.some((p) => p.gasto > 0);
   return (
     <div className="space-y-3">
       {temSaldo && (
@@ -47,6 +49,7 @@ export default function EvolucaoMesChart({ pontos }: { pontos: PontoEvolucao[] }
           </div>
         </figure>
       )}
+      {temGasto && (
       <figure className="space-y-1">
         <figcaption className="text-[12px] text-muted">Gasto por dia</figcaption>
         <div className="h-28 w-full" role="img" aria-label="Barras do gasto de cada dia do mês">
@@ -61,6 +64,7 @@ export default function EvolucaoMesChart({ pontos }: { pontos: PontoEvolucao[] }
           </ResponsiveContainer>
         </div>
       </figure>
+      )}
     </div>
   );
 }

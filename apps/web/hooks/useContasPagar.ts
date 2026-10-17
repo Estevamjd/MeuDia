@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { contasPagarRepository, contasPagarService } from '@meudia/api';
 import type { Competencia, ContaPagarInsert } from '@meudia/shared';
 import { useAuth } from './useAuth';
-import { chavesAfetadasPorPagamento, contasKeys } from '../lib/financas-query-keys';
+import { carteirasKeys, chavesAfetadasPorPagamento, contasKeys } from '../lib/financas-query-keys';
 
 interface PagamentoVars {
   contaId: string;
@@ -59,6 +59,8 @@ function useInvalidarContas() {
     void queryClient.invalidateQueries({ queryKey: contasKeys.todas });
     void queryClient.invalidateQueries({ queryKey: contasKeys.contaTodas });
     void queryClient.invalidateQueries({ queryKey: ['resumo-financeiro-mes'] });
+    // Contas a pagar entram na previsão de saldo (7 dias / fim do mês).
+    void queryClient.invalidateQueries({ queryKey: carteirasKeys.todas });
   };
 }
 

@@ -27,6 +27,8 @@ it('cria um espelho, edita duas vezes sem duplicar e desativa sem apagar pagamen
   expect(assinaturas.remove).toHaveBeenCalledWith('a', 'u');
   expect(vi.mocked(contas.update).mock.invocationCallOrder.at(-1)).toBeLessThan(vi.mocked(assinaturas.remove).mock.invocationCallOrder[0]!);
   expect(service.ASSINATURA_INVALIDACOES).toContainEqual(['resumo-financeiro-mes']);
+  // Assinatura espelha uma conta a pagar: muda a previsão de saldo.
+  expect(service.ASSINATURA_INVALIDACOES).toContainEqual(['carteiras']);
 });
 it('vence hoje, ajusta dia 31 para fevereiro e trata lista vazia', async () => {
   const hoje = { ...assinatura, id: 'hoje', dia_vencimento: 15 };

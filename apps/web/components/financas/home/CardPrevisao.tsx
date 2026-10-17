@@ -66,7 +66,7 @@ export function CardPrevisao({ tipo, previsao, escondido }: CardPrevisaoProps) {
             </li>
             {previsao.itens.map((i) => (
               <li key={`${i.tipo}-${i.id}-${i.competencia}`} className="flex justify-between gap-3">
-                <span className="min-w-0 truncate text-muted">
+                <span className="min-w-0 break-words text-muted">
                   {i.tipo === 'renda' ? '+ ' : '− '}
                   {i.descricao} ({i.tipo === 'renda' ? 'a receber' : i.vencida ? 'vencida' : 'vence'} {formatDiaMes(i.data)})
                 </span>
