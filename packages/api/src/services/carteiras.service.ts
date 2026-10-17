@@ -1,11 +1,10 @@
 import type { Carteira, Renda, Transacao, Transferencia } from '@meudia/shared';
 import {
   AppError,
-  CATEGORIA_AJUSTE,
   CATEGORIA_ENTRADA_EXTRA,
   alvosPrevisao,
   competenciaDe,
-  competenciasEntre,
+  competenciasPrevisao,
   comecouMesCom,
   dataAncora,
   dataRendaNoMes,
@@ -122,17 +121,10 @@ export async function saldoDaCarteira(userId: string, carteira: Carteira, hojeIS
  * R9 "Corrigir saldo": cria um ajuste com a diferença (receita ou despesa, `ajuste=true`).
  * Sem diferença, não cria nada (`null`).
  */
-export async function corrigirSaldo(userId: string, data: unknown, hojeISO = hojeSP()): Promise<Transacao | null> {
+export async function corrigirSaldo(userId: string, data: unknown, _hojeISO = hojeSP(), chave = crypto.randomUUID()): Promise<Transacao | null> {
   usuario(userId);
   const { carteira_id, saldo_real } = corrigirSaldoSchema.parse(data);
-  const carteira = await carteiraAtiva(userId, carteira_id);
-  const atual = await saldoDaCarteira(userId, carteira, hojeISO);
-  const diferenca = Math.round((saldo_real - atual) * 100) / 100;
-  if (diferenca === 0) return null;
-  return transacaoRepository.create(userId, {
-    tipo: diferenca > 0 ? 'receita' : 'despesa', categoria: CATEGORIA_AJUSTE, descricao: 'Correção de saldo',
-    valor: Math.abs(diferenca), data: hojeISO, carteira_id: carteira.id, banco: carteira.nome, ajuste: true,
-  });
+  return carteirasRepository.rpcCorrigirSaldo(carteira_id, saldo_real, chave);
 }
 
 /** R6 "Recebi": receita "Salário" + recebimento da competência (RPC atômica). */
@@ -164,16 +156,16 @@ export async function painelSaldo(userId: string, hojeISO = hojeSP()) {
   usuario(userId);
   const competencia = competenciaDe(hojeISO);
   const alvos = alvosPrevisao(hojeISO);
-  const competencias = competenciasEntre(competencia, competenciaDe(alvos.seteDias));
+  const periodo = competenciasPrevisao(hojeISO, alvos.seteDias);
   const carteiras = await carteirasRepository.findAll(userId);
   const desde = carteiras.map(dataAncora).sort()[0];
   const [transacoes, transferencias, rendas, recebimentos, contas, pagamentos] = await Promise.all([
     desde ? transacaoRepository.findComCarteiraDesde(userId, desde) : Promise.resolve([] as Transacao[]),
     desde ? transferenciasRepository.findDesde(userId, desde) : Promise.resolve([] as Transferencia[]),
     rendasRepository.findAll(userId, { ativo: true }),
-    recebimentosRendaRepository.findByCompetencias(userId, competencias),
+    recebimentosRendaRepository.findByCompetencias(userId, periodo.rendas),
     contasPagarRepository.findAll(userId, { ativo: true }),
-    pagamentosContaRepository.findByCompetencias(userId, competencias),
+    pagamentosContaRepository.findByCompetencias(userId, periodo.contas),
   ]);
   const saldos = saldosCarteiras(carteiras, transacoes, transferencias, hojeISO);
   const total = saldoHoje(carteiras, transacoes, transferencias, hojeISO);
@@ -205,3 +197,8 @@ export async function painelSaldo(userId: string, hojeISO = hojeSP()) {
 }
 
 export type PainelSaldo = Awaited<ReturnType<typeof painelSaldo>>;
+
+export async function criarCarteiraOnboarding(userId: string, id: string, data: unknown) {
+  usuario(userId);
+  return carteirasRepository.createIdempotente(userId, id, carteiraInsertSchema.parse(data));
+}

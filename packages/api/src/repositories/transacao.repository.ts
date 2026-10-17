@@ -1,5 +1,6 @@
 import type { Transacao, TransacaoInsert } from '@meudia/shared';
-import { AppError } from '@meudia/shared';
+import { paginas } from './cron-pagination';
+import { erroDb } from './erros-db';
 import { getSupabase } from './supabase';
 
 const COLUMNS = 'id, user_id, tipo, categoria, descricao, valor, data, banco, automatico, created_at, carteira_id, ajuste';
@@ -11,7 +12,7 @@ export async function findByUserId(userId: string): Promise<Transacao[]> {
     .eq('user_id', userId)
     .order('data', { ascending: false });
 
-  if (error) throw new AppError(error.message, 'DB_ERROR');
+  if (error) erroDb(error);
   return data as unknown as Transacao[];
 }
 
@@ -28,7 +29,7 @@ export async function findByDateRange(
     .lte('data', endDate)
     .order('data', { ascending: false });
 
-  if (error) throw new AppError(error.message, 'DB_ERROR');
+  if (error) erroDb(error);
   return data as unknown as Transacao[];
 }
 
@@ -40,7 +41,7 @@ export async function findById(transacaoId: string, userId: string): Promise<Tra
     .eq('user_id', userId)
     .single();
 
-  if (error) throw new AppError(error.message, 'DB_ERROR');
+  if (error) erroDb(error);
   return data as unknown as Transacao;
 }
 
@@ -51,7 +52,7 @@ export async function create(userId: string, data: TransacaoInsert): Promise<Tra
     .select(COLUMNS)
     .single();
 
-  if (error) throw new AppError(error.message, 'DB_ERROR');
+  if (error) erroDb(error);
   return created as unknown as Transacao;
 }
 
@@ -64,7 +65,7 @@ export async function update(transacaoId: string, data: Partial<TransacaoInsert>
     .select(COLUMNS)
     .single();
 
-  if (error) throw new AppError(error.message, 'DB_ERROR');
+  if (error) erroDb(error);
   return updated as unknown as Transacao;
 }
 
@@ -75,7 +76,7 @@ export async function remove(transacaoId: string, userId: string): Promise<void>
     .eq('id', transacaoId)
     .eq('user_id', userId);
 
-  if (error) throw new AppError(error.message, 'DB_ERROR');
+  if (error) erroDb(error);
 }
 
 /** Inclui pagamentos cuja data de caixa cai fora da competência exibida. */
@@ -85,17 +86,23 @@ export async function findByIds(userId: string, ids: string[]): Promise<Transaca
   for (let i = 0; i < unicos.length; i += 100) {
     const { data, error } = await getSupabase().from('transacoes').select(COLUMNS)
       .eq('user_id', userId).in('id', unicos.slice(i, i + 100));
-    if (error) throw new AppError(error.message, 'DB_ERROR');
+    if (error) erroDb(error);
     rows.push(...(data ?? []) as unknown as Transacao[]);
   }
   return rows;
 }
 
-/** Lançamentos com carteira a partir de `desde` (a âncora mais antiga): base do saldo. */
+/**
+ * Lançamentos com carteira a partir de `desde` (a âncora mais antiga): base do saldo.
+ * Paginado em ordem estável (data, id) até esgotar: o PostgREST corta em 1.000 linhas por resposta.
+ */
 export async function findComCarteiraDesde(userId: string, desde: string): Promise<Transacao[]> {
-  const { data, error } = await getSupabase().from('transacoes').select(COLUMNS)
-    .eq('user_id', userId).not('carteira_id', 'is', null).gte('data', desde)
-    .order('data', { ascending: true });
-  if (error) throw new AppError(error.message, 'DB_ERROR');
-  return data as unknown as Transacao[];
+  const rows = await paginas(
+    () => getSupabase().from('transacoes').select(COLUMNS)
+      .eq('user_id', userId).not('carteira_id', 'is', null).gte('data', desde)
+      .order('data', { ascending: true }).order('id', { ascending: true }),
+    erroDb,
+    1000,
+  );
+  return rows as unknown as Transacao[];
 }

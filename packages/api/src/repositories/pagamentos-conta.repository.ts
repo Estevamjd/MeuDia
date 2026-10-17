@@ -21,6 +21,19 @@ export async function findByCompetencias(userId: string, competencias: string[])
   return data as unknown as PagamentoConta[];
 }
 
+/** Pagamentos ligados às transações informadas (despesa criada pelo "Paguei"). */
+export async function findByTransacoes(userId: string, transacaoIds: string[]): Promise<PagamentoConta[]> {
+  const unicos = [...new Set(transacaoIds)];
+  const rows: PagamentoConta[] = [];
+  for (let i = 0; i < unicos.length; i += 100) {
+    const { data, error } = await getSupabase().from('pagamentos_conta').select(COLUMNS)
+      .eq('user_id', userId).in('transacao_id', unicos.slice(i, i + 100));
+    if (error) throw new AppError(error.message, 'DB_ERROR');
+    rows.push(...(data ?? []) as unknown as PagamentoConta[]);
+  }
+  return rows;
+}
+
 export async function findByConta(userId: string, contaId: string): Promise<PagamentoConta[]> {
   const { data, error } = await getSupabase().from('pagamentos_conta').select(COLUMNS)
     .eq('user_id', userId).eq('conta_id', contaId).order('competencia', { ascending: false });

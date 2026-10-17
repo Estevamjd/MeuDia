@@ -10,7 +10,7 @@ vi.mock('../supabase', () => ({ getSupabase }));
 
 function mockClient(result: { data?: unknown; error?: unknown } = { data: [], error: null }) {
   const query: Record<string, unknown> = {};
-  for (const m of ['select', 'eq', 'in', 'not', 'gte', 'order', 'single', 'insert', 'update', 'delete']) query[m] = vi.fn(() => query);
+  for (const m of ['range', 'select', 'eq', 'in', 'not', 'gte', 'order', 'single', 'insert', 'update', 'delete']) query[m] = vi.fn(() => query);
   query.then = (resolve: (v: unknown) => unknown) => Promise.resolve({ data: null, error: null, ...result }).then(resolve);
   const client = { from: vi.fn(() => query), rpc: vi.fn().mockResolvedValue({ data: null, error: null, ...result }) };
   getSupabase.mockReturnValue(client);
@@ -43,6 +43,21 @@ describe('repositórios de carteiras, transferências e recebimentos (sem banco)
     expect(query.not).toHaveBeenCalledWith('carteira_id', 'is', null);
     expect(query.gte).toHaveBeenCalledWith('data', '2026-09-20');
   });
+  it.each([transacoes.findComCarteiraDesde, transferencias.findDesde])('pagina histórico com movimento mais recente no final', async (buscar) => {
+    const { query } = mockClient();
+    const linhas = Array.from({ length: 1001 }, (_, i) => ({ id: String(i), data: '2026-10-17' }));
+    query.range!.mockImplementation((inicio: number, fim: number) => Promise.resolve({ data: linhas.slice(inicio, fim + 1), error: null }));
+    const resultado = await buscar('u', '2026-10-01');
+    expect(resultado).toHaveLength(1001);
+    expect(resultado.at(-1)?.id).toBe('1000');
+    expect(query.range).toHaveBeenCalledTimes(2);
+    expect(query.range).toHaveBeenLastCalledWith(1000, 1999);
+    expect(query.order).toHaveBeenCalledWith('id', { ascending: true });
+  });
+  it.each(['42703', '42P01', 'PGRST204'])('schema antigo %s retorna erro amigável', async (code) => {
+    mockClient({ error: { code, message: 'fixture' } });
+    await expect(transacoes.findComCarteiraDesde('u', '2026-10-01')).rejects.toMatchObject({ code: 'SCHEMA_DESATUALIZADO', status: 503 });
+  });
   it('listas vazias de competências não consultam o banco', async () => {
     const { client } = mockClient();
     expect(await recebimentos.findByCompetencias('u', [])).toEqual([]);
@@ -72,4 +87,21 @@ describe('repositórios de carteiras, transferências e recebimentos (sem banco)
     mockClient({ error: { code: '23503', message: 'fixture' } });
     await expect(transferencias.create('u', { origem_id: 'a', destino_id: 'b', valor: 1, data: '2026-10-17' })).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
+});
+
+it('RPC corrigir_saldo envia assinatura SQL e interpreta SETOF vazio/uma linha', async () => {
+  const { client } = mockClient({ data: [{ id: 'ajuste' }] });
+  expect(await carteiras.rpcCorrigirSaldo('c', -80, 'chave')).toEqual({ id: 'ajuste' });
+  expect(client.rpc).toHaveBeenCalledWith('corrigir_saldo', { p_carteira_id: 'c', p_valor_real: -80, p_chave: 'chave' });
+  mockClient();
+  expect(await carteiras.rpcCorrigirSaldo('c', 80, 'chave')).toBeNull();
+});
+it('cadastro do onboarding reutiliza UUID e mantém âncora em retry com edição', async () => {
+  const { query } = mockClient({ data: { id: 'estavel' } });
+  query.upsert = vi.fn(() => query);
+  await carteiras.createIdempotente('u', 'estavel', { nome: 'Nu editado', saldo_inicial: -100 });
+  expect(query.upsert).toHaveBeenCalledWith({ id: 'estavel', user_id: 'u', nome: 'Nu editado', saldo_inicial: -100 }, { onConflict: 'id', ignoreDuplicates: true });
+  expect(query.update).toHaveBeenCalledWith({ nome: 'Nu editado', saldo_inicial: -100 });
+  expect(query.eq).toHaveBeenCalledWith('id', 'estavel');
+  expect(query.eq).toHaveBeenCalledWith('user_id', 'u');
 });

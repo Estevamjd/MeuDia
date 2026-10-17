@@ -12,7 +12,7 @@ import {
 } from '../../repositories';
 
 vi.mock('../../repositories', () => ({
-  carteirasRepository: { findAll: vi.fn(), findById: vi.fn(), create: vi.fn(), update: vi.fn() },
+  carteirasRepository: { rpcCorrigirSaldo: vi.fn(), findAll: vi.fn(), findById: vi.fn(), create: vi.fn(), update: vi.fn() },
   transacaoRepository: { create: vi.fn(), findComCarteiraDesde: vi.fn() },
   transferenciasRepository: { create: vi.fn(), findDesde: vi.fn(), remove: vi.fn() },
   recebimentosRendaRepository: { findByCompetencias: vi.fn(), rpcReceber: vi.fn(), rpcDesfazer: vi.fn() },
@@ -93,24 +93,22 @@ describe('Gastei / Entrou dinheiro / Transferir', () => {
 });
 
 describe('Corrigir saldo (R9)', () => {
-  beforeEach(() => {
-    vi.mocked(carteiras.findById).mockResolvedValue(carteira(NU, 'Nubank', 650));
-    vi.mocked(transacoes.findComCarteiraDesde).mockResolvedValue([
-      { tipo: 'despesa', valor: 25, data: HOJE, created_at: '2026-10-17T15:10:00Z', carteira_id: NU },
-    ] as never);
+  it('delega saldo e chave à RPC atômica, sem ler/inserir ajuste no cliente', async () => {
+    const chave = crypto.randomUUID();
+    vi.mocked(carteiras.rpcCorrigirSaldo).mockResolvedValue(null);
+    expect(await service.corrigirSaldo('u', { carteira_id: NU, saldo_real: -80 }, HOJE, chave)).toBeNull();
+    await service.corrigirSaldo('u', { carteira_id: NU, saldo_real: -80 }, HOJE, chave);
+    expect(carteiras.rpcCorrigirSaldo).toHaveBeenCalledTimes(2);
+    expect(carteiras.rpcCorrigirSaldo).toHaveBeenLastCalledWith(NU, -80, chave);
+    expect(transacoes.create).not.toHaveBeenCalled();
+    expect(transacoes.findComCarteiraDesde).not.toHaveBeenCalled();
   });
-  it('cria ajuste com a diferença (despesa quando o banco mostra menos)', async () => {
-    await service.corrigirSaldo('u', { carteira_id: NU, saldo_real: 600 }, HOJE);
-    expect(transacoes.create).toHaveBeenCalledWith('u', {
-      tipo: 'despesa', categoria: 'Ajuste de saldo', descricao: 'Correção de saldo', valor: 25, data: HOJE,
-      carteira_id: NU, banco: 'Nubank', ajuste: true,
-    });
-  });
-  it('receita quando o banco mostra mais; sem diferença não cria nada', async () => {
-    await service.corrigirSaldo('u', { carteira_id: NU, saldo_real: 700.5 }, HOJE);
-    expect(transacoes.create).toHaveBeenLastCalledWith('u', expect.objectContaining({ tipo: 'receita', valor: 75.5, ajuste: true }));
-    expect(await service.corrigirSaldo('u', { carteira_id: NU, saldo_real: 625 }, HOJE)).toBeNull();
-    expect(transacoes.create).toHaveBeenCalledTimes(1);
+  it('gera UUID por tentativa quando a chave não foi informada', async () => {
+    await service.corrigirSaldo('u', { carteira_id: NU, saldo_real: 10 }, HOJE);
+    await service.corrigirSaldo('u', { carteira_id: NU, saldo_real: 10 }, HOJE);
+    const chamadas = vi.mocked(carteiras.rpcCorrigirSaldo).mock.calls;
+    expect(chamadas[0]![2]).toMatch(/^[0-9a-f-]{36}$/);
+    expect(chamadas[0]![2]).not.toBe(chamadas[1]![2]);
   });
 });
 
@@ -166,6 +164,6 @@ describe('painelSaldo', () => {
     expect(p.saldoHoje).toBe(0);
     expect(p.carteiraPadraoId).toBeNull();
     expect(transacoes.findComCarteiraDesde).not.toHaveBeenCalled();
-    expect(pagamentos.findByCompetencias).toHaveBeenCalledWith('u', ['2026-10', '2026-11']);
+    expect(pagamentos.findByCompetencias).toHaveBeenCalledWith('u', expect.arrayContaining(['2025-10', '2026-09', '2026-10', '2026-11']));
   });
 });

@@ -1,5 +1,6 @@
 import type { RecebimentoRenda } from '@meudia/shared';
 import { AppError } from '@meudia/shared';
+import { erroDb, schemaDesatualizado } from './erros-db';
 import { getSupabase } from './supabase';
 
 const COLUMNS = 'id, renda_id, user_id, competencia, recebido_em, transacao_id, created_at';
@@ -8,14 +9,28 @@ export async function findByCompetencias(userId: string, competencias: string[])
   if (!competencias.length) return [];
   const { data, error } = await getSupabase().from('recebimentos_renda').select(COLUMNS)
     .eq('user_id', userId).in('competencia', competencias);
-  if (error) throw new AppError(error.message, 'DB_ERROR');
+  if (error) erroDb(error);
   return data as unknown as RecebimentoRenda[];
+}
+
+/** Recebimentos ligados às transações informadas (receita criada pelo "Recebi"). */
+export async function findByTransacoes(userId: string, transacaoIds: string[]): Promise<RecebimentoRenda[]> {
+  const unicos = [...new Set(transacaoIds)];
+  const rows: RecebimentoRenda[] = [];
+  for (let i = 0; i < unicos.length; i += 100) {
+    const { data, error } = await getSupabase().from('recebimentos_renda').select(COLUMNS)
+      .eq('user_id', userId).in('transacao_id', unicos.slice(i, i + 100));
+    if (error) erroDb(error);
+    rows.push(...(data ?? []) as unknown as RecebimentoRenda[]);
+  }
+  return rows;
 }
 
 function erroRpc(error: { code?: string; message: string }): never {
   if (error.code === 'P0003' || error.code === '23505') throw new AppError('Renda já recebida neste mês', 'COMPETENCIA_JA_RECEBIDA', 409);
   if (error.code === 'P0002') throw new AppError('Renda ou carteira não encontrada', 'NOT_FOUND', 404);
   if (error.code === '22023') throw new AppError('Competência inválida', 'VALIDATION_ERROR', 400);
+  if (schemaDesatualizado(error)) erroDb(error);
   throw new AppError(error.message, 'DB_ERROR', 500);
 }
 
