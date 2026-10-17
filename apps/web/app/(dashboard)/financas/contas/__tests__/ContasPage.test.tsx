@@ -47,7 +47,7 @@ describe('Contas — modal "Nova conta"', () => {
         <ContasPage />
       </ToastProvider>,
     );
-    fireEvent.click(screen.getAllByRole('button', { name: /Nova conta/ })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /Nova conta/ })[0]!);
     passarAutofoco();
     expect(document.activeElement).toBe(campo('Nome'));
 

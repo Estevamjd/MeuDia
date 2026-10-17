@@ -19,7 +19,7 @@ const iPhone = devices['iPhone 13'];
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: /(novo-usuario|onboarding-loop)\.spec\.ts$/,
+  testMatch: /(modo-runtime|novo-usuario|onboarding-loop)\.spec\.ts$/,
   fullyParallel: false,
   workers: 1,
   retries: 0,
@@ -55,7 +55,8 @@ export default defineConfig({
     },
     {
       // Sempre rebuilda: um .next antigo pode ter a URL/chave do Supabase real embutida no bundle.
-      command: `pnpm exec next build && pnpm exec next start -p ${APP_PORT}`,
+      // Build sem APP_MODE e start com APP_MODE=financas: prova que o modo é lido em runtime (e2e/modo-runtime.spec.ts).
+      command: `env -u APP_MODE pnpm exec next build && pnpm exec next start -p ${APP_PORT}`,
       url: `http://localhost:${APP_PORT}/login`,
       env: appEnv,
       reuseExistingServer: false,
