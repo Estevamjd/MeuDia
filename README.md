@@ -88,7 +88,7 @@ pnpm --filter @meudia/mobile dev
 
 - Valores aceitos: `padrao` (todos os módulos) e `financas` (só Finanças, Assinaturas e Configurações). Qualquer outro valor, ou ausente, vira `padrao`.
 - É env de servidor, **sem** `NEXT_PUBLIC_`; chega ao cliente pelo layout raiz.
-- Trocar `APP_MODE` (ou `VAPID_PUBLIC_KEY`, também lida no layout) **exige rebuild/redeploy**: as páginas são pré-renderizadas no build. Promover um preview ou fazer rollback para um build com env diferente deixa a UI no modo antigo.
+- O layout raiz é renderizado por request (`noStore()`), então o modo vem do env do servidor em runtime. `e2e/modo-runtime.spec.ts` builda sem `APP_MODE`, sobe com `APP_MODE=financas` e falha se o modo congelar no build. Na Vercel, mudar uma env só vale a partir de um novo deploy.
 
 ## Qualidade
 
@@ -97,6 +97,7 @@ pnpm lint
 pnpm type-check
 pnpm test
 pnpm --filter @meudia/web test:e2e
+scripts/verify.sh   # o que o CI roda: type-check, lint, unitários e E2E mock (iPhone 13 WebKit)
 ```
 
 ## Status

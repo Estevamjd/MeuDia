@@ -145,7 +145,7 @@ describe('useFinancasHome: onboarding', () => {
       { descricao: 'Renda principal', valor: 4800, dia_recebimento: 5 },
       expect.objectContaining({ onSuccess: expect.any(Function) }),
     );
-    const { onSuccess } = m.criarRenda.mutate.mock.calls[0][1] as { onSuccess: () => void };
+    const { onSuccess } = m.criarRenda.mutate.mock.calls[0]![1] as { onSuccess: () => void };
     act(() => onSuccess());
     expect(r.current.rendaSheet.open).toBe(false);
     expect(m.toast.success).toHaveBeenCalledWith('Renda salva');
