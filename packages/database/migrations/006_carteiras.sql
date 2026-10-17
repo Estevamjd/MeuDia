@@ -23,6 +23,10 @@ CREATE INDEX IF NOT EXISTS idx_carteiras_user ON public.carteiras(user_id);
 ALTER TABLE public.transacoes ADD COLUMN IF NOT EXISTS carteira_id UUID;
 ALTER TABLE public.transacoes ADD COLUMN IF NOT EXISTS ajuste BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE public.rendas ADD COLUMN IF NOT EXISTS carteira_id UUID;
+-- Idempotência do "Corrigir saldo": a mesma chave nunca gera dois ajustes (ver corrigir_saldo).
+ALTER TABLE public.transacoes ADD COLUMN IF NOT EXISTS chave_ajuste UUID;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_transacoes_user_chave_ajuste
+  ON public.transacoes(user_id, chave_ajuste) WHERE chave_ajuste IS NOT NULL;
 
 DO $$
 BEGIN
@@ -211,6 +215,76 @@ BEGIN
 END;
 $$;
 
+-- R9 "Corrigir saldo" atômico: trava a carteira (FOR UPDATE), calcula o saldo de hoje pela mesma fórmula de
+-- saldoCarteira (packages/shared/src/utils/saldo.ts) e grava o ajuste com a diferença (ajuste=true).
+-- Idempotente por p_chave: repetir a mesma chave devolve o ajuste já criado. Duas abas com chaves diferentes
+-- são serializadas pelo lock; a segunda vê o saldo já corrigido e não cria nada.
+-- Sem diferença não cria nada (0 linhas). P0002: carteira inexistente/arquivada/de outro usuário; 22023: valor/chave inválidos.
+CREATE OR REPLACE FUNCTION public.corrigir_saldo(p_carteira_id UUID, p_valor_real NUMERIC, p_chave UUID)
+RETURNS SETOF public.transacoes
+LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
+AS $$
+DECLARE
+  v_carteira public.carteiras;
+  v_ajuste public.transacoes;
+  v_hoje DATE := (pg_catalog.now() AT TIME ZONE 'America/Sao_Paulo')::date;
+  v_dia_ancora DATE;
+  v_saldo NUMERIC;
+  v_diferenca NUMERIC;
+BEGIN
+  IF p_chave IS NULL THEN
+    RAISE EXCEPTION 'Chave de idempotência obrigatória' USING ERRCODE = '22023';
+  END IF;
+  IF p_valor_real IS NULL OR p_valor_real <> pg_catalog.round(p_valor_real, 2) OR pg_catalog.abs(p_valor_real) > 9999999999.99 THEN
+    RAISE EXCEPTION 'Valor inválido' USING ERRCODE = '22023', HINT = 'Exige no máximo 2 casas decimais.';
+  END IF;
+  SELECT * INTO v_carteira FROM public.carteiras
+    WHERE id = p_carteira_id AND user_id = auth.uid() FOR UPDATE;
+  IF NOT FOUND OR v_carteira.arquivada THEN
+    RAISE EXCEPTION 'Carteira não encontrada ou arquivada' USING ERRCODE = 'P0002';
+  END IF;
+  SELECT * INTO v_ajuste FROM public.transacoes
+    WHERE user_id = v_carteira.user_id AND chave_ajuste = p_chave;
+  IF FOUND THEN
+    IF v_ajuste.carteira_id IS DISTINCT FROM v_carteira.id THEN
+      RAISE EXCEPTION 'Chave já usada em outra carteira' USING ERRCODE = '22023';
+    END IF;
+    RETURN NEXT v_ajuste;
+    RETURN;
+  END IF;
+  -- R2: conta o que veio depois da âncora (dia seguinte, ou mesmo dia com created_at posterior), até hoje.
+  v_dia_ancora := (v_carteira.saldo_inicial_em AT TIME ZONE 'America/Sao_Paulo')::date;
+  SELECT v_carteira.saldo_inicial
+    + coalesce((SELECT pg_catalog.sum(CASE WHEN t.tipo = 'receita' THEN t.valor ELSE -t.valor END)
+        FROM public.transacoes t
+        WHERE t.user_id = v_carteira.user_id AND t.carteira_id = v_carteira.id AND t.data <= v_hoje
+          AND (t.data > v_dia_ancora OR (t.data = v_dia_ancora AND t.created_at > v_carteira.saldo_inicial_em))), 0)
+    + coalesce((SELECT pg_catalog.sum(CASE WHEN tr.destino_id = v_carteira.id THEN tr.valor ELSE -tr.valor END)
+        FROM public.transferencias tr
+        WHERE tr.user_id = v_carteira.user_id AND (tr.origem_id = v_carteira.id OR tr.destino_id = v_carteira.id)
+          AND tr.data <= v_hoje
+          AND (tr.data > v_dia_ancora OR (tr.data = v_dia_ancora AND tr.created_at > v_carteira.saldo_inicial_em))), 0)
+    INTO v_saldo;
+  v_diferenca := p_valor_real - v_saldo;
+  IF v_diferenca = 0 THEN
+    RETURN;
+  END IF;
+  INSERT INTO public.transacoes (user_id, tipo, categoria, descricao, valor, data, banco, automatico, carteira_id, ajuste, chave_ajuste)
+    VALUES (v_carteira.user_id, CASE WHEN v_diferenca > 0 THEN 'receita' ELSE 'despesa' END, 'Ajuste de saldo',
+            'Correção de saldo', pg_catalog.abs(v_diferenca), v_hoje, v_carteira.nome, FALSE, v_carteira.id, TRUE, p_chave)
+    RETURNING * INTO v_ajuste;
+  RETURN NEXT v_ajuste;
+END;
+$$;
+
+-- Tabelas novas: acesso explícito para authenticated (RLS users_own_data filtra as linhas), nada para anon.
+-- Não depende dos default privileges do projeto. UPDATE em recebimentos_renda é exigido pelo SELECT ... FOR UPDATE
+-- de desfazer_recebimento (RPC SECURITY INVOKER).
+REVOKE ALL ON public.carteiras, public.transferencias, public.recebimentos_renda FROM PUBLIC, anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.carteiras, public.transferencias, public.recebimentos_renda TO authenticated;
+
+REVOKE EXECUTE ON FUNCTION public.corrigir_saldo(UUID, NUMERIC, UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.corrigir_saldo(UUID, NUMERIC, UUID) TO authenticated;
 REVOKE EXECUTE ON FUNCTION public.receber_renda(UUID, TEXT, DATE, UUID) FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION public.desfazer_recebimento(UUID, TEXT) FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION public.pagar_conta_v2(UUID, TEXT, DATE, TEXT, UUID) FROM PUBLIC, anon;

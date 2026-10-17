@@ -7,7 +7,7 @@ BEGIN;
 \ir ../migrations/006_carteiras.sql
 \ir ../migrations/006_carteiras.sql
 
--- IDs: usuários A=...a1, B=...b1; carteiras A=...a2/a3/a4(arquivada), B=...b2; rendas A=...a5/a6(inativa), B=...b5;
+-- IDs: usuários A=...a1, B=...b1; carteiras A=...a2/a3/a4(arquivada)/ab(âncora há 10 dias), B=...b2; rendas A=...a5/a6(inativa), B=...b5;
 -- contas A=...a7, B=...b7; transação legada de A=...a8.
 INSERT INTO auth.users (id, email) VALUES
   ('c0060000-0000-4000-8000-0000000000a1', 'c006-a@example.invalid'),
@@ -16,7 +16,8 @@ INSERT INTO public.carteiras (id, user_id, nome, saldo_inicial, saldo_inicial_em
   ('c0060000-0000-4000-8000-0000000000a2', 'c0060000-0000-4000-8000-0000000000a1', 'Nubank', 650, '2026-10-17 15:00:00+00', FALSE),
   ('c0060000-0000-4000-8000-0000000000a3', 'c0060000-0000-4000-8000-0000000000a1', 'Caixa', 50, '2026-10-17 15:00:00+00', FALSE),
   ('c0060000-0000-4000-8000-0000000000a4', 'c0060000-0000-4000-8000-0000000000a1', 'Antiga', 0, '2026-10-17 15:00:00+00', TRUE),
-  ('c0060000-0000-4000-8000-0000000000b2', 'c0060000-0000-4000-8000-0000000000b1', 'Banco B', 10, '2026-10-17 15:00:00+00', FALSE);
+  ('c0060000-0000-4000-8000-0000000000b2', 'c0060000-0000-4000-8000-0000000000b1', 'Banco B', 10, '2026-10-17 15:00:00+00', FALSE),
+  ('c0060000-0000-4000-8000-0000000000ab', 'c0060000-0000-4000-8000-0000000000a1', 'Corrigível', 100, now() - interval '10 days', FALSE);
 INSERT INTO public.rendas (id, user_id, descricao, valor, dia_recebimento, ativo, carteira_id) VALUES
   ('c0060000-0000-4000-8000-0000000000a5', 'c0060000-0000-4000-8000-0000000000a1', 'Salário A', 900, 5, TRUE, 'c0060000-0000-4000-8000-0000000000a2'),
   ('c0060000-0000-4000-8000-0000000000a6', 'c0060000-0000-4000-8000-0000000000a1', 'Inativa A', 100, 10, FALSE, NULL),
@@ -59,7 +60,8 @@ BEGIN
   END IF;
   FOREACH f IN ARRAY ARRAY['public.receber_renda(uuid,text,date,uuid)'::pg_catalog.regprocedure,
                           'public.desfazer_recebimento(uuid,text)'::pg_catalog.regprocedure,
-                          'public.pagar_conta_v2(uuid,text,date,text,uuid)'::pg_catalog.regprocedure] LOOP
+                          'public.pagar_conta_v2(uuid,text,date,text,uuid)'::pg_catalog.regprocedure,
+                          'public.corrigir_saldo(uuid,numeric,uuid)'::pg_catalog.regprocedure] LOOP
     IF pg_catalog.has_function_privilege('anon', f, 'EXECUTE')
       OR NOT pg_catalog.has_function_privilege('authenticated', f, 'EXECUTE')
       OR EXISTS (SELECT 1 FROM pg_catalog.pg_proc p,
@@ -80,9 +82,26 @@ SELECT pg_temp.expect_error($q$INSERT INTO public.transferencias (user_id, orige
 SELECT pg_temp.expect_error($q$INSERT INTO public.transferencias (user_id, origem_id, destino_id, valor, data)
   VALUES ('c0060000-0000-4000-8000-0000000000a1', 'c0060000-0000-4000-8000-0000000000a2', 'c0060000-0000-4000-8000-0000000000a3', 0, '2026-10-17')$q$, '23514');
 
+-- Grants das tabelas novas vêm da própria 006 (nada de grant reparador aqui): authenticated com CRUD (RLS filtra), anon sem nada.
+DO $$
+DECLARE
+  t TEXT;
+  p TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['carteiras', 'transferencias', 'recebimentos_renda'] LOOP
+    FOREACH p IN ARRAY ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE'] LOOP
+      IF pg_catalog.has_table_privilege('anon', 'public.' || t, p) THEN
+        RAISE EXCEPTION 'anon não deveria ter % em %', p, t;
+      END IF;
+      IF NOT pg_catalog.has_table_privilege('authenticated', 'public.' || t, p) THEN
+        RAISE EXCEPTION 'Grant de authenticated incorreto: % em %', p, t;
+      END IF;
+    END LOOP;
+  END LOOP;
+END $$;
+-- Só o estado do Supabase anterior à 006 (tabelas do baseline/005, mesmo grant do tests/005_financas.sql).
 GRANT USAGE ON SCHEMA public TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.carteiras, public.transferencias, public.recebimentos_renda,
-  public.transacoes, public.rendas, public.contas_pagar, public.pagamentos_conta TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.transacoes, public.rendas, public.contas_pagar, public.pagamentos_conta TO authenticated;
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claim.sub', 'c0060000-0000-4000-8000-0000000000a1', true);
 
@@ -99,6 +118,13 @@ DECLARE
   renda_b CONSTANT UUID := 'c0060000-0000-4000-8000-0000000000b5';
   conta_a CONSTANT UUID := 'c0060000-0000-4000-8000-0000000000a7';
   conta_b CONSTANT UUID := 'c0060000-0000-4000-8000-0000000000b7';
+  corrigivel CONSTANT UUID := 'c0060000-0000-4000-8000-0000000000ab';
+  hoje CONSTANT DATE := (now() AT TIME ZONE 'America/Sao_Paulo')::date;
+  k1 CONSTANT UUID := 'c0060000-0000-4000-8000-0000000000e1';
+  k2 CONSTANT UUID := 'c0060000-0000-4000-8000-0000000000e2';
+  k3 CONSTANT UUID := 'c0060000-0000-4000-8000-0000000000e3';
+  aj public.transacoes;
+  aj2 public.transacoes;
   c public.carteiras;
   r public.recebimentos_renda;
   r2 public.recebimentos_renda;
@@ -109,7 +135,7 @@ BEGIN
   -- RLS: B invisível; A não consegue usar nem referenciar a carteira/renda/conta de B.
   IF EXISTS (SELECT 1 FROM public.carteiras WHERE id = cart_b)
     OR EXISTS (SELECT 1 FROM public.rendas WHERE id = renda_b)
-    OR (SELECT count(*) FROM public.carteiras) <> 3 THEN
+    OR (SELECT count(*) FROM public.carteiras) <> 4 THEN
     RAISE EXCEPTION 'RLS expôs carteira/renda de B';
   END IF;
   PERFORM pg_temp.expect_error(pg_catalog.format('UPDATE public.carteiras SET user_id = %L WHERE id = %L', ub, nubank), '42501');
@@ -198,6 +224,39 @@ BEGIN
     VALUES (ua, 'receita', 'Ajuste de saldo', 'Correção', 3.5, '2026-10-17', nubank, TRUE);
   UPDATE public.carteiras SET updated_at = '2000-01-01' WHERE id = nubank RETURNING * INTO c;
   IF c.updated_at IS DISTINCT FROM now() THEN RAISE EXCEPTION 'Trigger updated_at de carteiras falhou'; END IF;
+
+  -- Corrigir saldo (R9) atômico e idempotente. Saldo da Corrigível: 100 − 30 + 5 + 10 (transferência) = 85;
+  -- o lançamento futuro e o anterior à âncora não contam (mesma fórmula de saldoCarteira).
+  INSERT INTO public.transacoes (user_id, tipo, categoria, descricao, valor, data, carteira_id) VALUES
+    (ua, 'despesa', 'Mercado', 'Antes da âncora', 999, hoje - 20, corrigivel),
+    (ua, 'despesa', 'Mercado', 'Mercado', 30, hoje - 2, corrigivel),
+    (ua, 'receita', 'Entrada extra', 'Pix', 5, hoje - 1, corrigivel),
+    (ua, 'despesa', 'Mercado', 'Futuro', 1000, hoje + 5, corrigivel);
+  INSERT INTO public.transferencias (user_id, origem_id, destino_id, valor, data) VALUES (ua, caixa, corrigivel, 10, hoje - 1);
+  SELECT * INTO STRICT aj FROM public.corrigir_saldo(corrigivel, 80, k1);
+  IF aj.tipo <> 'despesa' OR aj.valor <> 5 OR NOT aj.ajuste OR aj.categoria <> 'Ajuste de saldo' OR aj.data <> hoje
+    OR aj.carteira_id IS DISTINCT FROM corrigivel OR aj.chave_ajuste IS DISTINCT FROM k1 OR aj.user_id <> ua THEN
+    RAISE EXCEPTION 'corrigir_saldo calculou/gravou o ajuste errado: % %', aj.tipo, aj.valor;
+  END IF;
+  -- Repetir a mesma chave (resposta perdida) devolve o mesmo ajuste, sem duplicar.
+  SELECT * INTO STRICT aj2 FROM public.corrigir_saldo(corrigivel, 80, k1);
+  IF aj2.id <> aj.id OR (SELECT count(*) FROM public.transacoes WHERE carteira_id = corrigivel AND ajuste) <> 1 THEN
+    RAISE EXCEPTION 'corrigir_saldo não é idempotente pela chave';
+  END IF;
+  -- Outra aba com o mesmo valor (chave nova): o saldo já é 80, nada a ajustar.
+  IF EXISTS (SELECT 1 FROM public.corrigir_saldo(corrigivel, 80, k2)) THEN
+    RAISE EXCEPTION 'Segunda correção para o mesmo valor deveria ser vazia';
+  END IF;
+  SELECT * INTO STRICT aj2 FROM public.corrigir_saldo(corrigivel, 100.5, k3);
+  IF aj2.tipo <> 'receita' OR aj2.valor <> 20.5 THEN RAISE EXCEPTION 'Ajuste positivo errado'; END IF;
+  PERFORM pg_temp.expect_error(pg_catalog.format('SELECT * FROM public.corrigir_saldo(%L, 1, %L)', caixa, k1), '22023');
+  PERFORM pg_temp.expect_error(pg_catalog.format('SELECT * FROM public.corrigir_saldo(%L, 1.234, %L)', corrigivel, gen_random_uuid()), '22023');
+  PERFORM pg_temp.expect_error(pg_catalog.format('SELECT * FROM public.corrigir_saldo(%L, 1, NULL)', corrigivel), '22023');
+  PERFORM pg_temp.expect_error(pg_catalog.format('SELECT * FROM public.corrigir_saldo(%L, 1, %L)', arquivada, gen_random_uuid()), 'P0002');
+  PERFORM pg_temp.expect_error(pg_catalog.format('SELECT * FROM public.corrigir_saldo(%L, 1, %L)', cart_b, gen_random_uuid()), 'P0002');
+  PERFORM pg_temp.expect_error(pg_catalog.format($q$INSERT INTO public.transacoes (user_id, tipo, categoria, descricao, valor, chave_ajuste)
+    VALUES (auth.uid(), 'despesa', 'Outros', 'chave repetida', 1, %L)$q$, k1), '23505');
+
   -- Carteira com transferência não pode ser apagada (arquivar é o caminho).
   PERFORM pg_temp.expect_error(pg_catalog.format('DELETE FROM public.carteiras WHERE id = %L', caixa), '23503');
 END $$;
@@ -258,8 +317,9 @@ BEGIN
     OR pg_catalog.to_regclass('public.transferencias') IS NOT NULL
     OR pg_catalog.to_regclass('public.recebimentos_renda') IS NOT NULL
     OR pg_catalog.to_regprocedure('public.pagar_conta_v2(uuid,text,date,text,uuid)') IS NOT NULL
+    OR pg_catalog.to_regprocedure('public.corrigir_saldo(uuid,numeric,uuid)') IS NOT NULL
     OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public'
-      AND ((table_name = 'transacoes' AND column_name IN ('carteira_id', 'ajuste')) OR (table_name = 'rendas' AND column_name = 'carteira_id')))
+      AND ((table_name = 'transacoes' AND column_name IN ('carteira_id', 'ajuste', 'chave_ajuste')) OR (table_name = 'rendas' AND column_name = 'carteira_id')))
     OR pg_catalog.to_regprocedure('public.pagar_conta(uuid,text,date,text)') IS NULL
     OR pg_catalog.to_regprocedure('public.set_updated_at()') IS NULL
     OR pg_catalog.to_regclass('public.pagamentos_conta') IS NULL
