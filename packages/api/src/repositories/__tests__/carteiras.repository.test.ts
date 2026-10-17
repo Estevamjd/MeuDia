@@ -1,4 +1,8 @@
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { logger } from '@meudia/shared';
 import * as carteiras from '../carteiras.repository';
 import * as transferencias from '../transferencias.repository';
 import * as recebimentos from '../recebimentos-renda.repository';
@@ -97,9 +101,13 @@ describe('repositórios de carteiras, transferências e recebimentos (sem banco)
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids).toEqual(expect.arrayContaining(Array.from({ length: 700 }, (_, i) => id(i))));
   });
-  it.each(['42703', '42P01', 'PGRST204'])('schema antigo %s retorna erro amigável', async (code) => {
-    mockClient({ error: { code, message: 'fixture' } });
+  it.each(['42703', '42P01', 'PGRST204'])('schema antigo %s retorna erro amigável e registra a mensagem real', async (code) => {
+    const aviso = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    mockClient({ error: { code, message: 'column transacoes.carteira_idd does not exist' } });
     await expect(transacoes.findComCarteiraDesde('u', '2026-10-01')).rejects.toMatchObject({ code: 'SCHEMA_DESATUALIZADO', status: 503 });
+    // Bug de código (coluna digitada errado) não some atrás da mensagem amigável: código + mensagem do banco no log.
+    expect(aviso).toHaveBeenCalledWith(expect.stringContaining('SCHEMA_DESATUALIZADO'), { code, message: 'column transacoes.carteira_idd does not exist' });
+    aviso.mockRestore();
   });
   it('listas vazias de competências não consultam o banco', async () => {
     const { client } = mockClient();
@@ -138,6 +146,25 @@ it('RPC corrigir_saldo envia assinatura SQL e interpreta SETOF vazio/uma linha',
   expect(client.rpc).toHaveBeenCalledWith('corrigir_saldo', { p_carteira_id: 'c', p_valor_real: -80, p_chave: 'chave' });
   mockClient();
   expect(await carteiras.rpcCorrigirSaldo('c', 80, 'chave')).toBeNull();
+});
+it.each([['P0002', 'NOT_FOUND', 404], ['22023', 'VALIDATION_ERROR', 400], ['XX000', 'DB_ERROR', 500]])(
+  'RPC corrigir_saldo %s vira %s (carteira arquivada/inexistente, chave/valor inválidos)', async (dbCode, code, status) => {
+    mockClient({ error: { code: dbCode, message: 'fixture' } });
+    await expect(carteiras.rpcCorrigirSaldo('c', 80, 'chave')).rejects.toMatchObject({ code, status });
+  });
+it('trigger da 006 (55000, lançamento vinculado) vira TRANSACAO_VINCULADA 409 em update/remove direto', async () => {
+  mockClient({ error: { code: '55000', message: 'Lançamento vinculado a Recebi/Paguei não pode ser alterado' } });
+  await expect(transacoes.update('t', { valor: 1 }, 'u')).rejects.toMatchObject({ code: 'TRANSACAO_VINCULADA', status: 409 });
+  await expect(transacoes.remove('t', 'u')).rejects.toMatchObject({ code: 'TRANSACAO_VINCULADA', status: 409 });
+});
+it('app nunca apaga carteira (sem DELETE no banco: só arquivar)', () => {
+  const raiz = path.resolve(__dirname, '../../../../..');
+  const fontes = execFileSync('git', ['ls-files', 'packages/*/src', 'apps/web'], { cwd: raiz, encoding: 'utf8' })
+    .split('\n').filter((f) => /\.(ts|tsx|mjs)$/.test(f) && !/__tests__|\.test\.|\/e2e\//.test(f));
+  const apagam = fontes.filter((f) => /from\(['"]carteiras['"]\)[^;]*?\.delete\(/s.test(readFileSync(path.join(raiz, f), 'utf8')));
+  expect(fontes.length).toBeGreaterThan(50);
+  expect(apagam).toEqual([]);
+  expect(Object.keys(carteiras)).not.toEqual(expect.arrayContaining([expect.stringMatching(/^(remove|delete|excluir)/)]));
 });
 it('cadastro do onboarding reutiliza UUID e mantém âncora em retry com edição', async () => {
   const { query } = mockClient({ data: { id: 'estavel' } });

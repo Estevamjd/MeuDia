@@ -1,4 +1,4 @@
-import { AppError } from '@meudia/shared';
+import { AppError, logger } from '@meudia/shared';
 
 /**
  * Coluna/tabela/função que o código novo pede e o banco não tem: a migração 006 não foi aplicada
@@ -12,9 +12,18 @@ export function schemaDesatualizado(error: { code?: string } | null | undefined)
   return !!error?.code && CODIGOS_SCHEMA.has(error.code);
 }
 
-/** Erro de banco → AppError; schema sem a 006 vira SCHEMA_DESATUALIZADO (503) com mensagem amigável. */
+/**
+ * Erro de banco → AppError; schema sem a 006 vira SCHEMA_DESATUALIZADO (503) com mensagem amigável.
+ * Os mesmos códigos aparecem por bug de código (coluna digitada errado): o código e a mensagem do banco vão para o log
+ * (só nomes de objetos do schema, nada do usuário). Remover o mapeamento quando a 006 estiver estável.
+ * 55000: lançamento vinculado a Recebi/Paguei (trigger da 006); só muda pelas RPCs desfazer_*.
+ */
 export function erroDb(error: { message: string; code?: string }): never {
+  if (error.code === '55000') {
+    throw new AppError(error.message, 'TRANSACAO_VINCULADA', 409, 'Use Desfazer recebimento/pagamento para alterar este lançamento.');
+  }
   if (schemaDesatualizado(error)) {
+    logger.warn('SCHEMA_DESATUALIZADO: erro de schema do banco', { code: error.code, message: error.message });
     throw new AppError(`Schema desatualizado (${error.code}): ${error.message}`, 'SCHEMA_DESATUALIZADO', 503, MENSAGEM_SCHEMA_DESATUALIZADO);
   }
   throw new AppError(error.message, 'DB_ERROR', 500);

@@ -97,4 +97,9 @@ describe('transacaoInsertSchema', () => {
     const result = transacaoInsertSchema.safeParse({ ...validData, tipo: 1 });
     expect(result.success).toBe(false);
   });
+
+  it('limita valor ao DECIMAL(10,2) de transacoes (acima vira 400, não estouro 22003 → 500)', () => {
+    expect(transacaoInsertSchema.safeParse({ ...validData, valor: 99999999.99 }).success).toBe(true);
+    expect(transacaoInsertSchema.safeParse({ ...validData, valor: 100000000 }).success).toBe(false);
+  });
 });

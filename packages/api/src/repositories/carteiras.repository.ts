@@ -49,6 +49,10 @@ export async function rpcCorrigirSaldo(carteiraId: string, valorReal: number, ch
   const { data, error } = await getSupabase().rpc('corrigir_saldo', {
     p_carteira_id: carteiraId, p_valor_real: valorReal, p_chave: chave,
   });
+  // P0002: carteira inexistente/arquivada/de outro usuário; 22023: valor, chave repetida com outro valor ou diferença
+  // acima do limite do ajuste (contrato em 006_carteiras.sql, corrigir_saldo).
+  if (error?.code === 'P0002') throw new AppError(error.message, 'NOT_FOUND', 404, 'Carteira não encontrada ou arquivada.');
+  if (error?.code === '22023') throw new AppError(error.message, 'VALIDATION_ERROR', 400, error.message);
   if (error) erro(error);
   return (Array.isArray(data) ? data[0] ?? null : data) as Transacao | null;
 }
