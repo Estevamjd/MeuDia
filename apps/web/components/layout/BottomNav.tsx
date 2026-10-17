@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
 import { useAppMode } from '../AppModeProvider';
+import { LancamentoRapidoSheet } from '../financas/LancamentoRapidoSheet';
 import {
   BOTTOM_TABS_PADRAO,
   MENU_MAIS_PADRAO,
@@ -34,7 +35,10 @@ const ITEM_CLASSES =
 
 function BottomNavFinancas({ onOpenChat, chatAberto }: BottomNavProps) {
   const pathname = usePathname();
+  const [acoesAbertas, setAcoesAbertas] = useState(false);
   return (
+    <>
+    <LancamentoRapidoSheet open={acoesAbertas} onClose={() => setAcoesAbertas(false)} />
     <nav
       aria-label="Navegação principal"
       className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-card/95 backdrop-blur-xl md:hidden"
@@ -63,12 +67,15 @@ function BottomNavFinancas({ onOpenChat, chatAberto }: BottomNavProps) {
             );
           }
 
-          if (item.tipo === 'nova-conta') {
+          if (item.tipo === 'acoes') {
             return (
-              <Link
-                key="nova-conta"
-                href={item.href}
+              <button
+                key="acoes"
+                type="button"
+                onClick={() => setAcoesAbertas(true)}
                 aria-label={item.label}
+                aria-haspopup="dialog"
+                aria-expanded={acoesAbertas}
                 className="flex min-h-[44px] min-w-[44px] flex-1 items-center justify-center rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
               >
                 <span
@@ -77,7 +84,7 @@ function BottomNavFinancas({ onOpenChat, chatAberto }: BottomNavProps) {
                 >
                   {item.emoji}
                 </span>
-              </Link>
+              </button>
             );
           }
 
@@ -96,6 +103,7 @@ function BottomNavFinancas({ onOpenChat, chatAberto }: BottomNavProps) {
         })}
       </div>
     </nav>
+    </>
   );
 }
 

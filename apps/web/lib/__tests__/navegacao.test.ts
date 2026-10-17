@@ -25,22 +25,22 @@ describe('Sidebar por APP_MODE', () => {
 
   it('modo finanças: só rotas de finanças', () => {
     const todos = secoesSidebar('financas').flatMap((s) => hrefs(s.items));
-    expect(todos).toEqual(['/financas', '/financas/contas', '/financas/orcamento', '/assinaturas']);
+    expect(todos).toEqual(['/financas', '/financas/carteiras', '/financas/contas', '/financas/orcamento', '/assinaturas']);
     for (const oculto of OCULTOS_NO_FINANCAS) expect(todos).not.toContain(oculto);
   });
 });
 
 describe('BottomNav modo finanças', () => {
-  it('Início, Contas, + Nova conta, Orçamento e Chat (nessa ordem)', () => {
+  it('Início, Contas, + Lançar, Orçamento e Chat (nessa ordem)', () => {
     const itens = itensBottomFinancas();
-    expect(itens.map((i) => i.label)).toEqual(['Início', 'Contas', 'Nova conta', 'Orçamento', 'Chat']);
-    expect(itens.map((i) => i.tipo)).toEqual(['link', 'link', 'nova-conta', 'link', 'chat']);
+    expect(itens.map((i) => i.label)).toEqual(['Início', 'Contas', 'Lançar', 'Orçamento', 'Chat']);
+    expect(itens.map((i) => i.tipo)).toEqual(['link', 'link', 'acoes', 'link', 'chat']);
   });
 
-  it('todos os links apontam para rotas visíveis; "+" abre o modal de /financas/contas', () => {
+  it('todos os links apontam para rotas visíveis; "+" abre a folha de ações (sem rota)', () => {
     const itens = itensBottomFinancas();
     for (const href of hrefs(itens)) expect(isRotaVisivel(href, 'financas')).toBe(true);
-    expect(itens.find((i) => i.tipo === 'nova-conta')).toMatchObject({ href: HREF_NOVA_CONTA });
+    expect(itens.find((i) => i.tipo === 'acoes')).not.toHaveProperty('href');
     expect(HREF_NOVA_CONTA).toBe('/financas/contas?nova=1');
     // Chat não tem rota (/chat não existe): abre o AgentPanel.
     expect(itens.find((i) => i.tipo === 'chat')).not.toHaveProperty('href');
@@ -55,7 +55,7 @@ describe('BottomNav modo finanças', () => {
 describe('Drawer', () => {
   it('modo finanças: seções de finanças + Configurações, sem módulos ocultos', () => {
     const todos = hrefs(itensDrawer('financas'));
-    expect(todos).toEqual(['/financas', '/financas/contas', '/financas/orcamento', '/assinaturas', '/configuracoes']);
+    expect(todos).toEqual(['/financas', '/financas/carteiras', '/financas/contas', '/financas/orcamento', '/assinaturas', '/configuracoes']);
     for (const href of todos) expect(isRotaVisivel(href, 'financas')).toBe(true);
     for (const oculto of OCULTOS_NO_FINANCAS) expect(todos).not.toContain(oculto);
   });

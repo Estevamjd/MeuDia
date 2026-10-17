@@ -63,7 +63,7 @@ describe('Drawer do Topbar (modo finanças)', () => {
     renderTopbar('financas');
     abrir();
     const links = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
-    expect(links).toEqual(['/financas', '/financas/contas', '/financas/orcamento', '/assinaturas', '/configuracoes']);
+    expect(links).toEqual(['/financas', '/financas/carteiras', '/financas/contas', '/financas/orcamento', '/assinaturas', '/configuracoes']);
     expect(screen.getByRole('button', { name: 'Sair' })).toBeTruthy();
   });
 
