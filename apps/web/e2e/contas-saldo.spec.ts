@@ -1,17 +1,17 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator } from '@playwright/test';
 import { test, expect } from './mock-guard';
+import { pastaEvidencias } from './evidencias';
 
 /**
  * Aceite do BRIEF §5 "Contas, saldo e dashboard" (iPhone 13 / WebKit) contra o mock em memória do Supabase.
  * Relógio fixo em 17/10/2026 12:00 (America/Sao_Paulo) no navegador (page.clock) e no mock (/__mock/clock).
- * Screenshots full-page em EVIDENCIAS_DIR (padrão /workspace/evidencias/contas-saldo; não versionados).
+ * Screenshots full-page (e de viewport, sufixo -viewport, sem header/BottomNav no meio da imagem) em
+ * EVIDENCIAS_DIR (padrão em e2e/evidencias.ts; não versionados).
  */
 
 const MOCK_URL = 'http://127.0.0.1:54329';
 const AGORA = '2026-10-17T15:00:00.000Z'; // 12:00 em São Paulo (UTC−3)
-const EVIDENCIAS = process.env.EVIDENCIAS_DIR || '/workspace/evidencias/contas-saldo';
 
 const run = Date.now().toString(36);
 const EMAIL = `bia.${run}@example.test`;
@@ -31,7 +31,7 @@ test.afterAll(async () => {
 });
 
 test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, renda e Recebi', async ({ page }) => {
-  fs.mkdirSync(EVIDENCIAS, { recursive: true });
+  const EVIDENCIAS = pastaEvidencias('contas-saldo');
   await page.clock.setFixedTime(new Date(AGORA));
 
   const erros: string[] = [];
@@ -40,7 +40,7 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
     if (res.status() >= 400) erros.push(`${res.request().method()} ${res.url()} → ${res.status()}`);
   });
 
-  const shot = (nome: string) => page.screenshot({ path: path.join(EVIDENCIAS, nome), fullPage: true, animations: 'disabled' });
+  const shot = (nome: string, fullPage = true) => page.screenshot({ path: path.join(EVIDENCIAS, nome), fullPage, animations: 'disabled' });
   const tocar = async (alvo: Locator) => {
     await alvo.evaluate((el) => el.scrollIntoView({ block: 'center' }));
     await alvo.click();
@@ -179,6 +179,12 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await expect(fimMes).toHaveText(brl('1.455,00'));
   await semScrollHorizontal();
   await shot('02-home-dashboard.png');
+  // Viewport (o que a usuária vê no iPhone): topo da home e rolada até os gráficos.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await shot('02-home-dashboard-viewport.png', false);
+  await page.getByRole('region', { name: 'Gastos do mês por categoria' }).evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  await page.evaluate(() => window.scrollBy(0, -72)); // folga para o header fixo não cobrir o título do card
+  await shot('02b-home-graficos-viewport.png', false);
 
   // "por quê?" do 7 dias: conta em português.
   await tocar(page.getByRole('button', { name: 'por quê? Em 7 dias você terá' }));
