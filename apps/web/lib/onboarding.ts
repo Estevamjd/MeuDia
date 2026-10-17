@@ -78,7 +78,10 @@ export function aplicarOnboardingNoCache(
 export const MENSAGEM_ERRO_ONBOARDING =
   'Não foi possível salvar. Verifique sua conexão e tente novamente.';
 
-/** Linhas do passo "Onde fica seu dinheiro?" → carteiras a criar (sem nome = ignorada). */
+/**
+ * Linhas do passo "Onde fica seu dinheiro?" → carteiras a criar (sem nome = ignorada). O id estável vem da linha
+ * (rascunho); sem id, um UUID novo (o índice não é UUID e quebraria com 22P02).
+ */
 export function montarCarteirasOnboarding(
   linhas: readonly { id?: string; negativo?: boolean; nome: string; digitos: string }[],
 ): { id: string; indice: number; carteira: { nome: string; tipo: 'banco' | 'dinheiro' | 'poupanca'; saldo_inicial: number; ordem: number } }[] {
@@ -87,6 +90,6 @@ export function montarCarteirasOnboarding(
     if (!nome) return [];
     const digitos = l.digitos.replace(/\D/g, '');
     const tipo = /carteira|dinheiro|esp[eé]cie/i.test(nome) ? 'dinheiro' : /poupan[cç]a/i.test(nome) ? 'poupanca' : 'banco';
-    return [{ id: l.id ?? String(indice), indice, carteira: { nome, tipo, saldo_inicial: digitos ? Number(digitos) / 100 * (l.negativo || l.digitos.includes('-') ? -1 : 1) : 0, ordem: indice } }];
+    return [{ id: l.id ?? crypto.randomUUID(), indice, carteira: { nome, tipo, saldo_inicial: digitos ? Number(digitos) / 100 * (l.negativo || l.digitos.includes('-') ? -1 : 1) : 0, ordem: indice } }];
   });
 }

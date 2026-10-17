@@ -171,13 +171,14 @@ describe('montarDashboard', () => {
 });
 
 describe('onboarding: "Onde fica seu dinheiro?"', () => {
+  const UUID = /^[0-9a-f-]{36}$/;
   it('ignora linhas sem nome, converte centavos e infere o tipo', () => {
     expect(montarCarteirasOnboarding([
       { nome: ' Nubank ', digitos: '65000' }, { nome: '', digitos: '100' }, { nome: 'Carteira', digitos: '' }, { nome: 'Poupança', digitos: '1' },
     ])).toEqual([
-      { id: '0', indice: 0, carteira: { nome: 'Nubank', tipo: 'banco', saldo_inicial: 650, ordem: 0 } },
-      { id: '2', indice: 2, carteira: { nome: 'Carteira', tipo: 'dinheiro', saldo_inicial: 0, ordem: 2 } },
-      { id: '3', indice: 3, carteira: { nome: 'Poupança', tipo: 'poupanca', saldo_inicial: 0.01, ordem: 3 } },
+      { id: expect.stringMatching(UUID), indice: 0, carteira: { nome: 'Nubank', tipo: 'banco', saldo_inicial: 650, ordem: 0 } },
+      { id: expect.stringMatching(UUID), indice: 2, carteira: { nome: 'Carteira', tipo: 'dinheiro', saldo_inicial: 0, ordem: 2 } },
+      { id: expect.stringMatching(UUID), indice: 3, carteira: { nome: 'Poupança', tipo: 'poupanca', saldo_inicial: 0.01, ordem: 3 } },
     ]);
   });
 });

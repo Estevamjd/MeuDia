@@ -104,9 +104,12 @@ export default function OnboardingPage() {
     setSaving(true);
     setErro(null);
 
-    // Upsert: cria a linha se o perfil não existir (senão o dashboard voltaria para cá).
+    // Upsert: cria a linha se o perfil não existir (senão o dashboard voltaria para cá). Sem onboarding_feito aqui:
+    // perfil novo nasce com o DEFAULT false e um já concluído não é rebaixado se a etapa dos bancos falhar.
     const perfil = montarPerfilOnboarding(user, data, { modoFinancas, pular });
-    const { error } = await supabase.from('profiles').upsert({ ...perfil, onboarding_feito: false }, { onConflict: 'id' });
+    const dadosPerfil: Partial<typeof perfil> = { ...perfil };
+    delete dadosPerfil.onboarding_feito;
+    const { error } = await supabase.from('profiles').upsert(dadosPerfil, { onConflict: 'id' });
 
     if (error) {
       setSaving(false);

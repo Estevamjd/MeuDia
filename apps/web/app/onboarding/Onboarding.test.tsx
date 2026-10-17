@@ -45,3 +45,15 @@ it('controle Está negativo envia saldo negativo', async () => {
   await waitFor(() => expect(m.replace).toHaveBeenCalled());
   expect(m.criar).toHaveBeenCalledWith('u', expect.any(String), expect.objectContaining({ saldo_inicial: -100 }));
 });
+it('perfil já concluído que passa pelo onboarding não volta a ficar incompleto se os bancos falharem', async () => {
+  m.criar.mockRejectedValueOnce(new Error('offline'));
+  montar();
+  fireEvent.click(screen.getByRole('button', { name: 'Continuar' }));
+  fireEvent.change(screen.getByLabelText('Banco ou carteira 1'), { target: { value: 'Nubank' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Concluir' }));
+  await screen.findByRole('alert');
+  // A 1ª gravação (antes dos bancos) não manda onboarding_feito: o upsert cria com o DEFAULT false do banco e,
+  // se a linha já existe com true, não rebaixa.
+  expect(m.upsert).toHaveBeenCalledTimes(1);
+  expect(m.upsert.mock.calls[0]![0]).not.toHaveProperty('onboarding_feito');
+});
