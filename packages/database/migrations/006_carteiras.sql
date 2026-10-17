@@ -25,6 +25,8 @@ ALTER TABLE public.transacoes ADD COLUMN IF NOT EXISTS ajuste BOOLEAN NOT NULL D
 ALTER TABLE public.rendas ADD COLUMN IF NOT EXISTS carteira_id UUID;
 -- Idempotência do "Corrigir saldo": a mesma chave nunca gera dois ajustes (ver corrigir_saldo).
 ALTER TABLE public.transacoes ADD COLUMN IF NOT EXISTS chave_ajuste UUID;
+-- Saldo informado no "Corrigir saldo" que gerou o ajuste; repetir a chave com outro valor é erro.
+ALTER TABLE public.transacoes ADD COLUMN IF NOT EXISTS ajuste_valor_real DECIMAL(12,2);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_transacoes_user_chave_ajuste
   ON public.transacoes(user_id, chave_ajuste) WHERE chave_ajuste IS NOT NULL;
 
@@ -104,7 +106,8 @@ END $$;
 
 -- P0002: renda/carteira inexistente, arquivada ou de outro usuário; 22023: competência/estado inválido;
 -- P0003: competência já recebida. NULL em p_recebido_em usa a data corrente em America/Sao_Paulo.
--- NULL em p_carteira_id usa a carteira padrão da renda (rendas.carteira_id), se houver.
+-- NULL em p_carteira_id usa a carteira padrão da renda (rendas.carteira_id), se houver; se ela estiver arquivada,
+-- usa a primeira carteira ativa (ordem, criação, id) ou nenhuma. p_carteira_id explícita e arquivada é P0002.
 CREATE OR REPLACE FUNCTION public.receber_renda(
   p_renda_id UUID,
   p_competencia TEXT,
@@ -136,12 +139,19 @@ BEGIN
     WHERE renda_id = p_renda_id AND competencia = p_competencia AND user_id = v_renda.user_id) THEN
     RAISE EXCEPTION 'Competência já recebida' USING ERRCODE = 'P0003', HINT = 'Exige competência sem recebimento.';
   END IF;
-  v_carteira_id := coalesce(p_carteira_id, v_renda.carteira_id);
-  IF v_carteira_id IS NOT NULL THEN
-    SELECT nome INTO v_carteira_nome FROM public.carteiras
-      WHERE id = v_carteira_id AND user_id = v_renda.user_id AND NOT arquivada;
+  IF p_carteira_id IS NOT NULL THEN
+    SELECT id, nome INTO v_carteira_id, v_carteira_nome FROM public.carteiras
+      WHERE id = p_carteira_id AND user_id = v_renda.user_id AND NOT arquivada;
     IF NOT FOUND THEN
       RAISE EXCEPTION 'Carteira não encontrada ou arquivada' USING ERRCODE = 'P0002';
+    END IF;
+  ELSIF v_renda.carteira_id IS NOT NULL THEN
+    SELECT id, nome INTO v_carteira_id, v_carteira_nome FROM public.carteiras
+      WHERE id = v_renda.carteira_id AND user_id = v_renda.user_id AND NOT arquivada;
+    IF NOT FOUND THEN
+      SELECT id, nome INTO v_carteira_id, v_carteira_nome FROM public.carteiras
+        WHERE user_id = v_renda.user_id AND NOT arquivada
+        ORDER BY ordem, created_at, id LIMIT 1;
     END IF;
   END IF;
   v_recebido_em := coalesce(p_recebido_em, (pg_catalog.now() AT TIME ZONE 'America/Sao_Paulo')::date);
@@ -178,8 +188,9 @@ BEGIN
     RAISE EXCEPTION 'Recebimento não encontrado nesta competência'
       USING ERRCODE = '22023', HINT = 'Exige competência recebida.';
   END IF;
-  DELETE FROM public.transacoes WHERE id = v_recebimento.transacao_id AND user_id = v_recebimento.user_id;
+  -- Vínculo antes da receita: a receita deixa de ser protegida (ver proteger_transacao_vinculada).
   DELETE FROM public.recebimentos_renda WHERE id = v_recebimento.id AND user_id = v_recebimento.user_id;
+  DELETE FROM public.transacoes WHERE id = v_recebimento.transacao_id AND user_id = v_recebimento.user_id;
 END;
 $$;
 
@@ -208,8 +219,12 @@ BEGIN
   END IF;
   v_pagamento := public.pagar_conta(p_conta_id, p_competencia, p_pago_em, coalesce(p_banco, v_carteira_nome));
   IF p_carteira_id IS NOT NULL THEN
+    -- A despesa já está vinculada ao pagamento; libera só este UPDATE (GUC local à transação, desligado logo após).
+    -- O cliente (PostgREST) não chama set_config: ela não fica exposta como RPC.
+    PERFORM pg_catalog.set_config('meudia.vinculo_liberado', 'on', true);
     UPDATE public.transacoes SET carteira_id = p_carteira_id
       WHERE id = v_pagamento.transacao_id AND user_id = v_pagamento.user_id;
+    PERFORM pg_catalog.set_config('meudia.vinculo_liberado', 'off', true);
   END IF;
   RETURN v_pagamento;
 END;
@@ -217,9 +232,13 @@ $$;
 
 -- R9 "Corrigir saldo" atômico: trava a carteira (FOR UPDATE), calcula o saldo de hoje pela mesma fórmula de
 -- saldoCarteira (packages/shared/src/utils/saldo.ts) e grava o ajuste com a diferença (ajuste=true).
--- Idempotente por p_chave: repetir a mesma chave devolve o ajuste já criado. Duas abas com chaves diferentes
--- são serializadas pelo lock; a segunda vê o saldo já corrigido e não cria nada.
--- Sem diferença não cria nada (0 linhas). P0002: carteira inexistente/arquivada/de outro usuário; 22023: valor/chave inválidos.
+-- Contrato da chave (p_chave, UUID gerado pelo cliente por tentativa de correção e mantido nos retries):
+--   * mesma chave + mesma carteira + mesmo p_valor_real: devolve o ajuste já criado, sem duplicar;
+--   * mesma chave com outra carteira ou outro p_valor_real: 22023 (nunca devolve em silêncio um ajuste de outro valor);
+--   * sem diferença não cria nada (0 linhas) e a chave não fica consumida.
+-- Duas abas com chaves diferentes são serializadas pelo lock; a segunda vê o saldo já corrigido e não cria nada.
+-- P0002: carteira inexistente/arquivada/de outro usuário; 22023: valor/chave inválidos ou diferença acima de
+-- 99.999.999,99 (limite de transacoes.valor DECIMAL(10,2)).
 CREATE OR REPLACE FUNCTION public.corrigir_saldo(p_carteira_id UUID, p_valor_real NUMERIC, p_chave UUID)
 RETURNS SETOF public.transacoes
 LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
@@ -249,6 +268,9 @@ BEGIN
     IF v_ajuste.carteira_id IS DISTINCT FROM v_carteira.id THEN
       RAISE EXCEPTION 'Chave já usada em outra carteira' USING ERRCODE = '22023';
     END IF;
+    IF v_ajuste.ajuste_valor_real IS DISTINCT FROM p_valor_real THEN
+      RAISE EXCEPTION 'Chave já usada com outro valor' USING ERRCODE = '22023', HINT = 'Gere uma chave nova por correção.';
+    END IF;
     RETURN NEXT v_ajuste;
     RETURN;
   END IF;
@@ -269,19 +291,96 @@ BEGIN
   IF v_diferenca = 0 THEN
     RETURN;
   END IF;
-  INSERT INTO public.transacoes (user_id, tipo, categoria, descricao, valor, data, banco, automatico, carteira_id, ajuste, chave_ajuste)
+  IF pg_catalog.abs(v_diferenca) > 99999999.99 THEN
+    RAISE EXCEPTION 'Diferença grande demais para um ajuste' USING ERRCODE = '22023',
+      HINT = 'O ajuste aceita no máximo 99.999.999,99.';
+  END IF;
+  INSERT INTO public.transacoes (user_id, tipo, categoria, descricao, valor, data, banco, automatico, carteira_id, ajuste,
+                                 chave_ajuste, ajuste_valor_real)
     VALUES (v_carteira.user_id, CASE WHEN v_diferenca > 0 THEN 'receita' ELSE 'despesa' END, 'Ajuste de saldo',
-            'Correção de saldo', pg_catalog.abs(v_diferenca), v_hoje, v_carteira.nome, FALSE, v_carteira.id, TRUE, p_chave)
+            'Correção de saldo', pg_catalog.abs(v_diferenca), v_hoje, v_carteira.nome, FALSE, v_carteira.id, TRUE,
+            p_chave, p_valor_real)
     RETURNING * INTO v_ajuste;
   RETURN NEXT v_ajuste;
 END;
 $$;
 
+-- Lançamento vinculado a "Recebi"/"Paguei" só muda pelas RPCs (desfazer_*), nunca por UPDATE/DELETE direto (PostgREST).
+-- UPDATE: bloqueado na hora por proteger_transacao_vinculada (BEFORE UPDATE em transacoes).
+-- DELETE: a FK do vínculo põe transacao_id em NULL (SET NULL); checar_vinculo_orfao é um CONSTRAINT TRIGGER
+-- adiado para o COMMIT e falha se o vínculo continuar existindo sem transação. Adiado para não depender da ordem
+-- dos DELETEs na transação: a desfazer_pagamento da 005 (intacta) apaga a despesa ANTES do pagamento.
+-- Sem GUC de "desfazendo" no DELETE: não há atalho a abrir. Exceções do UPDATE: ações em cascata (RI de
+-- profiles/carteiras, pg_trigger_depth() > 1) e o GUC local meudia.vinculo_liberado ligado só por pagar_conta_v2.
+-- 55000: lançamento vinculado; use desfazer_recebimento/desfazer_pagamento.
+CREATE INDEX IF NOT EXISTS idx_pagamentos_conta_transacao ON public.pagamentos_conta(transacao_id) WHERE transacao_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_recebimentos_renda_transacao ON public.recebimentos_renda(transacao_id) WHERE transacao_id IS NOT NULL;
+
+CREATE OR REPLACE FUNCTION public.proteger_transacao_vinculada()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
+AS $$
+BEGIN
+  IF pg_catalog.pg_trigger_depth() > 1
+    OR pg_catalog.current_setting('meudia.vinculo_liberado', true) IS NOT DISTINCT FROM 'on' THEN
+    RETURN NEW;
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.recebimentos_renda WHERE transacao_id = OLD.id AND user_id = OLD.user_id)
+    OR EXISTS (SELECT 1 FROM public.pagamentos_conta WHERE transacao_id = OLD.id AND user_id = OLD.user_id) THEN
+    RAISE EXCEPTION 'Lançamento vinculado a Recebi/Paguei não pode ser alterado' USING ERRCODE = '55000',
+      HINT = 'Use desfazer_recebimento ou desfazer_pagamento.';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.checar_vinculo_orfao()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY INVOKER SET search_path = ''
+AS $$
+DECLARE
+  v_orfao BOOLEAN;
+BEGIN
+  EXECUTE pg_catalog.format('SELECT EXISTS (SELECT 1 FROM %I.%I WHERE id = $1 AND transacao_id IS NULL)',
+    TG_TABLE_SCHEMA, TG_TABLE_NAME) INTO v_orfao USING NEW.id;
+  IF v_orfao THEN
+    RAISE EXCEPTION 'Lançamento vinculado a Recebi/Paguei não pode ser excluído' USING ERRCODE = '55000',
+      HINT = 'Use desfazer_recebimento ou desfazer_pagamento.';
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+DO $$
+DECLARE
+  t TEXT;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger
+    WHERE tgname = 'trg_vinculo_transacoes' AND tgrelid = 'public.transacoes'::pg_catalog.regclass) THEN
+    CREATE TRIGGER trg_vinculo_transacoes BEFORE UPDATE ON public.transacoes
+      FOR EACH ROW EXECUTE FUNCTION public.proteger_transacao_vinculada();
+  END IF;
+  FOREACH t IN ARRAY ARRAY['pagamentos_conta', 'recebimentos_renda'] LOOP
+    IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger
+      WHERE tgname = 'trg_vinculo_orfao' AND tgrelid = pg_catalog.to_regclass(pg_catalog.format('public.%I', t))) THEN
+      EXECUTE pg_catalog.format('CREATE CONSTRAINT TRIGGER trg_vinculo_orfao AFTER UPDATE OF transacao_id ON public.%I '
+        'DEFERRABLE INITIALLY DEFERRED FOR EACH ROW '
+        'WHEN (OLD.transacao_id IS NOT NULL AND NEW.transacao_id IS NULL) '
+        'EXECUTE FUNCTION public.checar_vinculo_orfao()', t);
+    END IF;
+  END LOOP;
+END $$;
+REVOKE EXECUTE ON FUNCTION public.proteger_transacao_vinculada() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.checar_vinculo_orfao() FROM PUBLIC, anon, authenticated;
+
 -- Tabelas novas: acesso explícito para authenticated (RLS users_own_data filtra as linhas), nada para anon.
--- Não depende dos default privileges do projeto. UPDATE em recebimentos_renda é exigido pelo SELECT ... FOR UPDATE
+-- REVOKE ALL antes do GRANT: no Supabase os default privileges dão ALL (inclusive TRUNCATE, REFERENCES e TRIGGER)
+-- a anon/authenticated em tabela nova. Carteira não tem DELETE (só arquivar); o CASCADE vindo de profiles roda
+-- como dono da tabela e segue funcionando. UPDATE em recebimentos_renda é exigido pelo SELECT ... FOR UPDATE
 -- de desfazer_recebimento (RPC SECURITY INVOKER).
-REVOKE ALL ON public.carteiras, public.transferencias, public.recebimentos_renda FROM PUBLIC, anon;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.carteiras, public.transferencias, public.recebimentos_renda TO authenticated;
+REVOKE ALL ON public.carteiras, public.transferencias, public.recebimentos_renda FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.carteiras TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.transferencias, public.recebimentos_renda TO authenticated;
 
 REVOKE EXECUTE ON FUNCTION public.corrigir_saldo(UUID, NUMERIC, UUID) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.corrigir_saldo(UUID, NUMERIC, UUID) TO authenticated;

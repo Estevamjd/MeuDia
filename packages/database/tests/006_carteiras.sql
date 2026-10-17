@@ -4,6 +4,8 @@
 BEGIN;
 \ir ../migrations/000_baseline.sql
 \ir ../migrations/005_financas.sql
+-- Como no Supabase: tabelas novas nascem com ALL para anon/authenticated (default privileges). A 006 tem de revogar.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated;
 \ir ../migrations/006_carteiras.sql
 \ir ../migrations/006_carteiras.sql
 
@@ -82,19 +84,23 @@ SELECT pg_temp.expect_error($q$INSERT INTO public.transferencias (user_id, orige
 SELECT pg_temp.expect_error($q$INSERT INTO public.transferencias (user_id, origem_id, destino_id, valor, data)
   VALUES ('c0060000-0000-4000-8000-0000000000a1', 'c0060000-0000-4000-8000-0000000000a2', 'c0060000-0000-4000-8000-0000000000a3', 0, '2026-10-17')$q$, '23514');
 
--- Grants das tabelas novas vêm da própria 006 (nada de grant reparador aqui): authenticated com CRUD (RLS filtra), anon sem nada.
+-- Grants das tabelas novas vêm da própria 006 (nada de grant reparador aqui), mesmo com os default privileges do
+-- Supabase: authenticated só com o necessário (RLS filtra), sem DELETE em carteiras (só arquivar), sem TRUNCATE,
+-- REFERENCES e TRIGGER; anon sem nada.
 DO $$
 DECLARE
   t TEXT;
   p TEXT;
+  esperado BOOLEAN;
 BEGIN
   FOREACH t IN ARRAY ARRAY['carteiras', 'transferencias', 'recebimentos_renda'] LOOP
-    FOREACH p IN ARRAY ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE'] LOOP
+    FOREACH p IN ARRAY ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'] LOOP
       IF pg_catalog.has_table_privilege('anon', 'public.' || t, p) THEN
         RAISE EXCEPTION 'anon não deveria ter % em %', p, t;
       END IF;
-      IF NOT pg_catalog.has_table_privilege('authenticated', 'public.' || t, p) THEN
-        RAISE EXCEPTION 'Grant de authenticated incorreto: % em %', p, t;
+      esperado := p IN ('SELECT', 'INSERT', 'UPDATE') OR (p = 'DELETE' AND t <> 'carteiras');
+      IF pg_catalog.has_table_privilege('authenticated', 'public.' || t, p) IS DISTINCT FROM esperado THEN
+        RAISE EXCEPTION 'Grant de authenticated incorreto: % em % (esperado %)', p, t, esperado;
       END IF;
     END LOOP;
   END LOOP;
@@ -128,6 +134,7 @@ DECLARE
   c public.carteiras;
   r public.recebimentos_renda;
   r2 public.recebimentos_renda;
+  r3 public.recebimentos_renda;
   p public.pagamentos_conta;
   t public.transacoes;
   comp TEXT;
@@ -184,6 +191,16 @@ BEGIN
     RAISE EXCEPTION 'Carteira padrão da renda/data SP falhou';
   END IF;
 
+  -- Carteira padrão arquivada e nenhuma escolhida: usa a primeira carteira ativa (ordem, criação, id), não trava o Recebi.
+  UPDATE public.rendas SET carteira_id = arquivada WHERE id = renda_a;
+  SELECT * INTO r3 FROM public.receber_renda(renda_a, '2026-12');
+  SELECT * INTO STRICT t FROM public.transacoes WHERE id = r3.transacao_id;
+  IF t.carteira_id IS DISTINCT FROM nubank OR t.banco IS DISTINCT FROM 'Nubank' THEN
+    RAISE EXCEPTION 'Recebi com carteira padrão arquivada deveria usar a primeira ativa: %', t.carteira_id;
+  END IF;
+  PERFORM public.desfazer_recebimento(renda_a, '2026-12');
+  UPDATE public.rendas SET carteira_id = nubank WHERE id = renda_a;
+
   -- Desfazer remove recebimento e receita só da competência indicada.
   PERFORM public.desfazer_recebimento(renda_a, '2026-10');
   IF EXISTS (SELECT 1 FROM public.recebimentos_renda WHERE id = r.id)
@@ -193,12 +210,27 @@ BEGIN
     RAISE EXCEPTION 'Desfazer recebimento afetou competência errada';
   END IF;
   PERFORM pg_temp.expect_error(pg_catalog.format('SELECT public.desfazer_recebimento(%L, %L)', renda_a, '2026-10'), '22023');
-  -- Apagar a receita à mão: o recebimento fica, sem transação e com o mesmo dono.
-  DELETE FROM public.transacoes WHERE id = r2.transacao_id;
-  IF NOT EXISTS (SELECT 1 FROM public.recebimentos_renda WHERE id = r2.id AND transacao_id IS NULL AND user_id = ua) THEN
-    RAISE EXCEPTION 'SET NULL da transação alterou proprietário do recebimento';
+  -- Receita do Recebi não se edita nem se apaga direto (PostgREST): UPDATE falha na hora; DELETE deixaria o
+  -- recebimento órfão e falha no COMMIT (trigger adiado; SET CONSTRAINTS ALL IMMEDIATE antecipa a checagem).
+  PERFORM pg_temp.expect_error(pg_catalog.format('UPDATE public.transacoes SET valor = 1 WHERE id = %L', r2.transacao_id), '55000');
+  PERFORM pg_temp.expect_error(pg_catalog.format('UPDATE public.transacoes SET carteira_id = %L WHERE id = %L', caixa, r2.transacao_id), '55000');
+  PERFORM pg_temp.expect_error(pg_catalog.format(
+    'DELETE FROM public.transacoes WHERE id = %L; SET CONSTRAINTS ALL IMMEDIATE', r2.transacao_id), '55000');
+  SET CONSTRAINTS ALL DEFERRED;
+  PERFORM pg_temp.expect_error(pg_catalog.format(
+    'UPDATE public.recebimentos_renda SET transacao_id = NULL WHERE id = %L; SET CONSTRAINTS ALL IMMEDIATE', r2.id), '55000');
+  SET CONSTRAINTS ALL DEFERRED;
+  IF NOT EXISTS (SELECT 1 FROM public.recebimentos_renda WHERE id = r2.id AND transacao_id = r2.transacao_id)
+    OR NOT EXISTS (SELECT 1 FROM public.transacoes WHERE id = r2.transacao_id AND valor = 900) THEN
+    RAISE EXCEPTION 'Bloqueio do vínculo deixou recebimento/receita alterados';
   END IF;
+  -- Desfazer é o caminho: passa inclusive pela checagem do COMMIT.
   PERFORM public.desfazer_recebimento(renda_a, '2026-11');
+  SET CONSTRAINTS ALL IMMEDIATE;
+  SET CONSTRAINTS ALL DEFERRED;
+  IF EXISTS (SELECT 1 FROM public.transacoes WHERE id = r2.transacao_id) THEN
+    RAISE EXCEPTION 'Desfazer recebimento não apagou a receita';
+  END IF;
 
   -- Paguei com carteira (v2) e a pagar_conta antiga continua sem ambiguidade.
   SELECT * INTO p FROM public.pagar_conta_v2(conta_a, '2026-10', '2026-10-17', NULL, nubank);
@@ -207,8 +239,21 @@ BEGIN
     RAISE EXCEPTION 'pagar_conta_v2 não vinculou a carteira';
   END IF;
   PERFORM pg_temp.expect_error(pg_catalog.format('SELECT public.pagar_conta_v2(%L, %L, NULL, NULL, %L)', conta_a, '2026-10', caixa), 'P0003');
+  -- Despesa do Paguei também é protegida; a desfazer_pagamento da 005 (apaga a transação antes do pagamento) segue ok.
+  PERFORM pg_temp.expect_error(pg_catalog.format('UPDATE public.transacoes SET data = %L WHERE id = %L', '2026-10-01', p.transacao_id), '55000');
+  PERFORM pg_temp.expect_error(pg_catalog.format(
+    'DELETE FROM public.transacoes WHERE id = %L; SET CONSTRAINTS ALL IMMEDIATE', p.transacao_id), '55000');
+  SET CONSTRAINTS ALL DEFERRED;
+  PERFORM pg_temp.expect_error(pg_catalog.format(
+    'UPDATE public.pagamentos_conta SET transacao_id = NULL WHERE id = %L; SET CONSTRAINTS ALL IMMEDIATE', p.id), '55000');
+  SET CONSTRAINTS ALL DEFERRED;
   PERFORM pg_temp.expect_error(pg_catalog.format('SELECT public.pagar_conta_v2(%L, %L, NULL, NULL, %L)', conta_a, '2026-11', arquivada), 'P0002');
   PERFORM public.desfazer_pagamento(conta_a, '2026-10');
+  SET CONSTRAINTS ALL IMMEDIATE;
+  SET CONSTRAINTS ALL DEFERRED;
+  IF EXISTS (SELECT 1 FROM public.pagamentos_conta WHERE conta_id = conta_a) THEN
+    RAISE EXCEPTION 'desfazer_pagamento da 005 não removeu o pagamento';
+  END IF;
   SELECT * INTO p FROM public.pagar_conta(conta_a, '2026-10');
   SELECT * INTO STRICT t FROM public.transacoes WHERE id = p.transacao_id;
   IF t.carteira_id IS NOT NULL THEN RAISE EXCEPTION 'pagar_conta antiga deveria manter carteira NULL'; END IF;
@@ -217,6 +262,14 @@ BEGIN
   SELECT * INTO STRICT t FROM public.transacoes WHERE id = p.transacao_id;
   IF t.carteira_id IS NOT NULL OR t.banco IS NOT NULL THEN RAISE EXCEPTION 'pagar_conta_v2 sem carteira divergiu da antiga'; END IF;
   PERFORM public.desfazer_pagamento(conta_a, '2026-10');
+
+  -- Lançamento sem vínculo segue editável e apagável.
+  INSERT INTO public.transacoes (user_id, tipo, categoria, descricao, valor, data, carteira_id)
+    VALUES (ua, 'despesa', 'Outros', 'Livre', 7, '2026-10-17', nubank) RETURNING * INTO t;
+  UPDATE public.transacoes SET valor = 8 WHERE id = t.id;
+  DELETE FROM public.transacoes WHERE id = t.id;
+  SET CONSTRAINTS ALL IMMEDIATE;
+  SET CONSTRAINTS ALL DEFERRED;
 
   -- Transferência e ajuste do próprio usuário; trigger updated_at.
   INSERT INTO public.transferencias (user_id, origem_id, destino_id, valor, data) VALUES (ua, caixa, nubank, 50, '2026-10-17');
@@ -250,6 +303,13 @@ BEGIN
   SELECT * INTO STRICT aj2 FROM public.corrigir_saldo(corrigivel, 100.5, k3);
   IF aj2.tipo <> 'receita' OR aj2.valor <> 20.5 THEN RAISE EXCEPTION 'Ajuste positivo errado'; END IF;
   PERFORM pg_temp.expect_error(pg_catalog.format('SELECT * FROM public.corrigir_saldo(%L, 1, %L)', caixa, k1), '22023');
+  -- Contrato da chave: repetir com o MESMO valor devolve o ajuste; com valor diferente é erro (22023), nunca silêncio.
+  PERFORM pg_temp.expect_error(pg_catalog.format('SELECT * FROM public.corrigir_saldo(%L, 81, %L)', corrigivel, k1), '22023');
+  SELECT * INTO STRICT aj2 FROM public.corrigir_saldo(corrigivel, 80, k1);
+  IF aj2.id <> aj.id THEN RAISE EXCEPTION 'Repetição com o mesmo valor deveria devolver o ajuste original'; END IF;
+  -- Diferença acima de transacoes.valor DECIMAL(10,2) é 22023 (não estouro 22003 → 500).
+  PERFORM pg_temp.expect_error(pg_catalog.format('SELECT * FROM public.corrigir_saldo(%L, 100000100.5, %L)', corrigivel, gen_random_uuid()), '22023');
+  PERFORM pg_temp.expect_error(pg_catalog.format('SELECT * FROM public.corrigir_saldo(%L, -99999900, %L)', corrigivel, gen_random_uuid()), '22023');
   PERFORM pg_temp.expect_error(pg_catalog.format('SELECT * FROM public.corrigir_saldo(%L, 1.234, %L)', corrigivel, gen_random_uuid()), '22023');
   PERFORM pg_temp.expect_error(pg_catalog.format('SELECT * FROM public.corrigir_saldo(%L, 1, NULL)', corrigivel), '22023');
   PERFORM pg_temp.expect_error(pg_catalog.format('SELECT * FROM public.corrigir_saldo(%L, 1, %L)', arquivada, gen_random_uuid()), 'P0002');
@@ -257,8 +317,13 @@ BEGIN
   PERFORM pg_temp.expect_error(pg_catalog.format($q$INSERT INTO public.transacoes (user_id, tipo, categoria, descricao, valor, chave_ajuste)
     VALUES (auth.uid(), 'despesa', 'Outros', 'chave repetida', 1, %L)$q$, k1), '23505');
 
-  -- Carteira com transferência não pode ser apagada (arquivar é o caminho).
-  PERFORM pg_temp.expect_error(pg_catalog.format('DELETE FROM public.carteiras WHERE id = %L', caixa), '23503');
+  -- Carteira não se apaga pelo app (sem grant de DELETE): arquivar é o caminho.
+  PERFORM pg_temp.expect_error(pg_catalog.format('DELETE FROM public.carteiras WHERE id = %L', nubank), '42501');
+  PERFORM pg_temp.expect_error('TRUNCATE public.carteiras', '42501');
+
+  -- Vínculos vivos para o CASCADE da exclusão de conta (mais abaixo) atravessar os triggers de proteção.
+  PERFORM public.receber_renda(renda_a, '2027-01');
+  PERFORM public.pagar_conta_v2(conta_a, '2026-11', NULL, NULL, nubank);
 END $$;
 
 SELECT set_config('request.jwt.claim.sub', 'c0060000-0000-4000-8000-0000000000b1', true);
@@ -273,7 +338,14 @@ BEGIN
   -- B também não consegue apontar para a carteira de A.
   PERFORM pg_temp.expect_error($q$SELECT public.receber_renda('c0060000-0000-4000-8000-0000000000b5', '2026-10', NULL, 'c0060000-0000-4000-8000-0000000000a2')$q$, 'P0002');
   UPDATE public.carteiras SET nome = 'Hack' WHERE id = 'c0060000-0000-4000-8000-0000000000a2';
-  DELETE FROM public.carteiras WHERE id = 'c0060000-0000-4000-8000-0000000000a3';
+  PERFORM pg_temp.expect_error($q$DELETE FROM public.carteiras WHERE id = 'c0060000-0000-4000-8000-0000000000a3'$q$, '42501');
+  -- Carteira padrão arquivada e nenhuma ativa: Recebi grava sem carteira (NULL) em vez de travar.
+  UPDATE public.rendas SET carteira_id = 'c0060000-0000-4000-8000-0000000000b2' WHERE id = 'c0060000-0000-4000-8000-0000000000b5';
+  UPDATE public.carteiras SET arquivada = TRUE WHERE id = 'c0060000-0000-4000-8000-0000000000b2';
+  IF EXISTS (SELECT 1 FROM public.transacoes t JOIN public.receber_renda('c0060000-0000-4000-8000-0000000000b5', '2026-10') r
+    ON t.id = r.transacao_id WHERE t.carteira_id IS NOT NULL) THEN
+    RAISE EXCEPTION 'Recebi sem carteira ativa deveria gravar carteira NULL';
+  END IF;
 END $$;
 RESET ROLE;
 DO $$
@@ -284,11 +356,14 @@ BEGIN
   END IF;
 END $$;
 
--- Carteira sem transferências apagada direto no banco: lançamentos ficam com carteira NULL e o mesmo dono.
+-- Carteira sem transferências apagada direto no banco (dono/CASCADE): lançamentos ficam com carteira NULL e o mesmo
+-- dono, inclusive o vinculado a um Paguei (o SET NULL em cascata não esbarra na proteção do vínculo).
 INSERT INTO public.carteiras (id, user_id, nome) VALUES
   ('c0060000-0000-4000-8000-0000000000a9', 'c0060000-0000-4000-8000-0000000000a1', 'Temporária');
 INSERT INTO public.transacoes (id, user_id, tipo, categoria, descricao, valor, carteira_id) VALUES
   ('c0060000-0000-4000-8000-0000000000aa', 'c0060000-0000-4000-8000-0000000000a1', 'despesa', 'Outros', 'Na temporária', 1, 'c0060000-0000-4000-8000-0000000000a9');
+INSERT INTO public.pagamentos_conta (conta_id, user_id, competencia, pago_em, transacao_id) VALUES
+  ('c0060000-0000-4000-8000-0000000000a7', 'c0060000-0000-4000-8000-0000000000a1', '2026-12', '2026-12-01', 'c0060000-0000-4000-8000-0000000000aa');
 DELETE FROM public.carteiras WHERE id = 'c0060000-0000-4000-8000-0000000000a9';
 DO $$
 BEGIN
@@ -300,6 +375,8 @@ END $$;
 
 -- Excluir a conta (auth.users → profiles CASCADE) remove carteiras e transferências sem esbarrar nas FKs.
 DELETE FROM auth.users WHERE id = 'c0060000-0000-4000-8000-0000000000a1';
+SET CONSTRAINTS ALL IMMEDIATE;
+SET CONSTRAINTS ALL DEFERRED;
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM public.carteiras WHERE user_id = 'c0060000-0000-4000-8000-0000000000a1')
@@ -308,7 +385,10 @@ BEGIN
   END IF;
 END $$;
 
--- Down repetível e novo up 2x; 000/005 preservados.
+-- Down repetível e novo up 2x; 000/005 preservados. Ajustes de saldo somem (senão viram receita/despesa comum).
+INSERT INTO public.transacoes (id, user_id, tipo, categoria, descricao, valor, data, ajuste) VALUES
+  ('c0060000-0000-4000-8000-0000000000f1', 'c0060000-0000-4000-8000-0000000000b1', 'receita', 'Ajuste de saldo', 'Correção', 5, '2026-10-17', TRUE),
+  ('c0060000-0000-4000-8000-0000000000f2', 'c0060000-0000-4000-8000-0000000000b1', 'despesa', 'Mercado', 'Comum', 5, '2026-10-17', FALSE);
 \ir ../migrations/006_carteiras_down.sql
 \ir ../migrations/006_carteiras_down.sql
 DO $$
@@ -323,7 +403,11 @@ BEGIN
     OR pg_catalog.to_regprocedure('public.pagar_conta(uuid,text,date,text)') IS NULL
     OR pg_catalog.to_regprocedure('public.set_updated_at()') IS NULL
     OR pg_catalog.to_regclass('public.pagamentos_conta') IS NULL
-    OR NOT EXISTS (SELECT 1 FROM public.rendas WHERE id = 'c0060000-0000-4000-8000-0000000000b5') THEN
+    OR NOT EXISTS (SELECT 1 FROM public.rendas WHERE id = 'c0060000-0000-4000-8000-0000000000b5')
+    OR EXISTS (SELECT 1 FROM public.transacoes WHERE id = 'c0060000-0000-4000-8000-0000000000f1')
+    OR NOT EXISTS (SELECT 1 FROM public.transacoes WHERE id = 'c0060000-0000-4000-8000-0000000000f2')
+    OR EXISTS (SELECT 1 FROM pg_catalog.pg_trigger WHERE tgname LIKE 'trg_vinculo%')
+    OR pg_catalog.to_regprocedure('public.proteger_transacao_vinculada()') IS NOT NULL THEN
     RAISE EXCEPTION 'Down removeu demais ou de menos';
   END IF;
 END $$;
