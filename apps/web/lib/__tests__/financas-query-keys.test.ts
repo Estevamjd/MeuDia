@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { carteirasKeys, chavesAfetadasPorLancamento, chavesAfetadasPorOrcamento, chavesAfetadasPorPagamento, contasKeys, orcamentoKeys } from '../financas-query-keys';
+import { carteirasKeys, chavesAfetadasPorExclusaoDeRenda, chavesAfetadasPorLancamento, chavesAfetadasPorOrcamento, chavesAfetadasPorPagamento, contasKeys, orcamentoKeys } from '../financas-query-keys';
 
 describe('orcamentoKeys', () => {
   it('lista do orçamento fica sob o prefixo invalidado por chavesAfetadasPorOrcamento', () => {
@@ -15,6 +15,12 @@ describe('orcamentoKeys', () => {
       ['resumo-financeiro-mes'],
       ['carteiras'],
     ]);
+  });
+});
+
+describe('chavesAfetadasPorExclusaoDeRenda', () => {
+  it('excluir renda também invalida os vínculos (o "Recebi" da receita some em cascata; sem isso a receita segue marcada)', () => {
+    expect(chavesAfetadasPorExclusaoDeRenda()).toEqual(expect.arrayContaining([...chavesAfetadasPorOrcamento(), ['vinculos-transacoes']]));
   });
 });
 

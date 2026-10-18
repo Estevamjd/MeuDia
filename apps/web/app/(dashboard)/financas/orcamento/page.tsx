@@ -31,6 +31,7 @@ import {
   ConfirmDialog,
   useToast,
 } from '../../../../components/ui';
+import { ConfirmarExclusao, detalheExclusaoRenda } from '../../../../components/financas/ConfirmarExclusao';
 import {
   deslocarCompetencia,
   formatBRL,
@@ -544,13 +545,12 @@ export default function OrcamentoPage() {
         isLoading={excluirOrcamento.isPending}
       />
 
-      <ConfirmDialog
+      <ConfirmarExclusao
         isOpen={!!excluindoRenda}
         onClose={() => setExcluindoRenda(null)}
         onConfirm={handleExcluirRenda}
-        title="Excluir renda"
-        message={`Excluir a renda "${excluindoRenda?.descricao}"? Esta ação não pode ser desfeita.`}
-        confirmLabel="Excluir"
+        titulo="Excluir renda"
+        detalhe={excluindoRenda ? detalheExclusaoRenda(excluindoRenda.descricao) : undefined}
         isLoading={excluirRenda.isPending}
       />
     </div>

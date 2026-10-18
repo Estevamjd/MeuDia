@@ -60,6 +60,8 @@ export type {
   Transferencia,
   TransferenciaInsert,
   RecebimentoRenda,
+  Meta,
+  MetaInsert,
 } from './financas';
 
 export type {

@@ -1,6 +1,6 @@
 import type { Carteira, CarteiraInsert, TipoCarteira, Transacao } from '@meudia/shared';
-import { AppError } from '@meudia/shared';
-import { erroDb } from './erros-db';
+import { AppError, logger } from '@meudia/shared';
+import { MENSAGEM_SCHEMA_DESATUALIZADO, erroDb } from './erros-db';
 import { getSupabase } from './supabase';
 
 const COLUMNS = 'id, user_id, nome, tipo, saldo_inicial, saldo_inicial_em, incluir_no_total, arquivada, ordem, created_at, updated_at';
@@ -65,4 +65,17 @@ export async function createIdempotente(userId: string, id: string, input: Carte
   const { data, error: erroAtualizacao } = await getSupabase().from('carteiras').update(input).eq('id', id).eq('user_id', userId).select(COLUMNS).single();
   if (erroAtualizacao) erro(erroAtualizacao);
   return data as unknown as Carteira;
+}
+
+/**
+ * Exclui de verdade (007). Lançamentos e rendas ficam com carteira NULL; transferências perdem só este lado.
+ * Banco sem a 007: 42501 (sem GRANT DELETE) ou 23503 (FK NO ACTION de transferências) → SCHEMA_DESATUALIZADO.
+ */
+export async function remove(id: string, userId: string): Promise<void> {
+  const { error } = await getSupabase().from('carteiras').delete().eq('id', id).eq('user_id', userId);
+  if (error?.code === '42501' || error?.code === '23503') {
+    logger.warn('SCHEMA_DESATUALIZADO: excluir carteira sem a 007', { code: error.code, message: error.message });
+    throw new AppError(`Schema desatualizado (${error.code}): ${error.message}`, 'SCHEMA_DESATUALIZADO', 503, MENSAGEM_SCHEMA_DESATUALIZADO);
+  }
+  if (error) erro(error);
 }

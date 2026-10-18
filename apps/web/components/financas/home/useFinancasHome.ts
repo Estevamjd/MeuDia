@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Competencia, Transacao } from '@meudia/shared';
 import {
   useVinculosTransacoes,
+  useDesfazerPagamento,
   useDesfazerRecebimento,
+  useExcluirTransacao,
   useContas,
   useContasMes,
   useCriarRenda,
@@ -39,7 +41,16 @@ function lerDispensado(): boolean {
 interface AcoesLancamento {
   onNovo: () => void;
   onEditar: (t: Transacao) => void;
-  onExcluir: (t: Transacao) => void;
+}
+
+type Vinculo = 'recebimento' | 'pagamento';
+
+/** O que a confirmação diz além de "Excluir? Isso não pode ser desfeito.". */
+export function detalheExclusaoLancamento(t: Pick<Transacao, 'ajuste' | 'carteira_id'>, vinculo: Vinculo | undefined): string {
+  if (vinculo === 'pagamento') return 'Ele veio do "Paguei": o lançamento sai e a conta volta a ficar a pagar.';
+  if (vinculo === 'recebimento') return 'Ele veio do "Recebi": o lançamento sai e a renda volta a ficar a receber.';
+  if (t.ajuste) return 'É um ajuste de saldo: o saldo do banco volta ao que era antes da correção.';
+  return t.carteira_id ? 'O lançamento sai e o saldo do banco volta ao que era.' : 'O lançamento sai do mês.';
 }
 
 /** Container da home: chama os hooks e entrega as props prontas para `FinancasHomeView`. */
@@ -52,11 +63,14 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
   const transacoes = useTransacoesMes(ano, mes);
   const vinculos = useVinculosTransacoes((transacoes.data ?? []).map((t) => t.id));
   const desfazerRecebimento = useDesfazerRecebimento();
+  const desfazerPagamentoVinculado = useDesfazerPagamento();
+  const excluirTransacao = useExcluirTransacao();
+  const [excluindo, setExcluindo] = useState<Transacao | null>(null);
   const rendas = useRendas();
   const contasCadastradas = useContas();
   const push = usePushLembretes();
   const criarRenda = useCriarRenda();
-  const { pagarConta, desfazerPagamento, contaOcupada } = usePagamentoAcoes();
+  const { pagarConta, contaOcupada } = usePagamentoAcoes();
   const painel = usePainelSaldo(hojeISO);
   const receber = useReceberRenda();
   const [recebendo, setRecebendo] = useState<RendaAReceberItem | null>(null);
@@ -96,13 +110,46 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
   const comErro = consultas.filter((q) => q.isError);
   const carregando = resumo.isLoading || contas.isLoading || rendas.isLoading || contasCadastradas.isLoading;
 
+  const mapaVinculos = Object.fromEntries([
+    ...(vinculos.data?.recebimentos ?? []).filter((r) => r.transacao_id).map((r) => [r.transacao_id!, 'recebimento']),
+    ...(vinculos.data?.pagamentos ?? []).filter((p) => p.transacao_id).map((p) => [p.transacao_id!, 'pagamento']),
+  ]) as Record<string, Vinculo>;
+
   const rendaCadastrada = (rendas.data ?? []).some((r) => r.ativo);
   // Definições cadastradas (não as ocorrências do mês): conta anual/avulsa de outro mês também conta.
   const temContas = (contasCadastradas.data ?? []).some((c) => c.ativo);
   // Sem a lista de rendas carregada, só o resumo vazio garante que falta o passo 1.
   const mostrarBoasVindas = rendas.isSuccess ? !rendaCadastrada || !temContas : !!secoes?.vazio;
 
+  const vinculoDe = (t: Transacao) => mapaVinculos[t.id];
+  const fecharExclusao = () => setExcluindo(null);
+  const aoExcluir = (mensagem: string) => ({
+    onSuccess: () => {
+      void vinculos.refetch?.();
+      toast.success(mensagem);
+      setExcluindo(null);
+    },
+    onError: () => toast.error('Não foi possível excluir. Tente de novo.'),
+  });
+  // Lançamento vinculado nunca sai por DELETE (trg_vinculo_* da 006): excluir = desfazer o Recebi/Paguei.
+  const confirmarExclusao = (t: Transacao) => {
+    const r = vinculos.data?.recebimentos.find((x) => x.transacao_id === t.id);
+    if (r) return desfazerRecebimento.mutate({ rendaId: r.renda_id, competencia: r.competencia }, aoExcluir('Lançamento excluído. A renda voltou a ficar a receber.'));
+    const p = vinculos.data?.pagamentos.find((x) => x.transacao_id === t.id);
+    if (p) return desfazerPagamentoVinculado.mutate({ contaId: p.conta_id, competencia: p.competencia }, aoExcluir('Lançamento excluído. A conta voltou a ficar a pagar.'));
+    excluirTransacao.mutate(t.id, aoExcluir('Lançamento excluído'));
+  };
+
   return {
+    exclusao: excluindo
+      ? {
+          transacao: excluindo,
+          detalhe: detalheExclusaoLancamento(excluindo, vinculoDe(excluindo)),
+          carregando: excluirTransacao.isPending || desfazerRecebimento.isPending || desfazerPagamentoVinculado.isPending,
+          onConfirmar: () => confirmarExclusao(excluindo),
+          onCancelar: fecharExclusao,
+        }
+      : null,
     estado: carregando ? 'carregando' : comErro.length > 0 || !secoes ? 'erro' : 'pronto',
     onTentarDeNovo: () => {
       for (const q of comErro.length > 0 ? comErro : [resumo]) void q.refetch();
@@ -200,23 +247,9 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
       : null,
     lancamentos: {
       ...acoes,
-      vinculos: Object.fromEntries([
-        ...(vinculos.data?.recebimentos ?? []).filter((r) => r.transacao_id).map((r) => [r.transacao_id!, 'recebimento']),
-        ...(vinculos.data?.pagamentos ?? []).filter((p) => p.transacao_id).map((p) => [p.transacao_id!, 'pagamento']),
-      ]) as Record<string, 'recebimento' | 'pagamento'>,
+      vinculos: mapaVinculos,
       acoesBloqueadas: !vinculos.isSuccess,
-      onDesfazer: (t) => {
-        const r = vinculos.data?.recebimentos.find((r) => r.transacao_id === t.id);
-        if (r) {
-          desfazerRecebimento.mutate({ rendaId: r.renda_id, competencia: r.competencia }, {
-            onSuccess: () => { void vinculos.refetch(); toast.success('Recebimento desfeito'); },
-            onError: () => toast.error('Não foi possível desfazer o recebimento. Tente de novo.'),
-          });
-          return;
-        }
-        const p = vinculos.data?.pagamentos.find((p) => p.transacao_id === t.id);
-        if (p) desfazerPagamento({ contaId: p.conta_id, competencia: p.competencia, descricao: t.descricao });
-      },
+      onExcluir: setExcluindo,
       carregando: transacoes.isLoading,
       expandido,
       onAlternarExpandido: () => setExpandido((v) => !v),

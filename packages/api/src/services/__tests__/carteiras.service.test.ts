@@ -12,7 +12,7 @@ import {
 } from '../../repositories';
 
 vi.mock('../../repositories', () => ({
-  carteirasRepository: { rpcCorrigirSaldo: vi.fn(), findAll: vi.fn(), findById: vi.fn(), create: vi.fn(), update: vi.fn() },
+  carteirasRepository: { rpcCorrigirSaldo: vi.fn(), findAll: vi.fn(), findById: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn() },
   transacaoRepository: { create: vi.fn(), findComCarteiraDesde: vi.fn() },
   transferenciasRepository: { create: vi.fn(), findDesde: vi.fn(), remove: vi.fn() },
   recebimentosRendaRepository: { findByCompetencias: vi.fn(), rpcReceber: vi.fn(), rpcDesfazer: vi.fn() },
@@ -155,8 +155,6 @@ describe('painelSaldo', () => {
     expect(p.rendasAReceber.map((r) => [r.renda.id, r.data])).toEqual([['r', '2026-10-05']]);
     expect(p.carteiraPadraoId).toBe(NU);
     expect(p.comecouMes).toBeNull();
-    // Âncora = dia (SP) da carteira ativa mais antiga; a arquivada não conta.
-    expect(p.ancoraISO).toBe(HOJE);
     expect(transacoes.findComCarteiraDesde).toHaveBeenCalledWith('u', HOJE);
     expect(recebimentos.findByCompetencias).toHaveBeenCalledWith('u', ['2026-10']);
   });
@@ -165,7 +163,6 @@ describe('painelSaldo', () => {
     const p = await service.painelSaldo('u', '2026-10-28');
     expect(p.saldoHoje).toBe(0);
     expect(p.carteiraPadraoId).toBeNull();
-    expect(p.ancoraISO).toBeNull();
     expect(transacoes.findComCarteiraDesde).not.toHaveBeenCalled();
     expect(recebimentos.findByCompetencias).toHaveBeenCalledWith('u', ['2026-10']);
     expect(pagamentos.findByCompetencias).toHaveBeenCalledWith('u', ['2026-10']);
@@ -180,5 +177,13 @@ describe('painelSaldo', () => {
     const p = await service.painelSaldo('u', HOJE);
     expect(p.rendasAReceber.map((r) => r.renda.id)).toEqual(['r2']);
     expect(p.mes.recebimentos).toEqual([{ renda_id: 'r', competencia: '2026-10' }]);
+  });
+});
+
+describe('excluir banco (007)', () => {
+  it('excluirCarteira apaga pelo repositório (lançamentos/rendas/transferências ficam a cargo das FKs da 007)', async () => {
+    await service.excluirCarteira('u', NU);
+    expect(carteiras.remove).toHaveBeenCalledWith(NU, 'u');
+    await expect(service.excluirCarteira('', NU)).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
   });
 });

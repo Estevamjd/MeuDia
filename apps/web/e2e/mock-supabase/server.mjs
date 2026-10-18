@@ -53,11 +53,12 @@ const DEFAULTS = {
   carteiras: () => ({ tipo: 'banco', saldo_inicial: 0, saldo_inicial_em: nowIso(), incluir_no_total: true, arquivada: false, ordem: 0, created_at: nowIso(), updated_at: nowIso() }),
   transferencias: () => ({ descricao: null, created_at: nowIso(), updated_at: nowIso() }),
   recebimentos_renda: () => ({ transacao_id: null, created_at: nowIso() }),
+  metas: () => ({ icone: null, data_limite: null, valor_guardado: 0, criado_em: nowIso(), updated_at: nowIso() }),
   assinaturas: () => ({ icone: null, cor: null, ativo: true, created_at: nowIso() }),
   chat_agente: () => ({ intencao: null, acoes: null, created_at: nowIso() }),
   notificacoes_agente: () => ({ lida: false, created_at: nowIso() }),
 };
-const COM_UPDATED_AT = new Set(['contas_pagar', 'rendas', 'orcamento_categorias', 'carteiras', 'transferencias']);
+const COM_UPDATED_AT = new Set(['contas_pagar', 'rendas', 'orcamento_categorias', 'carteiras', 'transferencias', 'metas']);
 
 /** Chaves únicas (além do PK `id`). Linhas com algum valor null não conflitam (semântica SQL). */
 const UNIQUES = {
@@ -122,9 +123,19 @@ function checkRow(table, r) {
     if (!['banco', 'dinheiro', 'poupanca'].includes(r.tipo)) fail('tipo');
   }
   if (table === 'transferencias') {
-    notNull('user_id', 'origem_id', 'destino_id', 'valor', 'data');
+    // 007: um lado pode ser NULL (banco excluído), nunca os dois.
+    notNull('user_id', 'valor', 'data');
     if (!(Number(r.valor) > 0)) fail('valor > 0');
-    if (r.origem_id === r.destino_id) fail('origem_id <> destino_id');
+    if (r.origem_id == null && r.destino_id == null) fail('transferencias_algum_lado');
+    if (r.origem_id != null && r.origem_id === r.destino_id) fail('origem_id <> destino_id');
+  }
+  if (table === 'metas') {
+    notNull('user_id', 'nome', 'valor_alvo', 'valor_guardado');
+    const nome = String(r.nome).trim();
+    if (nome.length < 1 || nome.length > 80) fail('nome');
+    if (r.icone != null && !/^[a-z][a-z0-9-]{0,39}$/.test(r.icone)) fail('icone');
+    if (!(Number(r.valor_alvo) > 0)) fail('valor_alvo > 0');
+    if (!(Number(r.valor_guardado) >= 0)) fail('valor_guardado >= 0');
   }
   if (table === 'recebimentos_renda') {
     notNull('renda_id', 'user_id', 'competencia', 'recebido_em');
@@ -581,7 +592,7 @@ function handleRest(req, res, url, body) {
     return finalize(req, res, table, affected, url, 201);
   }
 
-  // 006: lançamento vinculado a Recebi/Paguei só muda pelas RPCs desfazer_* (trigger 55000); carteira não se apaga.
+  // 006: lançamento vinculado a Recebi/Paguei só muda pelas RPCs desfazer_* (trigger 55000).
   const vinculada = (t) => rowsOf('recebimentos_renda').some((r) => r.transacao_id === t.id)
     || rowsOf('pagamentos_conta').some((p) => p.transacao_id === t.id);
   if (table === 'transacoes' && (req.method === 'PATCH' || req.method === 'DELETE') && matching().some(vinculada)) {
@@ -593,7 +604,6 @@ function handleRest(req, res, url, body) {
       || (req.method === 'DELETE' && matching().some((v) => v.transacao_id != null)))) {
     throw new PgError(400, '55000', 'Vínculo de Recebi/Paguei não pode ser alterado');
   }
-  if (table === 'carteiras' && req.method === 'DELETE') throw new PgError(403, '42501', 'permission denied for table carteiras');
 
   if (req.method === 'PATCH') {
     const rows = matching();
@@ -614,13 +624,40 @@ function handleRest(req, res, url, body) {
   if (req.method === 'DELETE') {
     const rows = matching();
     tables[table] = all.filter((r) => !rows.includes(r));
+    for (const r of rows) excluirEmCascata(table, r);
     return finalize(req, res, table, rows, url, 200);
   }
 
   return send(res, 405, { code: 'PGRST', message: 'method not allowed' });
 }
 
-// ─── RPCs (fiéis a packages/database/migrations/005_financas.sql e 006_carteiras.sql) ─
+/**
+ * Efeitos das FKs/triggers ao apagar (005/006/007): renda → recebimentos (CASCADE; a receita fica comum);
+ * carteira → transferência sem o outro lado some, lançamentos/rendas com carteira NULL e texto do banco limpo,
+ * transferências com o lado NULL (preparar_exclusao_carteira + ON DELETE SET NULL da 007).
+ */
+function excluirEmCascata(table, row) {
+  if (table === 'rendas') {
+    tables.recebimentos_renda = rowsOf('recebimentos_renda').filter((r) => !(r.renda_id === row.id && r.user_id === row.user_id));
+  }
+  if (table === 'contas_pagar') {
+    tables.pagamentos_conta = rowsOf('pagamentos_conta').filter((p) => !(p.conta_id === row.id && p.user_id === row.user_id));
+  }
+  if (table === 'carteiras') {
+    const doUsuario = (x) => x.user_id === row.user_id;
+    tables.transferencias = rowsOf('transferencias').filter((tr) => !(doUsuario(tr)
+      && ((tr.origem_id === row.id && tr.destino_id == null) || (tr.destino_id === row.id && tr.origem_id == null))));
+    for (const tr of rowsOf('transferencias')) {
+      if (!doUsuario(tr)) continue;
+      if (tr.origem_id === row.id) tr.origem_id = null;
+      if (tr.destino_id === row.id) tr.destino_id = null;
+    }
+    for (const t of rowsOf('transacoes')) if (doUsuario(t) && t.carteira_id === row.id) Object.assign(t, { carteira_id: null, banco: null });
+    for (const r of rowsOf('rendas')) if (doUsuario(r) && r.carteira_id === row.id) r.carteira_id = null;
+  }
+}
+
+// ─── RPCs (fiéis a packages/database/migrations/005_financas.sql, 006_carteiras.sql e 007_excluir_metas.sql) ─
 const RE_COMP = /^[0-9]{4}-(0[1-9]|1[0-2])$/;
 function carteiraAtivaDe(uid, id) {
   const c = rowsOf('carteiras').find((x) => x.id === id && x.user_id === uid && !x.arquivada);
@@ -716,6 +753,16 @@ function handleRpc(req, res, fn, args = {}, uid) {
     tables.transacoes = rowsOf('transacoes').filter((t) => !(t.id === rec.transacao_id && t.user_id === uid));
     tables.recebimentos_renda = rowsOf('recebimentos_renda').filter((r) => r.id !== rec.id);
     return send(res, 204);
+  }
+  if (fn === 'guardar_na_meta') {
+    // 007: soma atômica; P0002 meta de outro usuário/inexistente; 22023 valor ≤ 0 ou com mais de 2 casas.
+    const v = Number(args.p_valor);
+    if (!(v > 0) || Math.round(v * 100) / 100 !== v) throw new PgError(400, '22023', 'Valor inválido');
+    const meta = rowsOf('metas').find((x) => x.id === args.p_meta_id && x.user_id === uid);
+    if (!meta) throw new PgError(400, 'P0002', 'Meta não encontrada ou acesso negado');
+    meta.valor_guardado = Math.round((Number(meta.valor_guardado) + v) * 100) / 100;
+    meta.updated_at = nowIso();
+    return send(res, 200, meta);
   }
   if (fn === 'desfazer_pagamento') {
     const conta = rowsOf('contas_pagar').find((c) => c.id === args.p_conta_id && c.user_id === uid);

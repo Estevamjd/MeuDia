@@ -28,7 +28,7 @@ export function useCarteiras() {
   });
 }
 
-/** Saldo de hoje, chips, previsões (7 dias e fim do mês), "Começou o mês com" e rendas a receber. */
+/** Cofrinho (saldo de hoje), chips, entradas da sobra do mês, "Começou o mês com" e rendas a receber. */
 export function usePainelSaldo(hojeISO: string) {
   const { user } = useAuth();
   return useQuery({
@@ -60,6 +60,30 @@ export function useAtualizarCarteira() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: CarteiraPatch }) =>
       carteirasService.atualizarCarteira(requireUserId(user?.id), id, data),
+    onSuccess: invalidar,
+  });
+}
+
+/** Excluir banco (007): lançamentos/rendas viram "Sem banco"; o saldo dos demais bancos não muda. */
+export function useExcluirCarteira() {
+  const { user } = useAuth();
+  const invalidar = useInvalidarSaldo();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => carteirasService.excluirCarteira(requireUserId(user?.id), id),
+    onSuccess: () => {
+      invalidar();
+      // A renda pode ter perdido a carteira padrão.
+      void queryClient.invalidateQueries({ queryKey: ['rendas'] });
+    },
+  });
+}
+
+export function useExcluirTransferencia() {
+  const { user } = useAuth();
+  const invalidar = useInvalidarSaldo();
+  return useMutation({
+    mutationFn: (id: string) => carteirasService.excluirTransferencia(requireUserId(user?.id), id),
     onSuccess: invalidar,
   });
 }

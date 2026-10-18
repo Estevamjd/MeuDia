@@ -65,3 +65,4 @@ export {
   tipoCarteiraSchema,
   transferenciaInsertSchema,
 } from './carteiras.validator';
+export * from './metas.validator';

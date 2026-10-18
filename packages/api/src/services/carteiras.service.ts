@@ -2,7 +2,6 @@ import type { Carteira, Renda, Transacao, Transferencia } from '@meudia/shared';
 import {
   AppError,
   CATEGORIA_ENTRADA_EXTRA,
-  ancoraPrevisao,
   competenciaDe,
   comecouMesCom,
   dataAncora,
@@ -62,10 +61,19 @@ export async function atualizarCarteira(userId: string, id: string, data: unknow
   return carteirasRepository.update(id, carteiraUpdateSchema.parse(data), userId);
 }
 
-/** R1: não existe excluir, só arquivar (sai do total e dos seletores; o histórico fica). */
+/** Arquivar: sai do total e dos seletores; o histórico fica. */
 export async function arquivarCarteira(userId: string, id: string, arquivada = true) {
   usuario(userId);
   return carteirasRepository.update(id, { arquivada }, userId);
+}
+
+/**
+ * Excluir banco (007): lançamentos e rendas dele viram "Sem banco"; transferências perdem este lado e continuam
+ * contando no outro banco (o saldo dos demais não muda); transferência sem nenhum dos dois lados some.
+ */
+export async function excluirCarteira(userId: string, id: string) {
+  usuario(userId);
+  return carteirasRepository.remove(id, userId);
 }
 
 /** R5 "Gastei": despesa na carteira; descrição padrão = nome da categoria. */
@@ -147,7 +155,7 @@ export interface RendaAReceber {
 }
 
 /**
- * Tudo que a home precisa para "Você tem hoje", "Começou o mês com", "Recebi" e as entradas da sobra do mês
+ * Tudo que a home precisa para o "Cofrinho", "Começou o mês com", "Recebi" e as entradas da sobra do mês
  * (`sobraDoMes`, calculada na home com os lançamentos do mês que ela já lê).
  * Cálculo nas funções puras de `@meudia/shared`; aqui só a leitura.
  */
@@ -182,8 +190,6 @@ export async function painelSaldo(userId: string, hojeISO = hojeSP()) {
     arquivadas: carteiras.filter((c) => c.arquivada),
     saldoHoje: saldoHoje(carteiras, transacoes, transferencias, hojeISO),
     comecouMes: comecouMesCom(carteiras, transacoes, transferencias, competencia),
-    /** Dia da âncora mais antiga das carteiras ativas (o "Em 7 dias" só conta o que vem depois dela). */
-    ancoraISO: ancoraPrevisao(carteiras),
     rendasAReceber,
     /** Entradas de `sobraDoMes` na competência corrente. */
     mes: { rendas, recebimentos, contas, pagamentos },

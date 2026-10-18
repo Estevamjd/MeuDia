@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Carteira, ContaPagar, Renda, Transacao, Transferencia } from '../../types/financas';
 import {
-  ancoraPrevisao,
   comecouMesCom,
-  emSeteDias,
   entraNoSaldo,
   evolucaoMes,
   gastoDoMes,
@@ -47,19 +45,10 @@ describe('BRIEF §5: exemplo de aceite passo a passo (17/10/2026)', () => {
   const caixa = carteira('cx', 'Caixa', 50, { ordem: 1 });
   const carteiras = [nubank, caixa];
   const contas = [conta('luz', 'Luz', 120, 20, 'Luz'), conta('net', 'Internet', 100, 25, 'Internet')];
-  // "No fim do mês sobra" (renda do mês − despesas do mês) e "Em 7 dias" (guardado + a receber − a pagar, âncora 17/10).
-  const prever = (hoje: number, transacoes: Transacao[], rendas: Renda[] = [], recebimentos: { renda_id: string; competencia: string }[] = []) => {
-    const sobra = sobraDoMes({ competencia: '2026-10', transacoes, rendas, recebimentos, contas, pagamentos: [] });
-    return { sete: emSeteDias({ hojeISO: HOJE, guardado: hoje, ancoraISO: ancoraPrevisao(carteiras)!, sobra }).valor, fim: sobra.valor };
-  };
+  // "No fim do mês sobra" (renda do mês − despesas do mês).
+  const prever = (transacoes: Transacao[], rendas: Renda[] = [], recebimentos: { renda_id: string; competencia: string }[] = []) =>
+    sobraDoMes({ competencia: '2026-10', transacoes, rendas, recebimentos, contas, pagamentos: [] }).valor;
 
-  it('alvo de "Em 7 dias" = 24/10; âncora = dia (SP) da carteira ativa mais antiga', () => {
-    expect(emSeteDias({ hojeISO: HOJE, guardado: 0, ancoraISO: HOJE, sobra: { rendasAReceber: [], contasAPagar: [] } }).alvoISO).toBe('2026-10-24');
-    expect(ancoraPrevisao(carteiras)).toBe(HOJE);
-    expect(ancoraPrevisao([...carteiras, carteira('old', 'Arquivada', 0, { arquivada: true, saldo_inicial_em: '2025-01-01T12:00:00Z' })])).toBe(HOJE);
-    expect(ancoraPrevisao([carteira('a', 'A', 0, { saldo_inicial_em: '2026-10-02T02:30:00Z' }), ...carteiras])).toBe('2026-10-01');
-    expect(ancoraPrevisao([])).toBeNull();
-  });
 
   it('percorre os 6 passos com os valores do BRIEF', () => {
     const transacoes: Transacao[] = [];
@@ -74,7 +63,7 @@ describe('BRIEF §5: exemplo de aceite passo a passo (17/10/2026)', () => {
     expect(hoje()).toBe(800);
     expect(chips()).toEqual([['Nubank', 650], ['Caixa', 150]]);
     // 3. Luz 120 (20/10) e internet 100 (25/10) pendentes: 7 dias 800 − 220; sobra = renda 100 (entrada extra) − 220.
-    expect(prever(hoje(), transacoes)).toEqual({ sete: 580, fim: -120 });
+    expect(prever(transacoes)).toBe(-120);
     // 4. Transferir 50 Caixa → Nubank: total igual, gasto do mês não muda.
     const gastoAntes = gastoDoMes(transacoes);
     transferencias.push(transf('cx', 'nu', 50));
@@ -85,19 +74,19 @@ describe('BRIEF §5: exemplo de aceite passo a passo (17/10/2026)', () => {
     transacoes.push(tx({ tipo: 'despesa', categoria: 'Comida', valor: 25, carteira_id: 'nu' }));
     expect(hoje()).toBe(775);
     expect(gastosPorCategoria(transacoes)).toEqual([{ categoria: 'Comida', valor: 25 }]);
-    expect(prever(hoje(), transacoes)).toEqual({ sete: 555, fim: -145 });
+    expect(prever(transacoes)).toBe(-145);
     // 6. Renda 900 dia 5 cadastrada agora: entra na renda do mês (1.000 − 245 = 755), mas não no "a receber"
     // dos 7 dias (05/10 é antes do saldo informado em 17/10: pode já estar nele).
     const r = renda(900, 5);
     expect(hoje()).toBe(775);
-    expect(prever(hoje(), transacoes, [r])).toEqual({ sete: 555, fim: 755 });
+    expect(prever(transacoes, [r])).toBe(755);
     // Recebi: R$ 900 no Nubank, sem contar duas vezes.
     transacoes.push(tx({ tipo: 'receita', categoria: 'Salário', valor: 900, carteira_id: 'nu' }));
     const recebimentos = [{ renda_id: 'r1', competencia: '2026-10' }];
     expect(hoje()).toBe(1675);
     // A sobra não muda (a renda a receber virou receita lançada). O "Em 7 dias" sobe 900: a renda de 05/10 não estava
     // no "a receber" (anterior à âncora) e o Recebi mostrou que ela não estava no saldo informado.
-    expect(prever(hoje(), transacoes, [r], recebimentos)).toEqual({ sete: 1455, fim: 755 });
+    expect(prever(transacoes, [r], recebimentos)).toBe(755);
     expect(rendaDoMes('2026-10', transacoes, [r], recebimentos)).toEqual({ lancada: 1000, aReceber: 0, total: 1000 });
   });
 
@@ -289,69 +278,16 @@ describe('decisão final: "No fim do mês sobra" = renda do mês − despesas do
   });
 });
 
-describe('ajuste aprovado: "Em 7 dias" = guardado + a receber (depois da âncora) − a pagar (desde a âncora)', () => {
-  // Hoje 17/10/2026; saldo informado 235 em 17/10 (âncora); conta mensal 110 dia 20 sem Paguei.
-  const nubank = carteira('nu', 'Nubank', 235);
-  const luz = conta('luz', 'Luz', 110, 20);
-  const cenario = (diaSalario: number, transacoes: Transacao[] = [], recebimentos: { renda_id: string; competencia: string }[] = [], pagamentos: { conta_id: string; competencia: string }[] = []) => {
-    const salario = renda(2200, diaSalario, { created_at: '2026-10-16T15:00:00Z' });
-    const sobra = sobraDoMes({ competencia: '2026-10', transacoes, rendas: [salario], recebimentos, contas: [luz], pagamentos });
-    const sete = emSeteDias({ hojeISO: HOJE, guardado: saldoHoje([nubank], transacoes, []), ancoraISO: ancoraPrevisao([nubank])!, sobra });
-    return { sete, fim: sobra.valor };
-  };
 
-  it('A) salário de 01/10 já caiu (antes da âncora): 235 + 0 − 110 = 125; fim do mês 2.090', () => {
-    const { sete, fim } = cenario(1);
-    expect(sete).toMatchObject({ guardado: 235, aReceber: 0, aPagar: 110, valor: 125, rendasAReceber: [] });
-    expect(sete.contasAPagar).toEqual([{ id: 'luz', descricao: 'Luz', categoria: 'Contas', valor: 110, vencimento: '2026-10-20' }]);
-    expect(fim).toBe(2090);
-  });
-
-  it('B) salário de 25/10 ainda vai cair: 235 + 2.200 − 110 = 2.325; fim do mês 2.090', () => {
-    const { sete, fim } = cenario(25);
-    expect(sete).toMatchObject({ alvoISO: '2026-10-24', guardado: 235, aReceber: 2200, aPagar: 110, valor: 2325 });
-    expect(sete.rendasAReceber).toEqual([{ id: 'r1', descricao: 'Salário', valor: 2200, data: '2026-10-25' }]);
-    expect(fim).toBe(2090);
-  });
-
-  it('C) Recebi e Paguei não mudam o card (o valor sai de "a receber/a pagar" e entra no guardado)', () => {
-    const recebi = [tx({ tipo: 'receita', categoria: 'Salário', valor: 2200, carteira_id: 'nu' })];
-    const recebimentos = [{ renda_id: 'r1', competencia: '2026-10' }];
-    const depoisRecebi = cenario(25, recebi, recebimentos);
-    expect(depoisRecebi.sete).toMatchObject({ guardado: 2435, aReceber: 0, aPagar: 110, valor: 2325 });
-    expect(depoisRecebi.fim).toBe(2090);
-    const paguei = [...recebi, tx({ valor: 110, categoria: 'Contas', carteira_id: 'nu' })];
-    const depoisPaguei = cenario(25, paguei, recebimentos, [{ conta_id: 'luz', competencia: '2026-10' }]);
-    expect(depoisPaguei.sete).toMatchObject({ guardado: 2325, aReceber: 0, aPagar: 0, valor: 2325 });
-    expect(depoisPaguei.fim).toBe(2090);
-    // Só Paguei (sem Recebi) também não muda.
-    expect(cenario(25, [tx({ valor: 110, carteira_id: 'nu' })], [], [{ conta_id: 'luz', competencia: '2026-10' }]).sete.valor).toBe(2325);
-  });
-
-  it('D) conta vencida antes da âncora sem Paguei não entra no "a pagar"; vencida depois da âncora entra', () => {
-    const agua = conta('agua', 'Água', 80, 5);
-    const sobra = sobraDoMes({ competencia: '2026-10', transacoes: [], rendas: [], recebimentos: [], contas: [agua, luz], pagamentos: [] });
-    expect(emSeteDias({ hojeISO: HOJE, guardado: 235, ancoraISO: HOJE, sobra })).toMatchObject({ aPagar: 110, valor: 125 });
-    // Hoje 22/10 com âncora 17/10: a Luz de 20/10 venceu, mas depois da âncora: continua a pagar. No dia da âncora também.
-    expect(emSeteDias({ hojeISO: '2026-10-22', guardado: 235, ancoraISO: HOJE, sobra }).contasAPagar.map((c) => c.id)).toEqual(['luz']);
-    expect(emSeteDias({ hojeISO: HOJE, guardado: 0, ancoraISO: '2026-10-20', sobra }).contasAPagar.map((c) => c.id)).toEqual(['luz']);
-    // Renda no dia da âncora já está no saldo informado.
-    const r = sobraDoMes({ competencia: '2026-10', transacoes: [], rendas: [renda(900, 17)], recebimentos: [], contas: [], pagamentos: [] });
-    expect(emSeteDias({ hojeISO: HOJE, guardado: 0, ancoraISO: HOJE, sobra: r }).aReceber).toBe(0);
-    expect(emSeteDias({ hojeISO: HOJE, guardado: 0, ancoraISO: '2026-10-16', sobra: r }).aReceber).toBe(900);
-  });
-
-  it('avulsas lançadas já estão no guardado e não entram de novo; nada conta duas vezes em qualquer ordem de Recebi/Paguei', () => {
-    const extra = [tx({ tipo: 'receita', categoria: 'Entrada extra', valor: 300, carteira_id: 'nu' }), tx({ valor: 40, carteira_id: 'nu' })];
-    expect(cenario(25, extra).sete).toMatchObject({ guardado: 495, aReceber: 2200, aPagar: 110, valor: 2585 });
-    const recebi = tx({ tipo: 'receita', categoria: 'Salário', valor: 2200, carteira_id: 'nu' });
-    const paguei = tx({ valor: 110, categoria: 'Contas', carteira_id: 'nu' });
-    for (const [recebeu, pagou] of [[false, false], [true, false], [false, true], [true, true]] as const) {
-      const r = cenario(
-        25, [...(recebeu ? [recebi] : []), ...(pagou ? [paguei] : [])],
-        recebeu ? [{ renda_id: 'r1', competencia: '2026-10' }] : [], pagou ? [{ conta_id: 'luz', competencia: '2026-10' }] : [],
-      );
-      expect([r.sete.valor, r.fim]).toEqual([2325, 2090]);
-    }
+describe('banco excluído (007): transferência com um lado NULL', () => {
+  it('banco A→B 100, excluir A: o saldo de B é igual antes e depois; nada conta para lado NULL', () => {
+    const a = carteira('a', 'A', 500);
+    const b = carteira('b', 'B', 20);
+    const tr = transf('a', 'b', 100);
+    const antes = saldoCarteira(b, [], [tr]);
+    const depois = saldoCarteira(b, [], [{ ...tr, origem_id: null }]);
+    expect([antes, depois]).toEqual([120, 120]);
+    expect(saldoHoje([b], [], [{ ...tr, origem_id: null }])).toBe(120);
+    expect(saldoCarteira(a, [], [{ ...tr, destino_id: null }])).toBe(400);
   });
 });

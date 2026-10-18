@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { orcamentoService } from '@meudia/api';
 import type { OrcamentoCategoria, Renda } from '@meudia/shared';
 import { useAuth } from './useAuth';
-import { chavesAfetadasPorOrcamento, orcamentoKeys, rendasKeys, resumoKeys } from '../lib/financas-query-keys';
+import { chavesAfetadasPorExclusaoDeRenda, chavesAfetadasPorOrcamento, orcamentoKeys, rendasKeys, resumoKeys } from '../lib/financas-query-keys';
 
 export interface RendaInput {
   descricao: string;
@@ -75,11 +75,13 @@ export function useAtualizarRenda() {
 
 export function useExcluirRenda() {
   const { user } = useAuth();
-  const invalidar = useInvalidarOrcamento();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (id: string) => orcamentoService.excluirRenda(requireUserId(user?.id), id),
-    onSuccess: invalidar,
+    onSuccess: () => {
+      for (const queryKey of chavesAfetadasPorExclusaoDeRenda()) void queryClient.invalidateQueries({ queryKey });
+    },
   });
 }
 

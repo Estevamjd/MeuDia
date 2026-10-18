@@ -150,8 +150,10 @@ export interface CarteiraInsert {
 export interface Transferencia {
   id: UUID;
   user_id: UUID;
-  origem_id: UUID;
-  destino_id: UUID;
+  /** `null` = banco de origem excluído (007): o outro lado continua contando. Nunca os dois `null`. */
+  origem_id: UUID | null;
+  /** `null` = banco de destino excluído (007). */
+  destino_id: UUID | null;
   valor: number;
   data: string;
   descricao: string | null;
@@ -164,6 +166,29 @@ export interface TransferenciaInsert {
   valor: number;
   data: string;
   descricao?: string | null;
+}
+
+/** Meta de compra (007). Valores em reais. */
+export interface Meta {
+  id: UUID;
+  user_id: UUID;
+  nome: string;
+  /** Chave de `ICONES_META`; `null` = ícone padrão. */
+  icone: string | null;
+  valor_alvo: number;
+  /** `yyyy-MM-dd`; `null` = sem prazo. */
+  data_limite: string | null;
+  valor_guardado: number;
+  criado_em: string;
+  updated_at: string;
+}
+
+export interface MetaInsert {
+  nome: string;
+  icone?: string | null;
+  valor_alvo: number;
+  data_limite?: string | null;
+  valor_guardado?: number;
 }
 
 export interface RecebimentoRenda {

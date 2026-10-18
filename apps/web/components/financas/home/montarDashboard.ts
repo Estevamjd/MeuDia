@@ -1,6 +1,6 @@
 import type { PainelSaldo } from '@meudia/api';
-import type { Competencia, EmSeteDias, FatiaCategoria, PontoEvolucao, SobraDoMes, Transacao } from '@meudia/shared';
-import { emSeteDias, evolucaoMes, gastosPorCategoria, sobraDoMes } from '@meudia/shared';
+import type { Competencia, FatiaCategoria, PontoEvolucao, SobraDoMes, Transacao } from '@meudia/shared';
+import { evolucaoMes, gastosPorCategoria, sobraDoMes } from '@meudia/shared';
 import { partesCompetencia } from '../../../lib/financas-ui';
 import type { CardSaldoHojeProps } from './CardSaldoHoje';
 import type { RendaAReceberItem } from './CardRendaAReceber';
@@ -9,8 +9,7 @@ const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julh
 
 export interface DadosDashboard {
   saldo: Omit<CardSaldoHojeProps, 'escondido' | 'onAlternarOlho'>;
-  /** `null` fora do mês corrente ou sem carteira (sem saldo de partida o "Em 7 dias" engana). */
-  seteDias: EmSeteDias | null;
+  /** `null` fora do mês corrente ou sem carteira. */
   sobraMes: SobraDoMes | null;
   rendasAReceber: RendaAReceberItem[];
   fatias: FatiaCategoria[];
@@ -31,7 +30,6 @@ export function montarDashboard(competencia: Competencia, hojeISO: string, paine
       comecouMes: mesCorrente ? painel.comecouMes : null,
       nomeMes: MESES[partesCompetencia(painel.competencia).mes - 1]!,
     },
-    seteDias: sobra && painel.ancoraISO ? emSeteDias({ hojeISO, guardado: painel.saldoHoje, ancoraISO: painel.ancoraISO, sobra }) : null,
     sobraMes: sobra,
     rendasAReceber: mesCorrente
       ? painel.rendasAReceber.map((r) => ({ rendaId: r.renda.id, descricao: r.renda.descricao, valor: Number(r.renda.valor), data: r.data, competencia: r.competencia }))

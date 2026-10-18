@@ -52,3 +52,5 @@ Quando o dono corrigir um agente, conserte e adicione a linha aqui. Se a regra j
 | Down da 006 apaga os ajustes antes do DROP COLUMN (exige backup) | `tests/006_carteiras.sql` |
 | Onboarding não rebaixa perfil concluído; banco sem id ganha UUID | `Onboarding.test.tsx`, `onboarding.test.ts` |
 | E2E não depende da hora real (sessão do mock vale no relógio fixado e no real) | `newSession` em `e2e/mock-supabase/server.mjs` + `contas-saldo.spec.ts` |
+
+| Metas mostram progresso inteiro para baixo (máx. 100), falta e conclusão sem sugestão | `metas/__tests__/Metas.test.tsx` (500/3.000 = 16%, guardado acima do alvo) + `e2e/excluir-metas.spec.ts` |

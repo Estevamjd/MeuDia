@@ -14,7 +14,6 @@ export interface UltimosLancamentosProps {
   carregando?: boolean;
   vinculos?: Record<string, 'recebimento' | 'pagamento'>;
   acoesBloqueadas?: boolean;
-  onDesfazer?: (t: Transacao) => void;
   expandido: boolean;
   onAlternarExpandido: () => void;
   onNovo: () => void;
@@ -22,12 +21,14 @@ export interface UltimosLancamentosProps {
   onExcluir: (t: Transacao) => void;
 }
 
-/** "Últimos lançamentos": 5 mais recentes + "Ver todos", com editar/excluir. */
+/**
+ * "Últimos lançamentos": 5 mais recentes + "Ver todos", com editar/excluir. Vinculado a Recebi/Paguei não edita;
+ * o excluir dele vira desfazer na confirmação (useFinancasHome).
+ */
 export function UltimosLancamentos({
   transacoes,
   vinculos = {},
   acoesBloqueadas = false,
-  onDesfazer,
   carregando = false,
   expandido,
   onAlternarExpandido,
@@ -67,8 +68,13 @@ export function UltimosLancamentos({
                   </p>
                   <p className="truncate text-[13px] text-muted">
                     {t.categoria} · {formatDiaMes(t.data)}
-                    {t.banco ? ` · ${t.banco}` : ''}
+                    {t.banco ? ` · ${t.banco}` : t.carteira_id ? '' : ' · Sem banco'}
                   </p>
+                  {vinculos[t.id] && (
+                    <span className="mt-0.5 inline-block rounded-full bg-card2 px-2 py-0.5 text-[11px] text-muted">
+                      {vinculos[t.id] === 'pagamento' ? 'Paguei' : 'Recebi'}
+                    </span>
+                  )}
                 </div>
                 <span
                   className={clsx(
@@ -92,11 +98,11 @@ export function UltimosLancamentos({
                   <button
                     type="button"
                     disabled={acoesBloqueadas}
-                    onClick={() => vinculos[t.id] ? onDesfazer?.(t) : onExcluir(t)}
-                    className="rounded-lg p-2 text-muted transition-colors hover:bg-red/[0.14] hover:text-red"
-                    aria-label={`${vinculos[t.id] ? `Desfazer ${vinculos[t.id]}` : 'Excluir lançamento'} ${t.descricao}`}
+                    onClick={() => onExcluir(t)}
+                    className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg p-2 text-muted transition-colors hover:bg-red/[0.14] hover:text-red"
+                    aria-label={`Excluir lançamento ${t.descricao}`}
                   >
-                    {vinculos[t.id] ? <span className="text-xs">Desfazer {vinculos[t.id]}</span> : <Trash2 size={14} /> }
+                    <Trash2 size={14} />
                   </button>
                 </div>
               </li>

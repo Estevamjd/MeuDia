@@ -146,6 +146,8 @@ export {
   useCorrigirSaldo,
   useReceberRenda,
   useDesfazerRecebimento,
+  useExcluirCarteira,
+  useExcluirTransferencia,
   type CarteiraPatch,
   type GasteiInput,
   type EntrouInput,
@@ -153,3 +155,4 @@ export {
 } from './useCarteiras';
 
 export { useVinculosTransacoes } from './useFinancas';
+export { useMetas, useCriarMeta, useAtualizarMeta, useGuardarNaMeta, useExcluirMeta, useSobraDoMesCorrente } from './useMetas';
