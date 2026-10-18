@@ -1,6 +1,6 @@
 import type { PainelSaldo } from '@meudia/api';
-import type { Competencia, FatiaCategoria, PontoEvolucao, Previsao, Transacao } from '@meudia/shared';
-import { evolucaoMes, gastosPorCategoria } from '@meudia/shared';
+import type { Competencia, EmSeteDias, FatiaCategoria, PontoEvolucao, SobraDoMes, Transacao } from '@meudia/shared';
+import { emSeteDias, evolucaoMes, gastosPorCategoria, sobraDoMes } from '@meudia/shared';
 import { partesCompetencia } from '../../../lib/financas-ui';
 import type { CardSaldoHojeProps } from './CardSaldoHoje';
 import type { RendaAReceberItem } from './CardRendaAReceber';
@@ -9,8 +9,9 @@ const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julh
 
 export interface DadosDashboard {
   saldo: Omit<CardSaldoHojeProps, 'escondido' | 'onAlternarOlho'>;
-  previsao7: Previsao | null;
-  previsaoFim: Previsao | null;
+  /** `null` fora do mês corrente ou sem carteira (sem saldo de partida o "Em 7 dias" engana). */
+  seteDias: EmSeteDias | null;
+  sobraMes: SobraDoMes | null;
   rendasAReceber: RendaAReceberItem[];
   fatias: FatiaCategoria[];
   evolucao: PontoEvolucao[];
@@ -21,6 +22,8 @@ export function montarDashboard(competencia: Competencia, hojeISO: string, paine
   const mesCorrente = competencia === painel.competencia;
   const temCarteira = painel.carteiras.length > 0;
   const todas = [...painel.carteiras.map((s) => s.carteira), ...painel.arquivadas];
+  // `transacoesMes` é da competência exibida: só no mês corrente ela casa com as entradas do painel.
+  const sobra = mesCorrente && temCarteira ? sobraDoMes({ competencia: painel.competencia, transacoes: transacoesMes, ...painel.mes }) : null;
   return {
     saldo: {
       total: painel.saldoHoje,
@@ -28,8 +31,8 @@ export function montarDashboard(competencia: Competencia, hojeISO: string, paine
       comecouMes: mesCorrente ? painel.comecouMes : null,
       nomeMes: MESES[partesCompetencia(painel.competencia).mes - 1]!,
     },
-    previsao7: mesCorrente && temCarteira ? painel.previsao7 : null,
-    previsaoFim: mesCorrente && temCarteira ? painel.previsaoFim : null,
+    seteDias: sobra && painel.ancoraISO ? emSeteDias({ hojeISO, guardado: painel.saldoHoje, ancoraISO: painel.ancoraISO, sobra }) : null,
+    sobraMes: sobra,
     rendasAReceber: mesCorrente
       ? painel.rendasAReceber.map((r) => ({ rendaId: r.renda.id, descricao: r.renda.descricao, valor: Number(r.renda.valor), data: r.data, competencia: r.competencia }))
       : [],

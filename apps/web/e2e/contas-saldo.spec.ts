@@ -1,5 +1,5 @@
 import path from 'node:path';
-import type { Locator } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './mock-guard';
 import { pastaEvidencias } from './evidencias';
 
@@ -134,8 +134,11 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await bottomNav.getByRole('link', { name: 'Início' }).click();
   await page.waitForURL(/\/financas$/);
   await expect(hoje).toHaveText(brl('800,00'));
-  await expect(seteDias).toHaveText(brl('680,00'));
-  await expect(fimMes).toHaveText(brl('580,00'));
+  // Sobra do mês = renda 100 (entrada extra; sem renda fixa) − contas 220 = −120; 7 dias = 800 + 0 − 220.
+  await expect(seteDias).toHaveText(brl('580,00'));
+  await expect(page.getByTestId('previsao-7dias-conta')).toHaveText(/^Guardado R\$\s800,00 \+ a receber R\$\s0,00 − a pagar R\$\s220,00$/);
+  await expect(fimMes).toHaveText(/^−R\$\s120,00$/);
+  await expect(page.getByTestId('previsao-fim-mes-conta')).toHaveText(/^Renda R\$\s100,00 − despesas R\$\s220,00 = faltam R\$\s120,00$/);
 
   // 4. Transferir R$ 50 Caixa → Nubank: total igual, Nubank 700 · Caixa 100; gasto do mês não muda.
   folha = await abrirAcao(/Transferir/);
@@ -152,7 +155,7 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await expect(chips).toContainText(/Caixa\s*R\$\s100,00/);
   await expect(page.getByText('Nenhum gasto neste mês ainda.', { exact: false })).toBeVisible();
 
-  // 5. Gastei R$ 25 em Comida no Nubank → Hoje 775, rosca Comida 25, fim do mês 555.
+  // 5. Gastei R$ 25 em Comida no Nubank → Hoje 775, rosca Comida 25, fim do mês −145, 7 dias 630.
   folha = await abrirAcao(/Gastei/);
   await folha.getByLabel('Valor').fill('2500');
   await tocar(folha.getByRole('radio', { name: 'Comida' }));
@@ -165,9 +168,11 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await confirmarToast('Gasto salvo');
   await expect(hoje).toHaveText(brl('775,00'));
   await expect(page.getByRole('list', { name: 'Legenda dos gastos por categoria' })).toContainText(/Comida\s*R\$\s25,00/);
-  await expect(fimMes).toHaveText(brl('555,00'));
+  await expect(fimMes).toHaveText(/^−R\$\s145,00$/);
+  await expect(seteDias).toHaveText(brl('555,00'));
 
-  // 6. Só agora a renda: R$ 900 dia 5 → a renda a receber entra na previsão.
+  // 6. Só agora a renda: R$ 900 dia 5 (sem Recebi) entra na renda do mês: sobra 1.000 − 245 = 755. No "Em 7 dias"
+  // não entra: 05/10 é antes do saldo informado (17/10) e pode já estar nele → 775 + 0 − 220 = 555.
   await tocar(page.getByRole('button', { name: 'Cadastrar minha renda' }));
   const modalRenda = page.getByRole('dialog', { name: 'Sua renda do mês' });
   await modalRenda.getByLabel('Valor').fill('90000');
@@ -175,8 +180,9 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await modalRenda.getByRole('button', { name: 'Salvar' }).click();
   await confirmarToast('Renda salva');
   await expect(hoje).toHaveText(brl('775,00'));
-  await expect(seteDias).toHaveText(brl('1.555,00'));
-  await expect(fimMes).toHaveText(brl('1.455,00'));
+  await expect(seteDias).toHaveText(brl('555,00'));
+  await expect(fimMes).toHaveText(brl('755,00'));
+  await expect(page.getByTestId('previsao-7dias-conta')).toHaveText(/^Guardado R\$\s775,00 \+ a receber R\$\s0,00 − a pagar R\$\s220,00$/);
   await semScrollHorizontal();
   await shot('02-home-dashboard.png');
   // Viewport (o que a usuária vê no iPhone): topo da home e rolada até os gráficos.
@@ -186,17 +192,25 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await page.evaluate(() => window.scrollBy(0, -72)); // folga para o header fixo não cobrir o título do card
   await shot('02b-home-graficos-viewport.png', false);
 
-  // "por quê?" do 7 dias: conta em português.
+  // "por quê?": 7 dias = guardado e cada conta a pagar (a renda de 05/10 não); fim do mês = renda e cada conta.
   await tocar(page.getByRole('button', { name: 'por quê? Em 7 dias você terá' }));
   const explicacao = page.getByRole('region', { name: 'Em 7 dias você terá' });
-  await expect(explicacao).toContainText(/Você tem hoje\s*R\$\s775,00/);
-  await expect(explicacao).toContainText(/Renda principal \(a receber 05\/10\)/);
-  await expect(explicacao).toContainText(/Luz \(vence 20\/10\)/);
-  await expect(explicacao).not.toContainText('Internet');
+  await expect(explicacao).toContainText(/Guardado hoje nos bancos\s*R\$\s775,00/);
+  await expect(explicacao).toContainText(/Luz \(vence 20\/10\)\s*−R\$\s120,00/);
+  await expect(explicacao).toContainText(/Internet \(vence 25\/10\)\s*−R\$\s100,00/);
+  await expect(explicacao).not.toContainText('Renda principal');
+  await expect(explicacao).toContainText(/= Em 24\/10\s*R\$\s555,00/);
+  await tocar(page.getByRole('button', { name: 'por quê? No fim do mês sobra' }));
+  const explicacaoFim = page.getByRole('region', { name: 'No fim do mês sobra' });
+  await expect(explicacaoFim).toContainText(/Renda principal \(sem "Recebi", dia 05\/10\)/);
+  await expect(explicacaoFim).toContainText(/Despesas lançadas no mês\s*−R\$\s25,00/);
+  await expect(explicacaoFim).toContainText(/Luz \(vence 20\/10\)/);
+  await expect(explicacaoFim).toContainText(/Internet \(vence 25\/10\)/);
   await explicacao.evaluate((el) => el.scrollIntoView({ block: 'center' }));
   await shot('08-por-que-previsao.png');
 
-  // Recebi: R$ 900 no Nubank → Hoje 1.675; previsões sem contar duas vezes.
+  // Recebi: R$ 900 no Nubank → Hoje 1.675; a sobra não muda (a renda a receber virou receita lançada). O "Em 7 dias"
+  // sobe 900: a renda de 05/10 não estava no "a receber" e o Recebi mostrou que ela não estava no saldo informado.
   await tocar(page.getByRole('button', { name: 'Recebi Renda principal' }));
   const modalRecebi = page.getByRole('dialog', { name: 'Recebi o salário' });
   await modalRecebi.getByRole('radio', { name: 'Nubank' }).click();
@@ -205,8 +219,8 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await modalRecebi.getByRole('button', { name: /Confirmar/ }).click();
   await confirmarToast('Recebido: Renda principal');
   await expect(hoje).toHaveText(brl('1.675,00'));
-  await expect(seteDias).toHaveText(brl('1.555,00'));
-  await expect(fimMes).toHaveText(brl('1.455,00'));
+  await expect(fimMes).toHaveText(brl('755,00'));
+  await expect(seteDias).toHaveText(brl('1.455,00'));
   await expect(page.getByRole('region', { name: 'Salário a receber' })).toHaveCount(0);
   // Renda do mês R$ 1.000 (900 + 100 extra), gasto R$ 25: o "Saiu" segue só com o gasto (sem transferência).
   await expect(page.getByRole('region', { name: 'Entrou e saiu no mês' })).toContainText(/Saiu\s*R\$\s25,00/);
@@ -255,5 +269,124 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   expect(ajustes).toHaveLength(1);
   expect(ajustes[0]).toMatchObject({ valor: 75, tipo: 'despesa', chave_ajuste: expect.stringMatching(/^[0-9a-f-]{36}$/) });
 
+  expect(erros, 'erros na página ou respostas HTTP ≥ 400').toEqual([]);
+});
+
+/** Cadastro com 1 banco (R$ 235 em 17/10), Salário 2.200 no dia `diaSalario` e Internet 110 no dia 20. */
+async function cadastrarCenario(page: Page, nome: string, diaSalario: number) {
+  const tocar = async (alvo: Locator) => {
+    await alvo.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await alvo.click();
+  };
+  const bottomNav = page.getByRole('navigation', { name: 'Navegação principal' });
+  await page.goto('/registro');
+  await page.getByLabel('Nome').fill(nome);
+  await page.getByLabel('Email').fill(`${nome.toLowerCase().replace(/\s/g, '.')}.${run}@example.test`);
+  await page.getByLabel('Senha', { exact: true }).fill(SENHA);
+  await page.getByLabel('Confirmar senha').fill(SENHA);
+  await page.getByRole('button', { name: 'Criar conta' }).click();
+  await page.waitForURL(/\/onboarding/);
+  await page.getByRole('button', { name: 'Continuar' }).click();
+  await page.getByLabel('Banco ou carteira 1').fill('Nubank');
+  await page.getByLabel('Quanto tem hoje (1)').fill('23500');
+  await page.getByRole('button', { name: 'Concluir' }).click();
+  await page.waitForURL(/\/financas$/);
+  const banner = page.getByText('Instalar MeuDia').locator('xpath=ancestor::div[contains(@class,"fixed")][1]');
+  await expect(banner).toBeVisible();
+  await banner.getByRole('button', { name: 'Fechar' }).click();
+
+  await tocar(page.getByRole('button', { name: 'Cadastrar minha renda' }));
+  const modalRenda = page.getByRole('dialog', { name: 'Sua renda do mês' });
+  await modalRenda.getByLabel('Valor').fill('220000');
+  await modalRenda.getByLabel('Dia que recebe (opcional)').fill(String(diaSalario));
+  await modalRenda.getByRole('button', { name: 'Salvar' }).click();
+  await expect(modalRenda).toBeHidden();
+
+  await bottomNav.getByRole('link', { name: 'Contas' }).click();
+  await page.waitForURL(/\/financas\/contas$/);
+  await tocar(page.getByRole('button', { name: 'Nova conta' }).first());
+  const modal = page.getByRole('dialog', { name: 'Nova conta' });
+  await modal.getByLabel('Nome').fill('Internet');
+  await modal.getByLabel('Valor (R$)').fill('110');
+  await modal.getByLabel('Dia do vencimento').fill('20');
+  await tocar(modal.getByRole('radio', { name: 'Internet' }));
+  await modal.getByRole('button', { name: 'Salvar' }).click();
+  await expect(modal).toBeHidden();
+  await bottomNav.getByRole('link', { name: 'Início' }).click();
+  await page.waitForURL(/\/financas$/);
+  return { tocar };
+}
+
+const coletarErros = (page: Page) => {
+  const erros: string[] = [];
+  page.on('pageerror', (err) => erros.push(`${err.name}: ${err.message}`));
+  page.on('response', (res) => {
+    if (res.status() >= 400) erros.push(`${res.request().method()} ${res.url()} → ${res.status()}`);
+  });
+  return erros;
+};
+
+/**
+ * Ajuste aprovado do Estevam (exemplo A, "salário já caiu"): saldo informado 235 em 17/10, Salário 2.200 dia 1 sem
+ * Recebi, Internet 110 dia 20. O card antigo dava "Em 7 dias" = 2.325 (guardado + sobra, salário contado de novo).
+ */
+test('previsão A: salário de 01/10 já caiu → 7 dias = 235 − 110 = 125; fim do mês = 2.090', async ({ page }) => {
+  await page.clock.setFixedTime(new Date(AGORA));
+  const erros = coletarErros(page);
+  const { tocar } = await cadastrarCenario(page, 'Caio A', 1);
+  await expect(page.getByTestId('saldo-hoje-valor')).toHaveText(brl('235,00'));
+  await expect(page.getByTestId('previsao-7dias-valor')).toHaveText(brl('125,00'));
+  await expect(page.getByTestId('previsao-7dias-conta')).toHaveText(/^Guardado R\$\s235,00 \+ a receber R\$\s0,00 − a pagar R\$\s110,00$/);
+  await expect(page.getByTestId('previsao-fim-mes-valor')).toHaveText(brl('2.090,00'));
+  await expect(page.getByTestId('previsao-fim-mes-conta')).toHaveText(/^Renda R\$\s2\.200,00 − despesas R\$\s110,00 = sobra R\$\s2\.090,00$/);
+  await tocar(page.getByRole('button', { name: 'por quê? Em 7 dias você terá' }));
+  const explicacao = page.getByRole('region', { name: 'Em 7 dias você terá' });
+  await expect(explicacao).toContainText(/Internet \(vence 20\/10\)\s*−R\$\s110,00/);
+  await expect(explicacao).not.toContainText('Renda principal');
+  await expect(explicacao).toContainText(/= Em 24\/10\s*R\$\s125,00/);
+  expect(erros, 'erros na página ou respostas HTTP ≥ 400').toEqual([]);
+});
+
+/** Exemplos B e C: salário de 25/10 ainda vai cair; Recebi e Paguei não mudam nenhum dos dois cards. */
+test('previsão B/C: 7 dias = 235 + 2.200 − 110 = 2.325 e continua igual depois de Recebi e de Paguei', async ({ page }) => {
+  await page.clock.setFixedTime(new Date(AGORA));
+  const erros = coletarErros(page);
+  const { tocar } = await cadastrarCenario(page, 'Caio B', 25);
+  const hoje = page.getByTestId('saldo-hoje-valor');
+  const seteDias = page.getByTestId('previsao-7dias-valor');
+  const fimMes = page.getByTestId('previsao-fim-mes-valor');
+  const confirmarToast = async (texto: string) => {
+    const alerta = page.getByRole('alert').filter({ hasText: texto });
+    await expect(alerta).toBeVisible();
+    await alerta.getByRole('button', { name: 'Fechar notificação' }).click();
+    await expect(alerta).toBeHidden();
+  };
+
+  await expect(hoje).toHaveText(brl('235,00'));
+  await expect(seteDias).toHaveText(brl('2.325,00'));
+  await expect(page.getByTestId('previsao-7dias-conta')).toHaveText(/^Guardado R\$\s235,00 \+ a receber R\$\s2\.200,00 − a pagar R\$\s110,00$/);
+  await expect(fimMes).toHaveText(brl('2.090,00'));
+  await tocar(page.getByRole('button', { name: 'por quê? Em 7 dias você terá' }));
+  const explicacao = page.getByRole('region', { name: 'Em 7 dias você terá' });
+  await expect(explicacao).toContainText(/Renda principal \(a receber 25\/10\)\s*\+R\$\s2\.200,00/);
+  await expect(explicacao).toContainText(/Internet \(vence 20\/10\)\s*−R\$\s110,00/);
+
+  // C) Recebi 2.200: guardado 2.435, a receber 0 → 2.325.
+  await tocar(page.getByRole('button', { name: 'Recebi Renda principal' }));
+  const modalRecebi = page.getByRole('dialog', { name: 'Recebi o salário' });
+  await modalRecebi.getByRole('button', { name: /Confirmar/ }).click();
+  await confirmarToast('Recebido: Renda principal');
+  await expect(hoje).toHaveText(brl('2.435,00'));
+  await expect(page.getByTestId('previsao-7dias-conta')).toHaveText(/^Guardado R\$\s2\.435,00 \+ a receber R\$\s0,00 − a pagar R\$\s110,00$/);
+  await expect(seteDias).toHaveText(brl('2.325,00'));
+  await expect(fimMes).toHaveText(brl('2.090,00'));
+
+  // Paguei a Internet: guardado 2.325, a pagar 0 → 2.325; sobra do mês segue 2.090.
+  await tocar(page.getByRole('button', { name: 'Paguei Internet' }));
+  await confirmarToast('"Internet" marcada como paga.');
+  await expect(hoje).toHaveText(brl('2.325,00'));
+  await expect(page.getByTestId('previsao-7dias-conta')).toHaveText(/^Guardado R\$\s2\.325,00 \+ a receber R\$\s0,00 − a pagar R\$\s0,00$/);
+  await expect(seteDias).toHaveText(brl('2.325,00'));
+  await expect(fimMes).toHaveText(brl('2.090,00'));
   expect(erros, 'erros na página ou respostas HTTP ≥ 400').toEqual([]);
 });

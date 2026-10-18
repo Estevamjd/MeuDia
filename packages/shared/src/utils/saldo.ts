@@ -1,5 +1,6 @@
 import type {
   Carteira,
+  Competencia,
   ContaPagar,
   PagamentoConta,
   RecebimentoRenda,
@@ -12,7 +13,7 @@ import { ocorrenciaDaConta } from './ocorrencia-conta';
 import { competenciaDe, hojeSP, vencimentoNoMes } from './vencimentos';
 
 /**
- * Cálculo puro (sem I/O) de saldo, previsão e renda do mês (BRIEF R2, R3, R10, R11, R12).
+ * Cálculo puro (sem I/O) de saldo, sobra do mês, "Em 7 dias" e renda do mês (BRIEF R2, R3, R10, R11, R12).
  * Datas em `yyyy-MM-dd` no calendário de America/Sao_Paulo; instantes em ISO 8601.
  */
 
@@ -33,24 +34,6 @@ export function somarDias(dataISO: string, n: number): string {
 export function fimDoMes(dataOuCompetencia: string): string {
   const [a, m] = dataOuCompetencia.split('-').map(Number) as [number, number];
   return vencimentoNoMes(31, a, m);
-}
-
-function proximaCompetencia(competencia: string): string {
-  return competenciaDeslocada(competencia, 1);
-}
-
-/** Competência `n` meses depois (negativo: antes). */
-export function competenciaDeslocada(competencia: string, n: number): string {
-  const [a, m] = competencia.split('-').map(Number) as [number, number];
-  const total = a * 12 + (m - 1) + n;
-  return `${String(Math.floor(total / 12)).padStart(4, '0')}-${String((total % 12) + 1).padStart(2, '0')}`;
-}
-
-/** Competências de `de` até `ate` (inclusive). */
-export function competenciasEntre(de: string, ate: string): string[] {
-  const out: string[] = [];
-  for (let c = de; c <= ate; c = proximaCompetencia(c)) out.push(c);
-  return out;
 }
 
 /** Dia (SP) da âncora do saldo informado. */
@@ -135,104 +118,6 @@ export function dataRendaNoMes(renda: Pick<Renda, 'dia_recebimento'>, competenci
   return vencimentoNoMes(renda.dia_recebimento ?? 31, a, m);
 }
 
-export interface ItemPrevisao {
-  tipo: 'renda' | 'conta';
-  id: string;
-  descricao: string;
-  categoria: string;
-  /** Positivo para renda a receber, negativo para conta a pagar. */
-  valor: number;
-  data: string;
-  competencia: string;
-  vencida: boolean;
-}
-
-export interface EntradaPrevisao {
-  hojeISO: string;
-  alvoISO: string;
-  saldoHoje: number;
-  /** Âncora mais antiga das carteiras ativas (`ancoraPrevisao`); `null` sem carteira ativa. */
-  ancoraISO: string | null;
-  rendas: readonly Renda[];
-  recebimentos: readonly Pick<RecebimentoRenda, 'renda_id' | 'competencia'>[];
-  contas: readonly ContaPagar[];
-  pagamentos: readonly Pick<PagamentoConta, 'conta_id' | 'competencia'>[];
-}
-
-export interface Previsao {
-  alvoISO: string;
-  saldoHoje: number;
-  valor: number;
-  itens: ItemPrevisao[];
-}
-
-/** Quantos meses antes do corrente a previsão ainda procura contas vencidas sem "Paguei". */
-export const MESES_CONTAS_VENCIDAS = 12;
-
-/** Data (SP) da âncora mais antiga entre as carteiras ativas: antes dela o saldo informado já reflete o que foi pago. */
-export function ancoraPrevisao(carteiras: readonly Pick<Carteira, 'saldo_inicial_em' | 'arquivada'>[]): string | null {
-  return carteiras.filter((c) => !c.arquivada).map(dataAncora).sort()[0] ?? null;
-}
-
-/**
- * Competências que a previsão lê: contas desde `MESES_CONTAS_VENCIDAS` meses atrás (dívida vencida
- * não some na virada do mês), mas nunca antes da competência da âncora (conta paga antes de o usuário informar
- * o saldo já está nele; sem âncora, só o mês corrente), e rendas só do mês corrente em diante (renda antiga não
- * recebida não é dinheiro a entrar).
- */
-export function competenciasPrevisao(hojeISO: string, alvoISO: string, ancoraISO: string | null): { contas: string[]; rendas: string[] } {
-  const atual = competenciaDe(hojeISO);
-  const fim = competenciaDe(alvoISO);
-  const limite = competenciaDeslocada(atual, -MESES_CONTAS_VENCIDAS);
-  const ancora = ancoraISO ? competenciaDe(ancoraISO) : atual;
-  const inicio = [limite, ancora < atual ? ancora : atual].sort().at(-1)!;
-  return { contas: competenciasEntre(inicio, fim), rendas: competenciasEntre(atual, fim) };
-}
-
-/**
- * R10: saldo de hoje + rendas ativas ainda não recebidas com dia ≤ alvo (do mês corrente até o do alvo)
- * − ocorrências de contas não pagas com vencimento ≤ alvo, inclusive as vencidas de até
- * `MESES_CONTAS_VENCIDAS` meses atrás, nunca com vencimento antes da data da âncora nem (recorrentes) antes da
- * criação da conta.
- * Limites de orçamento não entram.
- */
-export function previsao({ hojeISO, alvoISO, saldoHoje: hoje, ancoraISO, rendas, recebimentos, contas, pagamentos }: EntradaPrevisao): Previsao {
-  const recebidas = new Set(recebimentos.map((r) => `${r.renda_id}|${r.competencia}`));
-  const pagas = new Set(pagamentos.map((p) => `${p.conta_id}|${p.competencia}`));
-  const itens: ItemPrevisao[] = [];
-  const periodo = competenciasPrevisao(hojeISO, alvoISO, ancoraISO);
-  for (const competencia of periodo.contas) {
-    for (const conta of contas) {
-      const ocorrencia = ocorrenciaDaConta(conta, competencia);
-      if (!ocorrencia || ocorrencia.vencimento > alvoISO || pagas.has(`${conta.id}|${competencia}`)) continue;
-      // Vencida antes da âncora já pode estar paga no saldo informado; segue na lista de contas para o "Paguei".
-      if (ancoraISO && ocorrencia.vencimento < ancoraISO) continue;
-      itens.push({
-        tipo: 'conta', id: conta.id, descricao: conta.descricao, categoria: conta.categoria, valor: -Number(conta.valor),
-        data: ocorrencia.vencimento, competencia, vencida: ocorrencia.vencimento < hojeISO,
-      });
-    }
-  }
-  for (const competencia of periodo.rendas) {
-    for (const renda of rendas) {
-      if (!rendaVigente(renda, competencia) || recebidas.has(`${renda.id}|${competencia}`)) continue;
-      const data = dataRendaNoMes(renda, competencia);
-      if (data > alvoISO) continue;
-      itens.push({
-        tipo: 'renda', id: renda.id, descricao: renda.descricao, categoria: 'Salário', valor: Number(renda.valor),
-        data, competencia, vencida: data < hojeISO,
-      });
-    }
-  }
-  itens.sort((a, b) => a.data.localeCompare(b.data) || b.valor - a.valor);
-  return { alvoISO, saldoHoje: hoje, valor: centavos(hoje + itens.reduce((s, i) => s + i.valor, 0)), itens };
-}
-
-/** Datas-alvo da home: hoje + 7 dias e o último dia do mês corrente. */
-export function alvosPrevisao(hojeISO: string): { seteDias: string; fimDoMes: string } {
-  return { seteDias: somarDias(hojeISO, 7), fimDoMes: fimDoMes(hojeISO) };
-}
-
 export interface RendaDoMes {
   /** Receitas lançadas na competência (sem ajustes). */
   lancada: number;
@@ -262,6 +147,115 @@ export function rendaDoMes(
 /** Gasto real do mês: despesas sem ajustes de saldo. */
 export function gastoDoMes(transacoes: readonly Pick<Transacao, 'tipo' | 'valor' | 'ajuste'>[]): number {
   return centavos(transacoes.filter((t) => t.tipo === 'despesa' && !t.ajuste).reduce((s, t) => s + Number(t.valor), 0));
+}
+
+export interface RendaAReceberDoMes {
+  id: string;
+  descricao: string;
+  valor: number;
+  /** Dia previsto na competência (sem dia cadastrado: último dia do mês). */
+  data: string;
+}
+
+export interface ContaAPagarDoMes {
+  id: string;
+  descricao: string;
+  categoria: string;
+  valor: number;
+  vencimento: string;
+}
+
+export interface EntradaSobraDoMes {
+  competencia: Competencia;
+  /** Lançamentos; só os da competência (por `data`) entram. */
+  transacoes: readonly Pick<Transacao, 'tipo' | 'valor' | 'data' | 'ajuste'>[];
+  rendas: readonly Renda[];
+  recebimentos: readonly Pick<RecebimentoRenda, 'renda_id' | 'competencia'>[];
+  contas: readonly ContaPagar[];
+  pagamentos: readonly Pick<PagamentoConta, 'conta_id' | 'competencia'>[];
+}
+
+export interface SobraDoMes {
+  competencia: Competencia;
+  /** `rendaDoMes`: receitas lançadas (o "Recebi" vira uma delas) + rendas fixas ainda sem "Recebi". */
+  renda: RendaDoMes;
+  rendasAReceber: RendaAReceberDoMes[];
+  /** `gastoDoMes`: despesas lançadas na competência, sem ajustes (o "Paguei" vira uma delas). */
+  despesasLancadas: number;
+  /** Ocorrências de contas da competência ainda sem "Paguei". */
+  contasAPagar: ContaAPagarDoMes[];
+  despesas: number;
+  valor: number;
+}
+
+/**
+ * "No fim do mês sobra" = renda do mês − despesas do mês (lançadas + contas da competência ainda não pagas).
+ * Não usa saldo de carteira. Cada real entra uma vez só: "Recebi" tira a renda de `aReceber` e a põe em receita
+ * lançada; "Paguei" tira a conta de `contasAPagar` e a põe em despesa lançada.
+ */
+export function sobraDoMes({ competencia, transacoes, rendas, recebimentos, contas, pagamentos }: EntradaSobraDoMes): SobraDoMes {
+  const doMes = transacoes.filter((t) => competenciaDe(t.data) === competencia);
+  const doMesRecebidas = recebimentos.filter((r) => r.competencia === competencia);
+  const renda = rendaDoMes(competencia, doMes, rendas, doMesRecebidas);
+  const recebidas = new Set(doMesRecebidas.map((r) => r.renda_id));
+  const rendasAReceber = rendas
+    .filter((r) => rendaVigente(r, competencia) && !recebidas.has(r.id))
+    .map((r) => ({ id: r.id, descricao: r.descricao, valor: Number(r.valor), data: dataRendaNoMes(r, competencia) }))
+    .sort((a, b) => a.data.localeCompare(b.data));
+  const pagas = new Set(pagamentos.filter((p) => p.competencia === competencia).map((p) => p.conta_id));
+  const contasAPagar: ContaAPagarDoMes[] = [];
+  for (const conta of contas) {
+    const ocorrencia = ocorrenciaDaConta(conta, competencia);
+    if (!ocorrencia || pagas.has(conta.id)) continue;
+    contasAPagar.push({ id: conta.id, descricao: conta.descricao, categoria: conta.categoria, valor: Number(conta.valor), vencimento: ocorrencia.vencimento });
+  }
+  contasAPagar.sort((a, b) => a.vencimento.localeCompare(b.vencimento) || a.descricao.localeCompare(b.descricao));
+  const despesasLancadas = gastoDoMes(doMes);
+  const despesas = centavos(despesasLancadas + contasAPagar.reduce((s, c) => s + c.valor, 0));
+  return { competencia, renda, rendasAReceber, despesasLancadas, contasAPagar, despesas, valor: centavos(renda.total - despesas) };
+}
+
+export interface EmSeteDias {
+  hojeISO: string;
+  alvoISO: string;
+  /** Saldo de hoje das carteiras ativas no total (`saldoHoje`): já inclui Recebi, Paguei e lançamentos avulsos. */
+  guardado: number;
+  /** Dia da âncora usada (`ancoraPrevisao`). */
+  ancoraISO: string;
+  /** Rendas da competência sem "Recebi" com data depois do dia da âncora. */
+  rendasAReceber: RendaAReceberDoMes[];
+  /** Contas da competência sem "Paguei" com vencimento no dia da âncora ou depois (inclui vencidas desde então). */
+  contasAPagar: ContaAPagarDoMes[];
+  aReceber: number;
+  aPagar: number;
+  valor: number;
+}
+
+/** Dia (SP) da âncora mais antiga entre as carteiras ativas; `null` sem carteira ativa. */
+export function ancoraPrevisao(carteiras: readonly Pick<Carteira, 'saldo_inicial_em' | 'arquivada'>[]): string | null {
+  return carteiras.filter((c) => !c.arquivada).map(dataAncora).sort()[0] ?? null;
+}
+
+/**
+ * "Em 7 dias você terá" = guardado + a receber − a pagar, na competência corrente (a de `sobra`).
+ * O saldo informado na âncora já reflete o que caiu até aquele dia (renda com data ≤ âncora não entra) e pode já
+ * refletir conta vencida antes dela (vencimento < âncora não entra). "Recebi"/"Paguei" tiram o item de
+ * `sobra.rendasAReceber`/`sobra.contasAPagar` e o põem no guardado: o valor do card não muda e nada conta duas vezes.
+ */
+export function emSeteDias({ hojeISO, guardado, ancoraISO, sobra }: {
+  hojeISO: string;
+  guardado: number;
+  ancoraISO: string;
+  sobra: Pick<SobraDoMes, 'rendasAReceber' | 'contasAPagar'>;
+}): EmSeteDias {
+  const rendasAReceber = sobra.rendasAReceber.filter((r) => r.data > ancoraISO);
+  const contasAPagar = sobra.contasAPagar.filter((c) => c.vencimento >= ancoraISO);
+  const aReceber = centavos(rendasAReceber.reduce((s, r) => s + r.valor, 0));
+  const aPagar = centavos(contasAPagar.reduce((s, c) => s + c.valor, 0));
+  return {
+    hojeISO, alvoISO: somarDias(hojeISO, 7), guardado, ancoraISO, rendasAReceber, contasAPagar, aReceber, aPagar,
+    valor: centavos(guardado + aReceber - aPagar),
+  };
 }
 
 /**

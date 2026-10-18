@@ -127,7 +127,7 @@ describe('Recebi (R6)', () => {
 });
 
 describe('painelSaldo', () => {
-  it('monta hoje, chips, previsões, renda a receber e carteira padrão (BRIEF §5 passo 6)', async () => {
+  it('monta hoje, chips, entradas da sobra do mês, renda a receber e carteira padrão (BRIEF §5 passo 6)', async () => {
     vi.mocked(carteiras.findAll).mockResolvedValue([
       carteira(NU, 'Nubank', 650), carteira(CX, 'Caixa', 50, { ordem: 1 }),
       carteira('arq', 'Antiga', 999, { arquivada: true, ordem: 2 }),
@@ -150,36 +150,35 @@ describe('painelSaldo', () => {
     expect(p.saldoHoje).toBe(775);
     expect(p.carteiras.map((c) => [c.carteira.nome, c.saldo])).toEqual([['Nubank', 675], ['Caixa', 100]]);
     expect(p.arquivadas.map((c) => c.nome)).toEqual(['Antiga']);
-    expect(p.previsao7.valor).toBe(1555);
-    expect(p.previsaoFim.valor).toBe(1455);
+    expect(p.mes.rendas.map((r) => r.id)).toEqual(['r']);
+    expect(p.mes.contas.map((c) => c.id)).toEqual(['luz', 'net']);
     expect(p.rendasAReceber.map((r) => [r.renda.id, r.data])).toEqual([['r', '2026-10-05']]);
     expect(p.carteiraPadraoId).toBe(NU);
     expect(p.comecouMes).toBeNull();
+    // Âncora = dia (SP) da carteira ativa mais antiga; a arquivada não conta.
+    expect(p.ancoraISO).toBe(HOJE);
     expect(transacoes.findComCarteiraDesde).toHaveBeenCalledWith('u', HOJE);
     expect(recebimentos.findByCompetencias).toHaveBeenCalledWith('u', ['2026-10']);
   });
-  it('sem carteiras: não lê lançamentos; 7 dias cruzando o mês busca as duas competências', async () => {
+  it('sem carteiras: não lê lançamentos; recebimentos e pagamentos só da competência corrente', async () => {
     vi.mocked(carteiras.findAll).mockResolvedValue([]);
     const p = await service.painelSaldo('u', '2026-10-28');
     expect(p.saldoHoje).toBe(0);
     expect(p.carteiraPadraoId).toBeNull();
+    expect(p.ancoraISO).toBeNull();
     expect(transacoes.findComCarteiraDesde).not.toHaveBeenCalled();
-    // Sem âncora não há como saber o que já foi pago: só competências do mês corrente em diante.
-    expect(pagamentos.findByCompetencias).toHaveBeenCalledWith('u', ['2026-10', '2026-11']);
-  });
-  it('previsão parte da âncora mais antiga das carteiras ativas: conta antiga sem Paguei não é descontada de novo', async () => {
-    vi.mocked(carteiras.findAll).mockResolvedValue([
-      carteira(NU, 'Nubank', 1000),
-      carteira('arq', 'Antiga', 0, { arquivada: true, saldo_inicial_em: '2025-01-01T12:00:00Z' }),
-    ]);
-    vi.mocked(contas.findAll).mockResolvedValue([
-      { id: 'al', descricao: 'Aluguel', categoria: 'Moradia', valor: 500, recorrencia: 'mensal', dia_vencimento: 10, ativo: true, created_at: '2025-01-01T12:00:00Z' },
-      { id: 'lz', descricao: 'Luz', categoria: 'Contas', valor: 200, recorrencia: 'mensal', dia_vencimento: 20, ativo: true, created_at: '2025-01-01T12:00:00Z' },
-    ] as never);
-    const p = await service.painelSaldo('u', HOJE);
-    // Aluguel de 10/10 venceu antes da âncora (17/10): pode já estar no saldo informado. Luz de 20/10 conta.
-    expect(p.previsaoFim.itens.map((i) => [i.descricao, i.competencia])).toEqual([['Luz', '2026-10']]);
-    expect(p.previsaoFim.valor).toBe(800);
+    expect(recebimentos.findByCompetencias).toHaveBeenCalledWith('u', ['2026-10']);
     expect(pagamentos.findByCompetencias).toHaveBeenCalledWith('u', ['2026-10']);
+  });
+  it('Recebi da competência tira a renda de "a receber"; recebimento de outra competência não', async () => {
+    vi.mocked(carteiras.findAll).mockResolvedValue([carteira(NU, 'Nubank', 235)]);
+    vi.mocked(rendas.findAll).mockResolvedValue([
+      { id: 'r', descricao: 'Salário', valor: 2200, dia_recebimento: 1, ativo: true, created_at: '2026-10-16T15:00:00Z' },
+      { id: 'r2', descricao: 'Bico', valor: 300, dia_recebimento: 20, ativo: true, created_at: '2026-10-16T15:00:00Z' },
+    ] as never);
+    vi.mocked(recebimentos.findByCompetencias).mockResolvedValue([{ renda_id: 'r', competencia: '2026-10' }] as never);
+    const p = await service.painelSaldo('u', HOJE);
+    expect(p.rendasAReceber.map((r) => r.renda.id)).toEqual(['r2']);
+    expect(p.mes.recebimentos).toEqual([{ renda_id: 'r', competencia: '2026-10' }]);
   });
 });
