@@ -50,6 +50,15 @@ describe('MetaCard', () => {
     expect(screen.getByRole('progressbar').className).toContain('bg-green');
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('100');
   });
+  it('percentual em centavos, sem erro de ponto flutuante (570/1000 = 57%, 290/1000 = 29%)', () => {
+    for (const [guardado, pct, falta] of [[570, '57', 'R$ 430,00'], [290, '29', 'R$ 710,00']] as const) {
+      render(<MetaCard meta={meta({ valor_alvo: 1000, valor_guardado: guardado })} sugestao={null} onGuardei={vi.fn()} onExcluir={vi.fn()} />);
+      expect(texto()).toContain(`· ${pct}%`);
+      expect(texto()).toContain(`Faltam ${falta}`);
+      expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe(pct);
+      cleanup();
+    }
+  });
 });
 
 describe('FormMeta', () => {

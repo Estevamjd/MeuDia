@@ -6,6 +6,7 @@ import {
   useSalvarOrcamento,
   useExcluirOrcamento,
   useCriarRenda,
+  useExcluirRenda,
   useResumoFinanceiroMes,
 } from '../useOrcamento';
 
@@ -16,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   salvarOrcamento: vi.fn(),
   excluirOrcamento: vi.fn(),
   criarRenda: vi.fn(),
+  excluirRenda: vi.fn(),
   resumoFinanceiroMes: vi.fn(),
 }));
 vi.mock('../useAuth', () => ({ useAuth: () => ({ user: mocks.user }) }));
@@ -25,6 +27,7 @@ vi.mock('@meudia/api', () => ({
     salvarOrcamento: mocks.salvarOrcamento,
     excluirOrcamento: mocks.excluirOrcamento,
     criarRenda: mocks.criarRenda,
+    excluirRenda: mocks.excluirRenda,
     resumoFinanceiroMes: mocks.resumoFinanceiroMes,
   },
 }));
@@ -86,6 +89,16 @@ it('excluir limite usa o id e invalida as mesmas chaves', async () => {
 it('criar renda invalida o resumo (sobra prevista atualiza ao salvar)', () => {
   const { result } = renderHook(() => useCriarRenda() as unknown as MutationOpts<unknown>);
   result.current.onSuccess();
+  expect(chavesInvalidadas()).toContainEqual(['rendas']);
+  expect(chavesInvalidadas()).toContainEqual(['resumo-financeiro-mes']);
+});
+
+it('excluir renda invalida os vínculos (recebimentos saem em cascata; o selo "Recebi" some)', async () => {
+  const { result } = renderHook(() => useExcluirRenda() as unknown as MutationOpts<string>);
+  await result.current.mutationFn('r1');
+  expect(mocks.excluirRenda).toHaveBeenCalledWith('u1', 'r1');
+  result.current.onSuccess();
+  expect(chavesInvalidadas()).toContainEqual(['vinculos-transacoes']);
   expect(chavesInvalidadas()).toContainEqual(['rendas']);
   expect(chavesInvalidadas()).toContainEqual(['resumo-financeiro-mes']);
 });

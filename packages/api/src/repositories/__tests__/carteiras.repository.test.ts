@@ -160,7 +160,8 @@ it('só carteirasRepository.remove apaga carteira (007: excluir de verdade, com 
   const raiz = path.resolve(__dirname, '../../../../..');
   const listar = (pasta: string): string[] => readdirSync(path.join(raiz, pasta), { withFileTypes: true })
     .flatMap((entrada) => {
-      if (['node_modules', '.next', 'dist', '.turbo'].includes(entrada.name)) return [];
+      // Varre o disco: ignora saídas de build/teste fora do git (bundle do `vercel build` etc.).
+      if (['node_modules', '.next', 'dist', '.turbo', '.vercel', 'coverage', 'test-results', 'playwright-report', 'out'].includes(entrada.name)) return [];
       const arquivo = `${pasta}/${entrada.name}`;
       return entrada.isDirectory() ? listar(arquivo) : [arquivo];
     });
