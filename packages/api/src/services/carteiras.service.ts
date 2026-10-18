@@ -2,6 +2,7 @@ import type { Carteira, Renda, Transacao, Transferencia } from '@meudia/shared';
 import {
   AppError,
   CATEGORIA_ENTRADA_EXTRA,
+  ancoraPrevisao,
   competenciaDe,
   comecouMesCom,
   dataAncora,
@@ -181,6 +182,8 @@ export async function painelSaldo(userId: string, hojeISO = hojeSP()) {
     arquivadas: carteiras.filter((c) => c.arquivada),
     saldoHoje: saldoHoje(carteiras, transacoes, transferencias, hojeISO),
     comecouMes: comecouMesCom(carteiras, transacoes, transferencias, competencia),
+    /** Dia da âncora mais antiga das carteiras ativas (o "Em 7 dias" só conta o que vem depois dela). */
+    ancoraISO: ancoraPrevisao(carteiras),
     rendasAReceber,
     /** Entradas de `sobraDoMes` na competência corrente. */
     mes: { rendas, recebimentos, contas, pagamentos },

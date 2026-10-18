@@ -45,7 +45,7 @@ Quando o dono corrigir um agente, conserte e adicione a linha aqui. Se a regra j
 | Novo lançamento escolhe carteira ativa quando existir | `NovoLancamento.test.tsx` |
 | Editar lançamento antigo (sem carteira) não troca carteira/banco; Salvar não trava se a consulta de carteiras falhar | `NovoLancamento.test.tsx` |
 | "No fim do mês sobra" = renda do mês (`rendaDoMes`) − despesas lançadas − contas da competência sem "Paguei"; não soma saldo; Recebi/Paguei não contam em dobro | `sobraDoMes` em `saldo.ts` + `saldo.test.ts`, `ContasSaldo.test.tsx`, `contas-saldo.spec.ts` (aceite 235 / 2.200 / 110) |
-| "Em 7 dias você terá" = guardado hoje + "No fim do mês sobra"; os dois cards mostram a conta numa linha visível e respeitam ocultar valores | `emSeteDias` + `saldo.test.ts`, `ContasSaldo.test.tsx`, `contas-saldo.spec.ts` |
+| "Em 7 dias você terá" = guardado + rendas sem Recebi com data > âncora − contas sem Paguei com vencimento ≥ âncora (competência corrente); Recebi/Paguei não mudam o card; os dois cards mostram a conta numa linha visível e respeitam ocultar valores | `emSeteDias`/`ancoraPrevisao` em `saldo.ts` + `saldo.test.ts` (exemplos A–D e todas as ordens de Recebi/Paguei), `ContasSaldo.test.tsx`, `contas-saldo.spec.ts` (previsão A e B/C) |
 | Ajuste de saldo fora de "Gastos por Categoria" do Início | `inicio/__tests__/GastosPorCategoria.test.tsx` |
 | Recebi sempre com carteira ativa (padrão arquivada cai na primeira ativa, no front e no banco) | `RecebiSheet.test.tsx`, `useFinancasHome.test.ts`, `tests/006_carteiras.sql` |
 | Carteira não se apaga (sem DELETE para authenticated; REVOKE ALL antes dos GRANTs) | `tests/006_carteiras.sql` (com default privileges do Supabase simulados), `carteiras.repository.test.ts` |

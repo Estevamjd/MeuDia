@@ -31,7 +31,7 @@ export function montarDashboard(competencia: Competencia, hojeISO: string, paine
       comecouMes: mesCorrente ? painel.comecouMes : null,
       nomeMes: MESES[partesCompetencia(painel.competencia).mes - 1]!,
     },
-    seteDias: sobra && emSeteDias(hojeISO, painel.saldoHoje, sobra),
+    seteDias: sobra && painel.ancoraISO ? emSeteDias({ hojeISO, guardado: painel.saldoHoje, ancoraISO: painel.ancoraISO, sobra }) : null,
     sobraMes: sobra,
     rendasAReceber: mesCorrente
       ? painel.rendasAReceber.map((r) => ({ rendaId: r.renda.id, descricao: r.renda.descricao, valor: Number(r.renda.valor), data: r.data, competencia: r.competencia }))

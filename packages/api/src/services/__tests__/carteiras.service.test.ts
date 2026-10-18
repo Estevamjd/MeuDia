@@ -155,6 +155,8 @@ describe('painelSaldo', () => {
     expect(p.rendasAReceber.map((r) => [r.renda.id, r.data])).toEqual([['r', '2026-10-05']]);
     expect(p.carteiraPadraoId).toBe(NU);
     expect(p.comecouMes).toBeNull();
+    // Âncora = dia (SP) da carteira ativa mais antiga; a arquivada não conta.
+    expect(p.ancoraISO).toBe(HOJE);
     expect(transacoes.findComCarteiraDesde).toHaveBeenCalledWith('u', HOJE);
     expect(recebimentos.findByCompetencias).toHaveBeenCalledWith('u', ['2026-10']);
   });
@@ -163,6 +165,7 @@ describe('painelSaldo', () => {
     const p = await service.painelSaldo('u', '2026-10-28');
     expect(p.saldoHoje).toBe(0);
     expect(p.carteiraPadraoId).toBeNull();
+    expect(p.ancoraISO).toBeNull();
     expect(transacoes.findComCarteiraDesde).not.toHaveBeenCalled();
     expect(recebimentos.findByCompetencias).toHaveBeenCalledWith('u', ['2026-10']);
     expect(pagamentos.findByCompetencias).toHaveBeenCalledWith('u', ['2026-10']);

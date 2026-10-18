@@ -128,25 +128,41 @@ describe('CardSobraMes e CardSeteDias (decisão final do Estevam)', () => {
     expect(texto()).toContain('− Despesas lançadas no mês−R$ 290,00');
   });
 
-  it('"Em 7 dias você terá" = guardado + sobra, com as duas parcelas', () => {
-    render(<CardSeteDias seteDias={emSeteDias('2026-10-17', 235, sobra)} escondido={false} />);
+  // Exemplo B do ajuste aprovado: âncora 17/10, Salário 2.200 em 25/10, Luz 110 em 20/10 e Água 80 em 05/10 (antes da âncora).
+  const sobraB: SobraDoMes = {
+    ...sobra,
+    rendasAReceber: [{ id: 'r', descricao: 'Salário', valor: 2200, data: '2026-10-25' }],
+    contasAPagar: [
+      { id: 'agua', descricao: 'Água', categoria: 'Água', valor: 80, vencimento: '2026-10-05' },
+      { id: 'luz', descricao: 'Luz', categoria: 'Luz', valor: 110, vencimento: '2026-10-20' },
+    ],
+  };
+  const seteB = (hojeISO = '2026-10-17') => emSeteDias({ hojeISO, guardado: 235, ancoraISO: '2026-10-17', sobra: sobraB });
+
+  it('"Em 7 dias você terá" = guardado + a receber − a pagar; "por quê?" lista cada item com data', () => {
+    render(<CardSeteDias seteDias={seteB()} escondido={false} />);
     expect(linha('previsao-7dias-valor')).toBe('R$ 2.325,00');
-    expect(linha('previsao-7dias-conta')).toBe('Guardado R$ 235,00 + sobra R$ 2.090,00');
+    expect(linha('previsao-7dias-conta')).toBe('Guardado R$ 235,00 + a receber R$ 2.200,00 − a pagar R$ 110,00');
     expect(texto()).toContain('até 24/10');
     fireEvent.click(screen.getByRole('button', { name: 'por quê? Em 7 dias você terá' }));
     expect(texto()).toContain('Guardado hoje nos bancosR$ 235,00');
-    expect(texto()).toContain('+ Sobra do fim do mês+R$ 2.090,00');
+    expect(texto()).toContain('+ Salário (a receber 25/10)+R$ 2.200,00');
+    expect(texto()).toContain('− Luz (vence 20/10)−R$ 110,00');
+    expect(texto()).not.toContain('Água');
     expect(texto()).toContain('= Em 24/10R$ 2.325,00');
+    expect(texto()).toContain('Renda até 17/10 e conta vencida antes dessa data não entram');
   });
 
-  it('"Em 7 dias" com sobra negativa: "− falta" e total em vermelho', () => {
-    render(<CardSeteDias seteDias={emSeteDias('2026-10-17', 100, { valor: -300 })} escondido={false} />);
-    expect(linha('previsao-7dias-conta')).toBe('Guardado R$ 100,00 − falta R$ 300,00');
+  it('"Em 7 dias": conta vencida depois da âncora aparece como vencida; negativo em vermelho', () => {
+    render(<CardSeteDias seteDias={{ ...seteB('2026-10-22'), guardado: -50, valor: -160, aReceber: 0, rendasAReceber: [] }} escondido={false} />);
+    expect(linha('previsao-7dias-conta')).toBe('Guardado −R$ 50,00 + a receber R$ 0,00 − a pagar R$ 110,00');
     expect(screen.getByTestId('previsao-7dias-valor').className).toContain('text-red');
+    fireEvent.click(screen.getByRole('button', { name: 'por quê? Em 7 dias você terá' }));
+    expect(texto()).toContain('− Luz (vencida 20/10)−R$ 110,00');
   });
 
   it('ocultar valores esconde também as linhas curtas e o "por quê?"', () => {
-    render(<><CardSobraMes sobra={sobra} escondido /><CardSeteDias seteDias={emSeteDias('2026-10-17', 235, sobra)} escondido /></>);
+    render(<><CardSobraMes sobra={sobra} escondido /><CardSeteDias seteDias={seteB()} escondido /></>);
     for (const b of screen.getAllByRole('button', { name: /por quê\?/ })) fireEvent.click(b);
     expect(texto()).not.toMatch(/2\.200|2\.090|2\.325|235|110/);
   });
@@ -186,7 +202,7 @@ describe('montarDashboard', () => {
     mes_vencimento: null, data_vencimento: null, ativo: true, created_at: '2026-10-17T15:00:00Z', updated_at: null,
   };
   const painel = {
-    hojeISO: '2026-10-17', competencia: '2026-10', saldoHoje: 775, comecouMes: null,
+    hojeISO: '2026-10-17', competencia: '2026-10', saldoHoje: 775, comecouMes: null, ancoraISO: '2026-10-17',
     carteiras: [{ carteira: carteira('n', 'Nubank'), saldo: 675 }, { carteira: carteira('c', 'Caixa'), saldo: 100 }],
     arquivadas: [], mes: { rendas: [renda], recebimentos: [], contas: [contaLuz], pagamentos: [] },
     rendasAReceber: [{ renda: { id: 'r', descricao: 'Salário', valor: 900 }, competencia: '2026-10', data: '2026-10-05' }],
@@ -198,8 +214,10 @@ describe('montarDashboard', () => {
     const d = montarDashboard('2026-10', '2026-10-17', painel, [gasto]);
     expect(d.saldo.carteiras.map((c) => [c.nome, c.saldo])).toEqual([['Nubank', 675], ['Caixa', 100]]);
     expect(d.saldo.nomeMes).toBe('outubro');
-    // Sobra = 900 (renda sem Recebi) − 25 (Gastei) − 120 (Luz) = 755; 7 dias = 775 + 755.
-    expect([d.sobraMes?.valor, d.seteDias?.valor, d.seteDias?.alvoISO]).toEqual([755, 1530, '2026-10-24']);
+    // Sobra = 900 (renda sem Recebi) − 25 (Gastei) − 120 (Luz) = 755.
+    // 7 dias = 775 + 0 (renda de 05/10 é antes da âncora 17/10) − 120 (Luz 20/10) = 655.
+    expect([d.sobraMes?.valor, d.seteDias?.valor, d.seteDias?.alvoISO]).toEqual([755, 655, '2026-10-24']);
+    expect(d.seteDias?.contasAPagar.map((c) => c.id)).toEqual(['luz']);
     expect(d.rendasAReceber).toEqual([{ rendaId: 'r', descricao: 'Salário', valor: 900, data: '2026-10-05', competencia: '2026-10' }]);
     expect(d.fatias).toEqual([{ categoria: 'Comida', valor: 25 }]);
     expect(d.evolucao).toHaveLength(17);

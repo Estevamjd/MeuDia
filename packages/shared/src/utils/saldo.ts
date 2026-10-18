@@ -216,16 +216,46 @@ export function sobraDoMes({ competencia, transacoes, rendas, recebimentos, cont
 }
 
 export interface EmSeteDias {
+  hojeISO: string;
   alvoISO: string;
-  /** Saldo de hoje das carteiras ativas no total (`saldoHoje`). */
+  /** Saldo de hoje das carteiras ativas no total (`saldoHoje`): já inclui Recebi, Paguei e lançamentos avulsos. */
   guardado: number;
-  sobra: number;
+  /** Dia da âncora usada (`ancoraPrevisao`). */
+  ancoraISO: string;
+  /** Rendas da competência sem "Recebi" com data depois do dia da âncora. */
+  rendasAReceber: RendaAReceberDoMes[];
+  /** Contas da competência sem "Paguei" com vencimento no dia da âncora ou depois (inclui vencidas desde então). */
+  contasAPagar: ContaAPagarDoMes[];
+  aReceber: number;
+  aPagar: number;
   valor: number;
 }
 
-/** "Em 7 dias você terá" = guardado hoje + "No fim do mês sobra". */
-export function emSeteDias(hojeISO: string, guardado: number, sobra: Pick<SobraDoMes, 'valor'>): EmSeteDias {
-  return { alvoISO: somarDias(hojeISO, 7), guardado, sobra: sobra.valor, valor: centavos(guardado + sobra.valor) };
+/** Dia (SP) da âncora mais antiga entre as carteiras ativas; `null` sem carteira ativa. */
+export function ancoraPrevisao(carteiras: readonly Pick<Carteira, 'saldo_inicial_em' | 'arquivada'>[]): string | null {
+  return carteiras.filter((c) => !c.arquivada).map(dataAncora).sort()[0] ?? null;
+}
+
+/**
+ * "Em 7 dias você terá" = guardado + a receber − a pagar, na competência corrente (a de `sobra`).
+ * O saldo informado na âncora já reflete o que caiu até aquele dia (renda com data ≤ âncora não entra) e pode já
+ * refletir conta vencida antes dela (vencimento < âncora não entra). "Recebi"/"Paguei" tiram o item de
+ * `sobra.rendasAReceber`/`sobra.contasAPagar` e o põem no guardado: o valor do card não muda e nada conta duas vezes.
+ */
+export function emSeteDias({ hojeISO, guardado, ancoraISO, sobra }: {
+  hojeISO: string;
+  guardado: number;
+  ancoraISO: string;
+  sobra: Pick<SobraDoMes, 'rendasAReceber' | 'contasAPagar'>;
+}): EmSeteDias {
+  const rendasAReceber = sobra.rendasAReceber.filter((r) => r.data > ancoraISO);
+  const contasAPagar = sobra.contasAPagar.filter((c) => c.vencimento >= ancoraISO);
+  const aReceber = centavos(rendasAReceber.reduce((s, r) => s + r.valor, 0));
+  const aPagar = centavos(contasAPagar.reduce((s, c) => s + c.valor, 0));
+  return {
+    hojeISO, alvoISO: somarDias(hojeISO, 7), guardado, ancoraISO, rendasAReceber, contasAPagar, aReceber, aPagar,
+    valor: centavos(guardado + aReceber - aPagar),
+  };
 }
 
 /**

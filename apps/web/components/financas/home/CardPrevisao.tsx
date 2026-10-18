@@ -122,10 +122,12 @@ export interface CardSeteDiasProps {
   escondido: boolean;
 }
 
-/** "Em 7 dias você terá" = guardado hoje nos bancos + "No fim do mês sobra". */
+/**
+ * "Em 7 dias você terá" = guardado hoje + a receber − a pagar (só o que vem depois do saldo informado).
+ * Recebi/Paguei não mudam o valor: o item sai de "a receber/a pagar" e entra no guardado.
+ */
 export function CardSeteDias({ seteDias, escondido }: CardSeteDiasProps) {
   const v = (n: number) => oculto(escondido, n);
-  const parcela = seteDias.sobra < 0 ? `− falta ${v(seteDias.sobra)}` : `+ sobra ${v(seteDias.sobra)}`;
   return (
     <CardBase
       id="previsao-7dias"
@@ -133,14 +135,25 @@ export function CardSeteDias({ seteDias, escondido }: CardSeteDiasProps) {
       icone={<CalendarDays size={20} />}
       valor={seteDias.valor}
       escondido={escondido}
-      conta={`Guardado ${seteDias.guardado < 0 ? '−' : ''}${v(seteDias.guardado)} ${parcela}`}
+      conta={`Guardado ${seteDias.guardado < 0 ? '−' : ''}${v(seteDias.guardado)} + a receber ${v(seteDias.aReceber)} − a pagar ${v(seteDias.aPagar)}`}
       rodape={`até ${formatDiaMes(seteDias.alvoISO)}`}
       porque={
-        <ul className="space-y-1">
-          <Linha rotulo="Guardado hoje nos bancos" valor={seteDias.guardado} escondido={escondido} />
-          <Linha rotulo={seteDias.sobra < 0 ? '− Falta no fim do mês' : '+ Sobra do fim do mês'} valor={seteDias.sobra} sinal={seteDias.sobra < 0 ? '−' : '+'} escondido={escondido} />
-          <Linha rotulo={`= Em ${formatDiaMes(seteDias.alvoISO)}`} valor={seteDias.valor} escondido={escondido} total />
-        </ul>
+        <>
+          <ul className="space-y-1">
+            <Linha rotulo="Guardado hoje nos bancos" valor={seteDias.guardado} escondido={escondido} />
+            {seteDias.rendasAReceber.map((r) => (
+              <Linha key={r.id} rotulo={`+ ${r.descricao} (a receber ${formatDiaMes(r.data)})`} valor={r.valor} sinal="+" escondido={escondido} />
+            ))}
+            {seteDias.contasAPagar.map((c) => (
+              <Linha key={c.id} rotulo={`− ${c.descricao} (${c.vencimento < seteDias.hojeISO ? 'vencida' : 'vence'} ${formatDiaMes(c.vencimento)})`} valor={c.valor} sinal="−" escondido={escondido} />
+            ))}
+            <Linha rotulo={`= Em ${formatDiaMes(seteDias.alvoISO)}`} valor={seteDias.valor} escondido={escondido} total />
+          </ul>
+          <p className="pt-1 text-muted">
+            Renda até {formatDiaMes(seteDias.ancoraISO)} e conta vencida antes dessa data não entram: o saldo informado já
+            pode incluir. Lançamentos, &quot;Recebi&quot; e &quot;Paguei&quot; já estão no guardado.
+          </p>
+        </>
       }
     />
   );
