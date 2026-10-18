@@ -1,7 +1,9 @@
 // Mock STATEFUL (em memória) de Supabase Auth (GoTrue) + PostgREST para os testes E2E.
 // Nunca toca um Supabase real. Uso: node e2e/mock-supabase/server.mjs [porta]
 // Endpoints de apoio: GET /__mock/state (dump), POST /__mock/reset, GET /__mock/health,
-// POST /__mock/clock {"now": ISO | null} (relógio injetável só do mock: datas default, JWT e now()).
+// POST /__mock/clock {"now": ISO | null} (relógio injetável só do mock: datas default, JWT e now()),
+// GET /__mock/stats e POST /__mock/stats/reset (contagem de chamadas, para a medição de e2e/perf).
+// MOCK_LATENCY_MS (env): atraso artificial em cada chamada de Auth/PostgREST, simulando a rede até o Supabase.
 import http from 'node:http';
 import { corrigirSaldo } from './corrigir-saldo.mjs';
 import crypto from 'node:crypto';
@@ -10,6 +12,12 @@ const PORT = Number(process.argv[2] || process.env.MOCK_SUPABASE_PORT || 54329);
 const JWT_SECRET = 'mock-jwt-secret-nao-usar-em-producao';
 const ACCESS_TTL = 3600;
 const VERBOSE = !!process.env.MOCK_VERBOSE;
+const LATENCY_MS = Number(process.env.MOCK_LATENCY_MS || 0);
+
+// Chamadas de Auth/PostgREST desde o último reset. Sem Origin = servidor (middleware/SSR); com Origin = navegador.
+let stats;
+const resetStats = () => { stats = { servidor: 0, navegador: 0, rotas: Object.create(null) }; };
+resetStats();
 
 // ─── Estado ──────────────────────────────────────────────────────────────────
 let users; // email -> user (com password)
@@ -739,6 +747,17 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/__mock/clock' && req.method === 'POST') {
       clockOffsetMs = body?.now ? Date.parse(body.now) - Date.now() : 0;
       return send(res, 200, { ok: true, now: nowIso() });
+    }
+    if (url.pathname === '/__mock/stats/reset' && req.method === 'POST') {
+      resetStats();
+      return send(res, 200, { ok: true });
+    }
+    if (url.pathname === '/__mock/stats') return send(res, 200, stats);
+    if (!url.pathname.startsWith('/__mock/')) {
+      stats[req.headers.origin ? 'navegador' : 'servidor'] += 1;
+      const rota = `${req.method} ${url.pathname}`;
+      stats.rotas[rota] = (stats.rotas[rota] ?? 0) + 1;
+      if (LATENCY_MS) await new Promise((r) => setTimeout(r, LATENCY_MS));
     }
     if (url.pathname === '/__mock/state') {
       return send(res, 200, { users: [...users.values()].map(publicUser), tables });

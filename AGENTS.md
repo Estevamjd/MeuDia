@@ -27,6 +27,8 @@ Todo bug corrigido ganha um teste ou checagem que falha sem a correção. Prove 
 | SW não recarrega a página na 1ª instalação | Parcial. `e2e/novo-usuario.spec.ts` digita com checagem de foco, mas não há teste dedicado da 1ª instalação do SW |
 | Termos e privacidade abrem logado | `lib/__tests__/supabase-middleware.test.ts` |
 | Versão do pnpm tem uma fonte só (`packageManager`) | Workflow sem `version:` no `pnpm/action-setup`; com duas fontes o CI quebra com "Multiple versions of pnpm specified" |
+| `useAuth` faz um só `getUser()` por aba (estado compartilhado); componente novo nasce com o usuário | `hooks/useAuth.ts` + `hooks/__tests__/useAuth.test.tsx`; medição em `e2e/perf/troca-abas.perf.ts` |
+| Troca de aba mostra esqueleto na hora (`loading.tsx` em `(dashboard)` e `(dashboard)/financas`, limite que o `<Link>` pré-carrega) | `e2e/perf/troca-abas.perf.ts` (fora do CI: `pnpm exec playwright test -c playwright.perf.config.ts`) |
 | Lint em `ai`, `api` e `mobile` | Nada ainda. Dívida antiga; fora do `verify.sh` até ser limpa (ver PLANO-PIRAMIDE) |
 
 Quando o dono corrigir um agente, conserte e adicione a linha aqui. Se a regra já estava e nada a garantia, suba o conserto para código, tipo, lint ou teste na mesma mudança.
@@ -42,7 +44,8 @@ Quando o dono corrigir um agente, conserte e adicione a linha aqui. Se a regra j
 | Seletores de carteira/categoria navegam por teclado com um único Tab | `RevisaoTeclado.test.tsx` |
 | Novo lançamento escolhe carteira ativa quando existir | `NovoLancamento.test.tsx` |
 | Editar lançamento antigo (sem carteira) não troca carteira/banco; Salvar não trava se a consulta de carteiras falhar | `NovoLancamento.test.tsx` |
-| Previsão só desconta contas vencidas a partir da âncora mais antiga das carteiras ativas | `saldo.test.ts`, `carteiras.service.test.ts` |
+| "No fim do mês sobra" = renda do mês (`rendaDoMes`) − despesas lançadas − contas da competência sem "Paguei"; não soma saldo; Recebi/Paguei não contam em dobro | `sobraDoMes` em `saldo.ts` + `saldo.test.ts`, `ContasSaldo.test.tsx`, `contas-saldo.spec.ts` (aceite 235 / 2.200 / 110) |
+| "Em 7 dias você terá" = guardado hoje + "No fim do mês sobra"; os dois cards mostram a conta numa linha visível e respeitam ocultar valores | `emSeteDias` + `saldo.test.ts`, `ContasSaldo.test.tsx`, `contas-saldo.spec.ts` |
 | Ajuste de saldo fora de "Gastos por Categoria" do Início | `inicio/__tests__/GastosPorCategoria.test.tsx` |
 | Recebi sempre com carteira ativa (padrão arquivada cai na primeira ativa, no front e no banco) | `RecebiSheet.test.tsx`, `useFinancasHome.test.ts`, `tests/006_carteiras.sql` |
 | Carteira não se apaga (sem DELETE para authenticated; REVOKE ALL antes dos GRANTs) | `tests/006_carteiras.sql` (com default privileges do Supabase simulados), `carteiras.repository.test.ts` |

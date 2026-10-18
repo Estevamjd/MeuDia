@@ -220,7 +220,7 @@ it.each([null, 'inexistente', 'segunda'])('Paguei usa sempre carteira ativa (pad
     carteiraPadraoId: padrao,
     hojeISO: '2026-10-16', competencia: '2026-10', saldoHoje: 150, comecouMes: null,
     arquivadas: [], rendasAReceber: [], transacoesCarteiras: [], transferencias: [],
-    previsao7: { itens: [], valor: 150 }, previsaoFim: { itens: [], valor: 150 },
+    mes: { rendas: [], recebimentos: [], contas: [], pagamentos: [] },
   };
   const home = usar();
   expect(home.pagamentoBloqueado).toBe(false);
@@ -238,7 +238,7 @@ it.each([['arquivada', 'primeira'], ['segunda', 'segunda'], [null, 'primeira']])
       arquivadas: [{ id: 'arquivada', nome: 'Antiga', arquivada: true }],
       rendasAReceber: [{ renda: { id: 'r1', descricao: 'Salário', valor: 900, carteira_id: daRenda }, competencia: '2026-10', data: '2026-10-05' }],
       transacoesCarteiras: [], transferencias: [],
-      previsao7: { itens: [], valor: 150 }, previsaoFim: { itens: [], valor: 150 },
+      mes: { rendas: [], recebimentos: [], contas: [], pagamentos: [] },
     };
     const result = montar();
     act(() => result.current.dashboard!.onRecebi(item as never));

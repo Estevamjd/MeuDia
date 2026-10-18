@@ -2,15 +2,11 @@ import type { Carteira, Renda, Transacao, Transferencia } from '@meudia/shared';
 import {
   AppError,
   CATEGORIA_ENTRADA_EXTRA,
-  alvosPrevisao,
-  ancoraPrevisao,
   competenciaDe,
-  competenciasPrevisao,
   comecouMesCom,
   dataAncora,
   dataRendaNoMes,
   hojeSP,
-  previsao,
   saldoCarteira,
   saldoHoje,
   saldosCarteiras,
@@ -150,29 +146,25 @@ export interface RendaAReceber {
 }
 
 /**
- * Tudo que a home precisa para "Você tem hoje", previsões, "Começou o mês com" e "Recebi".
+ * Tudo que a home precisa para "Você tem hoje", "Começou o mês com", "Recebi" e as entradas da sobra do mês
+ * (`sobraDoMes`, calculada na home com os lançamentos do mês que ela já lê).
  * Cálculo nas funções puras de `@meudia/shared`; aqui só a leitura.
  */
 export async function painelSaldo(userId: string, hojeISO = hojeSP()) {
   usuario(userId);
   const competencia = competenciaDe(hojeISO);
-  const alvos = alvosPrevisao(hojeISO);
   const carteiras = await carteirasRepository.findAll(userId);
-  const ancoraISO = ancoraPrevisao(carteiras);
-  const periodo = competenciasPrevisao(hojeISO, alvos.seteDias, ancoraISO);
   const desde = carteiras.map(dataAncora).sort()[0];
   const [transacoes, transferencias, rendas, recebimentos, contas, pagamentos] = await Promise.all([
     desde ? transacaoRepository.findComCarteiraDesde(userId, desde) : Promise.resolve([] as Transacao[]),
     desde ? transferenciasRepository.findDesde(userId, desde) : Promise.resolve([] as Transferencia[]),
     rendasRepository.findAll(userId, { ativo: true }),
-    recebimentosRendaRepository.findByCompetencias(userId, periodo.rendas),
+    recebimentosRendaRepository.findByCompetencias(userId, [competencia]),
     contasPagarRepository.findAll(userId, { ativo: true }),
-    pagamentosContaRepository.findByCompetencias(userId, periodo.contas),
+    pagamentosContaRepository.findByCompetencias(userId, [competencia]),
   ]);
   const saldos = saldosCarteiras(carteiras, transacoes, transferencias, hojeISO);
-  const total = saldoHoje(carteiras, transacoes, transferencias, hojeISO);
-  const base = { hojeISO, saldoHoje: total, ancoraISO, rendas, recebimentos, contas, pagamentos };
-  const recebidas = new Set(recebimentos.filter((r) => r.competencia === competencia).map((r) => r.renda_id));
+  const recebidas = new Set(recebimentos.map((r) => r.renda_id));
   const rendasAReceber: RendaAReceber[] = rendas
     .filter((r) => r.ativo && !recebidas.has(r.id))
     .map((renda) => ({ renda, competencia, data: dataRendaNoMes(renda, competencia) }))
@@ -187,11 +179,11 @@ export async function painelSaldo(userId: string, hojeISO = hojeSP()) {
     competencia,
     carteiras: saldos,
     arquivadas: carteiras.filter((c) => c.arquivada),
-    saldoHoje: total,
+    saldoHoje: saldoHoje(carteiras, transacoes, transferencias, hojeISO),
     comecouMes: comecouMesCom(carteiras, transacoes, transferencias, competencia),
-    previsao7: previsao({ ...base, alvoISO: alvos.seteDias }),
-    previsaoFim: previsao({ ...base, alvoISO: alvos.fimDoMes }),
     rendasAReceber,
+    /** Entradas de `sobraDoMes` na competência corrente. */
+    mes: { rendas, recebimentos, contas, pagamentos },
     carteiraPadraoId: ultima ?? saldos[0]?.carteira.id ?? null,
     transacoesCarteiras: transacoes,
     transferencias,

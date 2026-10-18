@@ -1,21 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import type { Carteira, ContaPagar, Renda, Transacao, Transferencia } from '../../types/financas';
 import {
-  alvosPrevisao,
-  ancoraPrevisao,
   comecouMesCom,
-  competenciaDeslocada,
-  competenciasPrevisao,
+  emSeteDias,
   entraNoSaldo,
   evolucaoMes,
   gastoDoMes,
   gastosPorCategoria,
-  previsao,
   rendaDoMes,
   saldoCarteira,
   saldoHoje,
   saldosCarteiras,
-  somarDias,
+  sobraDoMes,
 } from '../saldo';
 import { categoriaInfo, CATEGORIAS } from '../../constants/categorias';
 
@@ -50,15 +46,14 @@ describe('BRIEF §5: exemplo de aceite passo a passo (17/10/2026)', () => {
   const caixa = carteira('cx', 'Caixa', 50, { ordem: 1 });
   const carteiras = [nubank, caixa];
   const contas = [conta('luz', 'Luz', 120, 20, 'Luz'), conta('net', 'Internet', 100, 25, 'Internet')];
-  const { seteDias, fimDoMes } = alvosPrevisao(HOJE);
-  const prever = (hoje: number, rendas: Renda[] = [], recebimentos: { renda_id: string; competencia: string }[] = []) => ({
-    sete: previsao({ hojeISO: HOJE, alvoISO: seteDias, saldoHoje: hoje, ancoraISO: HOJE, rendas, recebimentos, contas, pagamentos: [] }).valor,
-    fim: previsao({ hojeISO: HOJE, alvoISO: fimDoMes, saldoHoje: hoje, ancoraISO: HOJE, rendas, recebimentos, contas, pagamentos: [] }).valor,
-  });
+  // "No fim do mês sobra" (renda do mês − despesas do mês) e "Em 7 dias" (guardado + sobra).
+  const prever = (hoje: number, transacoes: Transacao[], rendas: Renda[] = [], recebimentos: { renda_id: string; competencia: string }[] = []) => {
+    const sobra = sobraDoMes({ competencia: '2026-10', transacoes, rendas, recebimentos, contas, pagamentos: [] });
+    return { sete: emSeteDias(HOJE, hoje, sobra).valor, fim: sobra.valor };
+  };
 
-  it('alvos: 7 dias = 24/10 e fim do mês = 31/10', () => {
-    expect(seteDias).toBe('2026-10-24');
-    expect(fimDoMes).toBe('2026-10-31');
+  it('alvo de "Em 7 dias" = 24/10', () => {
+    expect(emSeteDias(HOJE, 0, { valor: 0 }).alvoISO).toBe('2026-10-24');
   });
 
   it('percorre os 6 passos com os valores do BRIEF', () => {
@@ -73,8 +68,8 @@ describe('BRIEF §5: exemplo de aceite passo a passo (17/10/2026)', () => {
     transacoes.push(tx({ tipo: 'receita', categoria: 'Entrada extra', valor: 100, carteira_id: 'cx' }));
     expect(hoje()).toBe(800);
     expect(chips()).toEqual([['Nubank', 650], ['Caixa', 150]]);
-    // 3. Luz 120 (20/10) e internet 100 (25/10) pendentes.
-    expect(prever(hoje())).toEqual({ sete: 680, fim: 580 });
+    // 3. Luz 120 (20/10) e internet 100 (25/10) pendentes: renda 100 (entrada extra) − 220 = −120; 800 − 120.
+    expect(prever(hoje(), transacoes)).toEqual({ sete: 680, fim: -120 });
     // 4. Transferir 50 Caixa → Nubank: total igual, gasto do mês não muda.
     const gastoAntes = gastoDoMes(transacoes);
     transferencias.push(transf('cx', 'nu', 50));
@@ -85,23 +80,25 @@ describe('BRIEF §5: exemplo de aceite passo a passo (17/10/2026)', () => {
     transacoes.push(tx({ tipo: 'despesa', categoria: 'Comida', valor: 25, carteira_id: 'nu' }));
     expect(hoje()).toBe(775);
     expect(gastosPorCategoria(transacoes)).toEqual([{ categoria: 'Comida', valor: 25 }]);
-    expect(prever(hoje()).fim).toBe(555);
-    // 6. Renda 900 dia 5 cadastrada agora; antes do Recebi entra como "a receber".
+    expect(prever(hoje(), transacoes)).toEqual({ sete: 630, fim: -145 });
+    // 6. Renda 900 dia 5 cadastrada agora; antes do Recebi entra na renda do mês: 1.000 − 245 = 755.
     const r = renda(900, 5);
     expect(hoje()).toBe(775);
-    expect(prever(hoje(), [r])).toEqual({ sete: 1555, fim: 1455 });
+    expect(prever(hoje(), transacoes, [r])).toEqual({ sete: 1530, fim: 755 });
     // Recebi: R$ 900 no Nubank, sem contar duas vezes.
     transacoes.push(tx({ tipo: 'receita', categoria: 'Salário', valor: 900, carteira_id: 'nu' }));
     const recebimentos = [{ renda_id: 'r1', competencia: '2026-10' }];
     expect(hoje()).toBe(1675);
-    expect(prever(hoje(), [r], recebimentos)).toEqual({ sete: 1555, fim: 1455 });
+    // A sobra não muda (a renda a receber virou receita lançada); o guardado sobe 900 e o "Em 7 dias" junto.
+    expect(prever(hoje(), transacoes, [r], recebimentos)).toEqual({ sete: 2430, fim: 755 });
     expect(rendaDoMes('2026-10', transacoes, [r], recebimentos)).toEqual({ lancada: 1000, aReceber: 0, total: 1000 });
   });
 
-  it('"por quê?" lista cada item com sinal e data', () => {
-    const p = previsao({ hojeISO: HOJE, alvoISO: fimDoMes, saldoHoje: 800, ancoraISO: HOJE, rendas: [], recebimentos: [], contas, pagamentos: [] });
-    expect(p.itens.map((i) => [i.descricao, i.valor, i.data])).toEqual([['Luz', -120, '2026-10-20'], ['Internet', -100, '2026-10-25']]);
-    expect(p.saldoHoje).toBe(800);
+  it('"por quê?": rendas a receber, despesas lançadas e cada conta a pagar com vencimento', () => {
+    const p = sobraDoMes({ competencia: '2026-10', transacoes: [], rendas: [renda(900, 5)], recebimentos: [], contas, pagamentos: [] });
+    expect(p.rendasAReceber).toEqual([{ id: 'r1', descricao: 'Salário', valor: 900, data: '2026-10-05' }]);
+    expect(p.contasAPagar.map((c) => [c.descricao, c.valor, c.vencimento])).toEqual([['Luz', 120, '2026-10-20'], ['Internet', 100, '2026-10-25']]);
+    expect([p.renda.total, p.despesasLancadas, p.despesas, p.valor]).toEqual([900, 0, 220, 680]);
   });
 });
 
@@ -158,106 +155,6 @@ describe('bordas do saldo', () => {
     ];
     expect(saldoCarteira(c, rows, [])).toBe(-150);
   });
-
-  it('alvo de 7 dias cruzando o mês inclui contas/rendas do mês seguinte até o alvo', () => {
-    const hoje = '2026-10-28';
-    const alvo = somarDias(hoje, 7);
-    expect(alvo).toBe('2026-11-04');
-    const contas = [conta('a', 'Aluguel', 500, 2), conta('b', 'Internet', 100, 10)];
-    const r = renda(900, 3, { created_at: '2026-10-01T12:00:00Z' });
-    const p = previsao({
-      hojeISO: hoje, alvoISO: alvo, saldoHoje: 1000, ancoraISO: '2026-10-01', rendas: [r],
-      recebimentos: [{ renda_id: 'r1', competencia: '2026-10' }], contas, pagamentos: [{ conta_id: 'a', competencia: '2026-10' }],
-    });
-    // Outubro: aluguel pago, internet 10/10 vencida e não paga; renda recebida. Novembro: aluguel 02/11 e renda 03/11.
-    expect(p.itens.map((i) => [i.descricao, i.competencia, i.vencida])).toEqual([
-      ['Internet', '2026-10', true], ['Aluguel', '2026-11', false], ['Salário', '2026-11', false],
-    ]);
-    expect(p.valor).toBe(1000 - 100 - 500 + 900);
-  });
-
-  it('conta vencida não paga entra; paga não entra', () => {
-    const contas = [conta('v', 'Água', 80, 5)];
-    const base = { hojeISO: HOJE, alvoISO: '2026-10-24', saldoHoje: 500, ancoraISO: '2026-10-01', rendas: [], recebimentos: [], contas };
-    const p = previsao({ ...base, pagamentos: [] });
-    expect(p.valor).toBe(420);
-    expect(p.itens[0]?.vencida).toBe(true);
-    expect(previsao({ ...base, pagamentos: [{ conta_id: 'v', competencia: '2026-10' }] }).valor).toBe(500);
-  });
-
-  it('virada do mês: conta única vencida em setembro e ainda não paga continua descontada em outubro', () => {
-    const unica: ContaPagar = {
-      ...conta('u1', 'IPVA', 300, 1), recorrencia: 'unica', dia_vencimento: null, data_vencimento: '2026-09-20',
-      created_at: '2026-09-01T12:00:00Z',
-    };
-    const base = { hojeISO: HOJE, alvoISO: '2026-10-24', saldoHoje: 1000, ancoraISO: '2026-09-01', rendas: [], recebimentos: [], contas: [unica] };
-    const p = previsao({ ...base, pagamentos: [] });
-    expect(p.itens.map((i) => [i.descricao, i.competencia, i.vencida])).toEqual([['IPVA', '2026-09', true]]);
-    expect(p.valor).toBe(700);
-    expect(previsao({ ...base, pagamentos: [{ conta_id: 'u1', competencia: '2026-09' }] }).valor).toBe(1000);
-  });
-
-  it('recorrente: ocorrências anteriores não pagas entram (até 12 meses, nunca antes da criação nem da âncora)', () => {
-    const aluguel = { ...conta('al', 'Aluguel', 500, 10), created_at: '2026-08-15T12:00:00Z' };
-    const base = { hojeISO: HOJE, alvoISO: '2026-10-24', saldoHoje: 2000, ancoraISO: '2020-01-01', rendas: [], recebimentos: [], contas: [aluguel] };
-    // Criada em agosto: ago, set e out (10/10) vencidas; julho não existe.
-    const p = previsao({ ...base, pagamentos: [{ conta_id: 'al', competencia: '2026-08' }] });
-    expect(p.itens.map((i) => i.competencia)).toEqual(['2026-09', '2026-10']);
-    expect(p.valor).toBe(1000);
-    const antiga = { ...aluguel, created_at: '2020-01-01T12:00:00Z' };
-    const longa = previsao({ ...base, contas: [antiga], pagamentos: [] });
-    // Limite de 12 meses: de 2025-10 a 2026-10 (13 competências).
-    expect(longa.itens[0]?.competencia).toBe('2025-10');
-    expect(longa.itens).toHaveLength(13);
-  });
-
-  it('âncora recente: conta antiga não paga antes da âncora não é descontada de novo', () => {
-    // Usuário com Aluguel desde 2025 nunca marcou "Paguei"; informou o saldo real em 17/10/2026 (já sem esses aluguéis).
-    const aluguel = { ...conta('al', 'Aluguel', 500, 10), created_at: '2025-01-01T12:00:00Z' };
-    const ancora = ancoraPrevisao([carteira('nu', 'Nubank', 2000), carteira('old', 'Arquivada', 0, { arquivada: true, saldo_inicial_em: '2025-01-01T12:00:00Z' })]);
-    expect(ancora).toBe(HOJE);
-    const p = previsao({ hojeISO: HOJE, alvoISO: '2026-10-24', saldoHoje: 2000, ancoraISO: ancora, rendas: [], recebimentos: [], contas: [aluguel], pagamentos: [] });
-    // Nem o de 10/10: venceu antes da âncora (17/10).
-    expect(p.itens).toEqual([]);
-    expect(p.valor).toBe(2000);
-    // Âncora em 20/08: o de 10/08 fica de fora; setembro e outubro contam; nada antes mesmo com a conta de 2025.
-    const agosto = previsao({ hojeISO: HOJE, alvoISO: '2026-10-24', saldoHoje: 2000, ancoraISO: '2026-08-20', rendas: [], recebimentos: [], contas: [aluguel], pagamentos: [] });
-    expect(agosto.itens.map((i) => i.competencia)).toEqual(['2026-09', '2026-10']);
-    const agostoInicio = previsao({ hojeISO: HOJE, alvoISO: '2026-10-24', saldoHoje: 2000, ancoraISO: '2026-08-01', rendas: [], recebimentos: [], contas: [aluguel], pagamentos: [] });
-    expect(agostoInicio.itens.map((i) => i.competencia)).toEqual(['2026-08', '2026-09', '2026-10']);
-    // Sem carteira ativa não há âncora: só o mês corrente.
-    expect(ancoraPrevisao([])).toBeNull();
-    expect(competenciasPrevisao(HOJE, '2026-10-24', null).contas).toEqual(['2026-10']);
-  });
-
-  it('âncora no meio do mês: vencida antes da âncora não desconta; vencida depois desconta', () => {
-    // Saldo informado em 17/10: a conta de 05/10 sem "Paguei" já pode estar paga nele; a de 18/10 não.
-    const base = { hojeISO: '2026-10-20', alvoISO: '2026-10-24', saldoHoje: 1000, ancoraISO: HOJE, rendas: [], recebimentos: [], pagamentos: [] };
-    const antes = previsao({ ...base, contas: [conta('a', 'Água', 80, 5)] });
-    expect(antes.itens).toEqual([]);
-    expect(antes.valor).toBe(1000);
-    const depoisDaAncora = previsao({ ...base, contas: [conta('l', 'Luz', 120, 18)] });
-    expect(depoisDaAncora.itens.map((i) => [i.data, i.vencida])).toEqual([['2026-10-18', true]]);
-    expect(depoisDaAncora.valor).toBe(880);
-  });
-
-  it('rendas antigas não recebidas não entram na previsão (só do mês corrente em diante)', () => {
-    const r = renda(900, 5, { created_at: '2026-01-01T12:00:00Z' });
-    const p = previsao({ hojeISO: HOJE, alvoISO: '2026-10-24', saldoHoje: 0, ancoraISO: HOJE, rendas: [r], recebimentos: [], contas: [], pagamentos: [] });
-    expect(p.itens.map((i) => i.competencia)).toEqual(['2026-10']);
-    expect(competenciasPrevisao(HOJE, '2026-11-03', '2020-01-01')).toEqual({
-      contas: ['2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11'],
-      rendas: ['2026-10', '2026-11'],
-    });
-    expect(competenciaDeslocada('2026-01', -1)).toBe('2025-12');
-    expect(competenciaDeslocada('2025-12', 13)).toBe('2027-01');
-  });
-
-  it('renda sem dia conta no último dia do mês', () => {
-    const base = { hojeISO: HOJE, saldoHoje: 0, ancoraISO: HOJE, rendas: [renda(900, null)], recebimentos: [], contas: [], pagamentos: [] };
-    expect(previsao({ ...base, alvoISO: '2026-10-24' }).valor).toBe(0);
-    expect(previsao({ ...base, alvoISO: '2026-10-31' }).valor).toBe(900);
-  });
 });
 
 describe('R12: começou o mês com', () => {
@@ -311,5 +208,82 @@ describe('evolução do mês e categorias', () => {
     expect(categoriaInfo('Categoria inventada').nome).toBe('Outros');
     expect(categoriaInfo(null).icone).toBe('tag');
     expect(new Set(nomes).size).toBe(nomes.length);
+  });
+});
+
+
+describe('decisão final: "No fim do mês sobra" = renda do mês − despesas do mês; "Em 7 dias" = guardado + sobra', () => {
+  // Hoje 17/10, saldo informado 235 em 17/10, Salário 2.200 dia 1 sem Recebi, conta mensal 110 dia 5 criada em 16/10.
+  const salario = renda(2200, 1, { created_at: '2026-10-16T15:00:00Z' });
+  const internet = { ...conta('net', 'Internet', 110, 5), created_at: '2026-10-16T15:00:00Z' };
+  const nubank = carteira('nu', 'Nubank', 235);
+  const sobra = (transacoes: Transacao[] = [], pagamentos: { conta_id: string; competencia: string }[] = []) =>
+    sobraDoMes({ competencia: '2026-10', transacoes, rendas: [salario], recebimentos: [], contas: [internet], pagamentos });
+
+  it('aceite: sobra 2.200 − 110 = 2.090; 7 dias = 235 + 2.090 = 2.325 (o card antigo dava 2.435)', () => {
+    const s = sobra();
+    expect([s.renda.total, s.despesas, s.valor]).toEqual([2200, 110, 2090]);
+    expect(s.rendasAReceber).toEqual([{ id: 'r1', descricao: 'Salário', valor: 2200, data: '2026-10-01' }]);
+    expect(s.contasAPagar).toEqual([{ id: 'net', descricao: 'Internet', categoria: 'Contas', valor: 110, vencimento: '2026-10-05' }]);
+    expect(emSeteDias(HOJE, saldoHoje([nubank], [], []), s)).toEqual({ alvoISO: '2026-10-24', guardado: 235, sobra: 2090, valor: 2325 });
+  });
+
+  it('Gastei 50: sobra 2.040 e 7 dias = 185 + 2.040 = 2.225 (o gasto reduz o guardado e a sobra)', () => {
+    const transacoes = [tx({ valor: 50, categoria: 'Comida', carteira_id: 'nu' })];
+    const s = sobra(transacoes);
+    expect(s.valor).toBe(2040);
+    expect(emSeteDias(HOJE, saldoHoje([nubank], transacoes, []), s).valor).toBe(2225);
+  });
+
+  it('Paguei 110 não muda a sobra: a despesa lançada substitui a conta a pagar', () => {
+    const antes = sobra().valor;
+    const depois = sobra([tx({ valor: 110, categoria: 'Contas', carteira_id: 'nu' })], [{ conta_id: 'net', competencia: '2026-10' }]);
+    expect(depois.contasAPagar).toEqual([]);
+    expect(depois.despesasLancadas).toBe(110);
+    expect(depois.valor).toBe(antes);
+  });
+
+  it('Recebi não conta a renda duas vezes: sai de "a receber" e entra como receita lançada', () => {
+    const s = sobraDoMes({
+      competencia: '2026-10', transacoes: [tx({ tipo: 'receita', categoria: 'Salário', valor: 2200, carteira_id: 'nu' })],
+      rendas: [salario], recebimentos: [{ renda_id: 'r1', competencia: '2026-10' }], contas: [internet], pagamentos: [],
+    });
+    expect(s.renda).toEqual({ lancada: 2200, aReceber: 0, total: 2200 });
+    expect(s.rendasAReceber).toEqual([]);
+    expect(s.valor).toBe(2090);
+  });
+
+  it('só a competência conta: lançamentos, pagamentos e recebimentos de outro mês ficam fora; ajustes também', () => {
+    const s = sobraDoMes({
+      competencia: '2026-10',
+      transacoes: [
+        tx({ valor: 70, data: '2026-09-30' }), tx({ tipo: 'receita', valor: 500, data: '2026-11-01' }),
+        tx({ valor: 30, ajuste: true }), tx({ tipo: 'receita', valor: 40, ajuste: true }),
+      ],
+      rendas: [salario], recebimentos: [{ renda_id: 'r1', competencia: '2026-09' }],
+      contas: [internet], pagamentos: [{ conta_id: 'net', competencia: '2026-09' }],
+    });
+    expect([s.renda.total, s.despesasLancadas, s.despesas, s.valor]).toEqual([2200, 0, 110, 2090]);
+  });
+
+  it('contas: únicas e anuais só no mês delas, inativas e de antes da criação não; renda inativa/futura não', () => {
+    const unica: ContaPagar = { ...conta('ipva', 'IPVA', 300, 1), recorrencia: 'unica', dia_vencimento: null, data_vencimento: '2026-10-28' };
+    const anualOutroMes: ContaPagar = { ...conta('iptu', 'IPTU', 900, 10), recorrencia: 'anual', mes_vencimento: 3 };
+    const inativa = { ...conta('x', 'Antiga', 50, 8), ativo: false };
+    const futura = { ...conta('y', 'Academia', 90, 8), created_at: '2026-11-02T12:00:00Z' };
+    const s = sobraDoMes({
+      competencia: '2026-10', transacoes: [],
+      rendas: [salario, renda(500, 20, { id: 'r2', created_at: '2026-11-02T12:00:00Z' }), renda(700, 20, { id: 'r3', ativo: false })],
+      recebimentos: [], contas: [internet, unica, anualOutroMes, inativa, futura], pagamentos: [],
+    });
+    expect(s.renda.total).toBe(2200);
+    expect(s.contasAPagar.map((c) => c.id)).toEqual(['net', 'ipva']);
+    expect(s.valor).toBe(2200 - 110 - 300);
+  });
+
+  it('pode ficar negativo; centavos sem erro de ponto flutuante', () => {
+    const s = sobraDoMes({ competencia: '2026-10', transacoes: [tx({ valor: 0.1 }), tx({ valor: 0.2 })], rendas: [], recebimentos: [], contas: [{ ...internet, valor: 2500.5 }], pagamentos: [] });
+    expect(s.valor).toBe(-2500.8);
+    expect(emSeteDias(HOJE, 235, s).valor).toBe(-2265.8);
   });
 });

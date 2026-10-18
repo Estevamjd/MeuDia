@@ -11,19 +11,19 @@ import { ProximasContas, type ContaProxima } from './ProximasContas';
 import { RendaSheet, type RendaSheetProps } from './RendaSheet';
 import { UltimosLancamentos, type UltimosLancamentosProps } from './UltimosLancamentos';
 import { CardSaldoHoje, type CardSaldoHojeProps } from './CardSaldoHoje';
-import { CardPrevisao } from './CardPrevisao';
+import { CardSeteDias, CardSobraMes } from './CardPrevisao';
 import { CardRendaAReceber, type RendaAReceberItem } from './CardRendaAReceber';
 import { GraficoCategorias } from './GraficoCategorias';
 import { GraficoEvolucao } from './GraficoEvolucao';
 import { RecebiSheet, type RecebiSheetProps } from './RecebiSheet';
-import type { FatiaCategoria, PontoEvolucao, Previsao } from '@meudia/shared';
+import type { EmSeteDias, FatiaCategoria, PontoEvolucao, SobraDoMes } from '@meudia/shared';
 
 /** Cards do dashboard (saldo, previsões, Recebi e gráficos). `null` = painel indisponível: só o resumo do mês. */
 export interface DashboardHome {
   saldo: Omit<CardSaldoHojeProps, 'escondido' | 'onAlternarOlho'>;
   /** `null` fora do mês corrente ou sem carteira (previsão sem saldo de partida engana). */
-  previsao7: Previsao | null;
-  previsaoFim: Previsao | null;
+  seteDias: EmSeteDias | null;
+  sobraMes: SobraDoMes | null;
   rendasAReceber: RendaAReceberItem[];
   fatias: FatiaCategoria[];
   evolucao: PontoEvolucao[];
@@ -112,10 +112,10 @@ export function FinancasHomeView({
           <CardSaldoHoje {...d.saldo} escondido={d.escondido} onAlternarOlho={d.onAlternarOlho} />
           {!soConvite && (
             <>
-              {d.previsao7 && d.previsaoFim && (
+              {d.seteDias && d.sobraMes && (
                 <div className="grid grid-cols-1 gap-4">
-                  <CardPrevisao tipo="7dias" previsao={d.previsao7} escondido={d.escondido} />
-                  <CardPrevisao tipo="fimMes" previsao={d.previsaoFim} escondido={d.escondido} />
+                  <CardSeteDias seteDias={d.seteDias} escondido={d.escondido} />
+                  <CardSobraMes sobra={d.sobraMes} escondido={d.escondido} />
                 </div>
               )}
               {d.rendasAReceber.length > 0 && (

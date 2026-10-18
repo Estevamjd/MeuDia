@@ -58,9 +58,9 @@ it.each([false, true])('remove endpoint antes de sair; erro de push=%s', async (
   expect(mocks.signOut).toHaveBeenCalled();
   expect(mocks.push).toHaveBeenCalledWith('/login');
 });
-it.each([useCriarTransacao, useAtualizarTransacao, useExcluirTransacao])('mutação invalida resumo financeiro: %s', async hook => {
+it.each([useCriarTransacao, useAtualizarTransacao, useExcluirTransacao])('mutação invalida resumo financeiro: %s', hook => {
+  // Sem esperar getUser: o estado de auth é compartilhado (uma chamada por aba), não um por hook.
   const { result } = renderHook(() => hook());
-  await waitFor(() => expect(mocks.getUser).toHaveBeenCalled());
   act(() => (result.current as unknown as { onSuccess: () => void }).onSuccess());
   expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['resumo-financeiro-mes'] });
 });

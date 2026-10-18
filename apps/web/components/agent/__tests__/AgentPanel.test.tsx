@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { NotificacaoAgente } from '@meudia/shared';
 import { AppModeProvider } from '../../AppModeProvider';
@@ -50,6 +50,14 @@ vi.mock('../../../hooks', () => ({
   useResumoMensal: () => ({ data: { saldo: 0, totalDespesas: 0, totalReceitas: 0 } }),
 }));
 
+// Relógio fixo (sábado 17/10/2026 10:00): depois das 20h o resumo repete o treino pendente e o teste dependia da hora.
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(2026, 9, 17, 10, 0));
+});
+afterAll(() => {
+  vi.useRealTimers();
+});
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
