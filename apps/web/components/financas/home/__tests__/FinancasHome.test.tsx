@@ -442,3 +442,19 @@ it('erro amigável do painel mantém resumo e bloqueia Paguei enquanto bancos n�
   }
   expect(pagar).not.toHaveBeenCalled();
 });
+
+describe('FinancasHomeView: confirmação de exclusão', () => {
+  it('"Excluir? Isso não pode ser desfeito." + efeito, Cancelar e Excluir; fechada sem pedido', () => {
+    const onConfirmar = vi.fn();
+    const onCancelar = vi.fn();
+    const { rerender } = render(<FinancasHomeView {...viewProps()} />);
+    expect(screen.queryByRole('dialog', { name: 'Excluir lançamento' })).toBeNull();
+    rerender(<FinancasHomeView {...viewProps({ exclusao: { transacao: transacoes[0]!, detalhe: 'A conta volta a ficar a pagar.', carregando: false, onConfirmar, onCancelar } })} />);
+    const dialogo = screen.getByRole('dialog', { name: 'Excluir lançamento' });
+    expect(dialogo.textContent).toContain('Excluir? Isso não pode ser desfeito. A conta volta a ficar a pagar.');
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(onCancelar).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Excluir' }));
+    expect(onConfirmar).toHaveBeenCalled();
+  });
+});

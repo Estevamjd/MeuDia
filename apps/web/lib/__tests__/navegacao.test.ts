@@ -25,7 +25,7 @@ describe('Sidebar por APP_MODE', () => {
 
   it('modo finanças: só rotas de finanças', () => {
     const todos = secoesSidebar('financas').flatMap((s) => hrefs(s.items));
-    expect(todos).toEqual(['/financas', '/financas/carteiras', '/financas/contas', '/financas/orcamento', '/assinaturas']);
+    expect(todos).toEqual(['/financas', '/financas/carteiras', '/financas/contas', '/financas/orcamento', '/financas/metas', '/assinaturas']);
     for (const oculto of OCULTOS_NO_FINANCAS) expect(todos).not.toContain(oculto);
   });
 });
@@ -55,7 +55,7 @@ describe('BottomNav modo finanças', () => {
 describe('Drawer', () => {
   it('modo finanças: seções de finanças + Configurações, sem módulos ocultos', () => {
     const todos = hrefs(itensDrawer('financas'));
-    expect(todos).toEqual(['/financas', '/financas/carteiras', '/financas/contas', '/financas/orcamento', '/assinaturas', '/configuracoes']);
+    expect(todos).toEqual(['/financas', '/financas/carteiras', '/financas/contas', '/financas/orcamento', '/financas/metas', '/assinaturas', '/configuracoes']);
     for (const href of todos) expect(isRotaVisivel(href, 'financas')).toBe(true);
     for (const oculto of OCULTOS_NO_FINANCAS) expect(todos).not.toContain(oculto);
   });

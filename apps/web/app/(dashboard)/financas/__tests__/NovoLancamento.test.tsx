@@ -10,7 +10,7 @@ const m = vi.hoisted(() => ({
 }));
 vi.mock('../../../../hooks', () => ({
   useCarteiras: () => ({ data: m.consulta.isSuccess ? m.carteiras : undefined, ...m.consulta }),
-  useCriarTransacao: () => ({ mutate: m.criar }), useAtualizarTransacao: () => ({ mutate: m.atualizar }), useExcluirTransacao: () => ({}),
+  useCriarTransacao: () => ({ mutate: m.criar }), useAtualizarTransacao: () => ({ mutate: m.atualizar }),
 }));
 vi.mock('../../../../components/ui', async (original) => ({ ...await original<object>(), useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
 vi.mock('../../../../components/AppModeProvider', () => ({ useAppMode: () => 'financas' }));

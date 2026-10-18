@@ -11,18 +11,19 @@ import { ProximasContas, type ContaProxima } from './ProximasContas';
 import { RendaSheet, type RendaSheetProps } from './RendaSheet';
 import { UltimosLancamentos, type UltimosLancamentosProps } from './UltimosLancamentos';
 import { CardSaldoHoje, type CardSaldoHojeProps } from './CardSaldoHoje';
-import { CardSeteDias, CardSobraMes } from './CardPrevisao';
+import { CardSobraMes } from './CardPrevisao';
 import { CardRendaAReceber, type RendaAReceberItem } from './CardRendaAReceber';
 import { GraficoCategorias } from './GraficoCategorias';
 import { GraficoEvolucao } from './GraficoEvolucao';
 import { RecebiSheet, type RecebiSheetProps } from './RecebiSheet';
-import type { EmSeteDias, FatiaCategoria, PontoEvolucao, SobraDoMes } from '@meudia/shared';
+import { ConfirmarExclusao } from '../ConfirmarExclusao';
+import type { Transacao } from '@meudia/shared';
+import type { FatiaCategoria, PontoEvolucao, SobraDoMes } from '@meudia/shared';
 
-/** Cards do dashboard (saldo, previsões, Recebi e gráficos). `null` = painel indisponível: só o resumo do mês. */
+/** Cards do dashboard (Cofrinho, sobra do mês, Recebi e gráficos). `null` = painel indisponível: só o resumo do mês. */
 export interface DashboardHome {
   saldo: Omit<CardSaldoHojeProps, 'escondido' | 'onAlternarOlho'>;
-  /** `null` fora do mês corrente ou sem carteira (previsão sem saldo de partida engana). */
-  seteDias: EmSeteDias | null;
+  /** `null` fora do mês corrente ou sem carteira. */
   sobraMes: SobraDoMes | null;
   rendasAReceber: RendaAReceberItem[];
   fatias: FatiaCategoria[];
@@ -31,6 +32,15 @@ export interface DashboardHome {
   onAlternarOlho: () => void;
   onRecebi: (renda: RendaAReceberItem) => void;
   recebiSheet: RecebiSheetProps;
+}
+
+/** Confirmação de exclusão de um lançamento; `null` = fechada. */
+export interface ExclusaoLancamento {
+  transacao: Transacao;
+  detalhe: string;
+  carregando: boolean;
+  onConfirmar: () => void;
+  onCancelar: () => void;
 }
 
 export interface FinancasHomeViewProps {
@@ -50,10 +60,11 @@ export interface FinancasHomeViewProps {
   onPagar: (conta: ContaProxima) => void;
   lancamentos: Omit<UltimosLancamentosProps, 'transacoes'>;
   dashboard?: DashboardHome | null;
+  exclusao?: ExclusaoLancamento | null;
 }
 
 /**
- * Home de Finanças (pura), ordem do BRIEF: Você tem hoje → previsões → Recebi → contas a vencer → rosca →
+ * Home de Finanças (pura), ordem do BRIEF: Cofrinho → No fim do mês sobra → Recebi → contas a vencer → rosca →
  * evolução → sobra/entrou/saiu → limites → indicadores → lançamentos.
  */
 export function FinancasHomeView({
@@ -70,6 +81,7 @@ export function FinancasHomeView({
   onPagar,
   lancamentos,
   dashboard = null,
+  exclusao = null,
 }: FinancasHomeViewProps) {
   if (estado === 'carregando') {
     return (
@@ -95,7 +107,7 @@ export function FinancasHomeView({
 
   const { vazio } = secoes;
   const d = dashboard;
-  // Usuária nova sem banco: só o convite "Você tem hoje" (sem cards vazios nem "R$ 0,00").
+  // Usuária nova sem banco: só o convite do "Cofrinho" (sem cards vazios nem "R$ 0,00").
   const soConvite = !!d && vazio && d.saldo.carteiras.length === 0;
 
   return (
@@ -112,12 +124,7 @@ export function FinancasHomeView({
           <CardSaldoHoje {...d.saldo} escondido={d.escondido} onAlternarOlho={d.onAlternarOlho} />
           {!soConvite && (
             <>
-              {d.seteDias && d.sobraMes && (
-                <div className="grid grid-cols-1 gap-4">
-                  <CardSeteDias seteDias={d.seteDias} escondido={d.escondido} />
-                  <CardSobraMes sobra={d.sobraMes} escondido={d.escondido} />
-                </div>
-              )}
+              {d.sobraMes && <CardSobraMes sobra={d.sobraMes} escondido={d.escondido} />}
               {d.rendasAReceber.length > 0 && (
                 <div className="sm:col-span-2">
                   <CardRendaAReceber rendas={d.rendasAReceber} hojeISO={hojeISO} onRecebi={d.onRecebi} />
@@ -156,6 +163,14 @@ export function FinancasHomeView({
 
       <RendaSheet {...rendaSheet} />
       {d && <RecebiSheet {...d.recebiSheet} />}
+      <ConfirmarExclusao
+        isOpen={!!exclusao}
+        onClose={() => exclusao?.onCancelar()}
+        onConfirm={() => exclusao?.onConfirmar()}
+        titulo="Excluir lançamento"
+        detalhe={exclusao?.detalhe}
+        isLoading={exclusao?.carregando}
+      />
     </div>
   );
 }

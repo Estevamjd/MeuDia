@@ -23,12 +23,12 @@ export interface CardSaldoHojeProps {
   onAlternarOlho: () => void;
 }
 
-/** "Você tem hoje": total das carteiras no total, chips por banco e "Começou o mês com". */
+/** "Cofrinho" (quanto tem hoje): total das carteiras no total, chips por banco e "Começou o mês com". */
 export function CardSaldoHoje({ total, carteiras, comecouMes, nomeMes, escondido, onAlternarOlho }: CardSaldoHojeProps) {
   const valor = (v: number) => (escondido ? VALOR_OCULTO : formatBRLSinal(v));
   if (carteiras.length === 0) {
     return (
-      <CardDashboard id="saldo-hoje" titulo="Você tem hoje" icone={<Wallet size={20} />}>
+      <CardDashboard id="saldo-hoje" titulo="Cofrinho" icone={<Wallet size={20} />}>
         <p className="text-[15px] text-text">Diga onde fica seu dinheiro para ver quanto você tem hoje.</p>
         <Link
           href="/financas/carteiras?nova=1"
@@ -42,7 +42,7 @@ export function CardSaldoHoje({ total, carteiras, comecouMes, nomeMes, escondido
   return (
     <CardDashboard
       id="saldo-hoje"
-      titulo="Você tem hoje"
+      titulo="Cofrinho"
       icone={<Wallet size={20} />}
       acao={
         <button

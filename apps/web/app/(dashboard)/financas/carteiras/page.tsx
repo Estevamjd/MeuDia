@@ -3,14 +3,15 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { clsx } from 'clsx';
-import { Archive, ArchiveRestore, Landmark, Pencil, Plus, Scale } from 'lucide-react';
-import type { Carteira, TipoCarteira } from '@meudia/shared';
+import { Archive, ArchiveRestore, ArrowLeftRight, Landmark, Pencil, Plus, Scale, Trash2 } from 'lucide-react';
+import type { Carteira, TipoCarteira, Transferencia } from '@meudia/shared';
 import { hojeSP } from '@meudia/shared';
-import { useAtualizarCarteira, useCorrigirSaldo, useCriarCarteira, usePainelSaldo } from '../../../../hooks';
+import { useAtualizarCarteira, useCorrigirSaldo, useCriarCarteira, useExcluirCarteira, useExcluirTransferencia, usePainelSaldo } from '../../../../hooks';
 import { Button, ConfirmDialog, EmptyState, Input, Modal, Select, SkeletonList, useToast } from '../../../../components/ui';
 import { IconeCarteira } from '../../../../components/financas/SeletorCarteira';
-import { TIPO_CARTEIRA_LABEL, comSinal } from '../../../../lib/carteiras-ui';
-import { formatBRLSinal, mascaraBRL } from '../../../../lib/financas-ui';
+import { ConfirmarExclusao } from '../../../../components/financas/ConfirmarExclusao';
+import { TIPO_CARTEIRA_LABEL, comSinal, detalheExclusaoCarteira, detalheExclusaoTransferencia, rotuloTransferencia } from '../../../../lib/carteiras-ui';
+import { formatBRL, formatBRLSinal, formatDiaMes, mascaraBRL } from '../../../../lib/financas-ui';
 
 export default function CarteirasPage() {
   return (
@@ -30,10 +31,14 @@ function CarteirasConteudo() {
   const hojeISO = useMemo(() => hojeSP(), []);
   const painel = usePainelSaldo(hojeISO);
   const atualizar = useAtualizarCarteira();
+  const excluirCarteira = useExcluirCarteira();
+  const excluirTransferencia = useExcluirTransferencia();
 
   const [criando, setCriando] = useState(false);
   const [editando, setEditando] = useState<Carteira | null>(null);
   const [arquivando, setArquivando] = useState<Carteira | null>(null);
+  const [excluindo, setExcluindo] = useState<Carteira | null>(null);
+  const [excluindoTransferencia, setExcluindoTransferencia] = useState<Transferencia | null>(null);
   const [corrigindo, setCorrigindo] = useState<{ carteira: Carteira; saldo: number } | null>(null);
 
   // `?nova=1` (atalhos da home e da folha do "+") abre o cadastro; o param sai da URL.
@@ -61,6 +66,32 @@ function CarteirasConteudo() {
 
   const ativas = painel.data?.carteiras ?? [];
   const arquivadas = painel.data?.arquivadas ?? [];
+  const nomes = new Map([...ativas.map((s) => s.carteira), ...arquivadas].map((c) => [c.id, c.nome]));
+  const transferencias = [...(painel.data?.transferencias ?? [])].sort(
+    (a, b) => b.data.localeCompare(a.data) || (b.created_at ?? '').localeCompare(a.created_at ?? ''),
+  );
+
+  const confirmarExcluir = () => {
+    if (!excluindo) return;
+    excluirCarteira.mutate(excluindo.id, {
+      onSuccess: () => {
+        toast.success(`"${excluindo.nome}" excluída.`);
+        setExcluindo(null);
+      },
+      onError: (e) => toast.error((e as { userMessage?: string }).userMessage ?? 'Não foi possível excluir. Tente de novo.'),
+    });
+  };
+
+  const confirmarExcluirTransferencia = () => {
+    if (!excluindoTransferencia) return;
+    excluirTransferencia.mutate(excluindoTransferencia.id, {
+      onSuccess: () => {
+        toast.success('Transferência excluída');
+        setExcluindoTransferencia(null);
+      },
+      onError: () => toast.error('Não foi possível excluir. Tente de novo.'),
+    });
+  };
 
   return (
     <div className="animate-fadeSlide space-y-6">
@@ -89,7 +120,7 @@ function CarteirasConteudo() {
       ) : (
         <>
           <p className="text-[15px] text-muted">
-            Você tem hoje <span className="font-semibold tabular-nums text-text">{formatBRLSinal(painel.data!.saldoHoje)}</span>
+            Cofrinho: <span className="font-semibold tabular-nums text-text">{formatBRLSinal(painel.data!.saldoHoje)}</span>
             {ativas.some((s) => !s.carteira.incluir_no_total) ? ' (sem contar o que está fora do total)' : ''}.
           </p>
           <ul className="space-y-2">
@@ -118,6 +149,9 @@ function CarteirasConteudo() {
                   <Button variant="icon" className="min-h-[44px] min-w-[44px]" onClick={() => setArquivando(carteira)} aria-label={`Arquivar ${carteira.nome}`}>
                     <Archive size={16} />
                   </Button>
+                  <Button variant="icon" className="min-h-[44px] min-w-[44px]" onClick={() => setExcluindo(carteira)} aria-label={`Excluir ${carteira.nome}`}>
+                    <Trash2 size={16} />
+                  </Button>
                 </div>
               </li>
             ))}
@@ -138,12 +172,43 @@ function CarteirasConteudo() {
                     >
                       <ArchiveRestore size={16} aria-hidden="true" /> Desarquivar
                     </Button>
+                    <Button variant="icon" className="min-h-[44px] min-w-[44px]" onClick={() => setExcluindo(c)} aria-label={`Excluir ${c.nome}`}>
+                      <Trash2 size={16} />
+                    </Button>
                   </li>
                 ))}
               </ul>
             </section>
           )}
         </>
+      )}
+
+      {transferencias.length > 0 && (
+        <section aria-labelledby="transferencias" className="space-y-2">
+          <h2 id="transferencias" className="text-[15px] font-semibold text-text">Transferências</h2>
+          <ul className="space-y-2">
+            {transferencias.map((tr) => (
+              <li key={tr.id} className="flex items-center gap-3 rounded-card border border-border bg-card p-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-card2 text-muted">
+                  <ArrowLeftRight size={16} aria-hidden="true" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[15px] text-text">{rotuloTransferencia(tr, nomes)}</p>
+                  <p className="text-[13px] text-muted">{formatDiaMes(tr.data)}</p>
+                </div>
+                <span className="shrink-0 whitespace-nowrap text-[15px] font-semibold tabular-nums text-text">{formatBRL(Number(tr.valor))}</span>
+                <Button
+                  variant="icon"
+                  className="min-h-[44px] min-w-[44px]"
+                  onClick={() => setExcluindoTransferencia(tr)}
+                  aria-label={`Excluir transferência ${rotuloTransferencia(tr, nomes)} de ${formatBRL(Number(tr.valor))}`}
+                >
+                  <Trash2 size={16} />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <Modal isOpen={criando} onClose={() => setCriando(false)} title="Novo banco ou carteira">
@@ -163,6 +228,22 @@ function CarteirasConteudo() {
         message={`Arquivar "${arquivando?.nome}"? Ela sai do total e dos seletores; os lançamentos antigos continuam no histórico.`}
         confirmLabel="Arquivar"
         isLoading={atualizar.isPending}
+      />
+      <ConfirmarExclusao
+        isOpen={!!excluindo}
+        onClose={() => setExcluindo(null)}
+        onConfirm={confirmarExcluir}
+        titulo="Excluir banco"
+        detalhe={excluindo ? detalheExclusaoCarteira(excluindo.nome, ativas.length + arquivadas.length === 1) : undefined}
+        isLoading={excluirCarteira.isPending}
+      />
+      <ConfirmarExclusao
+        isOpen={!!excluindoTransferencia}
+        onClose={() => setExcluindoTransferencia(null)}
+        onConfirm={confirmarExcluirTransferencia}
+        titulo="Excluir transferência"
+        detalhe={excluindoTransferencia ? detalheExclusaoTransferencia(excluindoTransferencia) : undefined}
+        isLoading={excluirTransferencia.isPending}
       />
     </div>
   );

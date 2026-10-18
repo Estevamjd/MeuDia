@@ -46,10 +46,12 @@ db() {
     local q=(psql -X -q -v ON_ERROR_STOP=1)
     cd packages/database
     "${q[@]}" -f tests/supabase_stub.sql >/dev/null
-    # Cada roteiro roda numa transação com ROLLBACK: 005 sozinha, depois 000 + 005 + 006 (2x) e o down.
+    # Cada roteiro roda numa transação com ROLLBACK: 005 sozinha; 000 + 005 + 006 (2x) e o down;
+    # 000 + 005 + 006 + 007 (2x), os downs 007 (2x) e 006 e o up de novo.
     "${q[@]}" -f tests/005_financas.sql >/dev/null
     "${q[@]}" -f tests/006_carteiras.sql >/dev/null
-    echo "ok: tests/005_financas.sql e tests/006_carteiras.sql"
+    "${q[@]}" -f tests/007_excluir_metas.sql >/dev/null
+    echo "ok: tests/005_financas.sql, tests/006_carteiras.sql e tests/007_excluir_metas.sql"
     bash tests/006_corrigir_saldo_concorrencia.sh
   )
 }

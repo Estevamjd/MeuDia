@@ -1,5 +1,4 @@
-import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { logger } from '@meudia/shared';
@@ -157,14 +156,20 @@ it('trigger da 006 (55000, lançamento vinculado) vira TRANSACAO_VINCULADA 409 e
   await expect(transacoes.update('t', { valor: 1 }, 'u')).rejects.toMatchObject({ code: 'TRANSACAO_VINCULADA', status: 409 });
   await expect(transacoes.remove('t', 'u')).rejects.toMatchObject({ code: 'TRANSACAO_VINCULADA', status: 409 });
 });
-it('app nunca apaga carteira (sem DELETE no banco: só arquivar)', () => {
+it('só carteirasRepository.remove apaga carteira (007: excluir de verdade, com confirmação na tela)', () => {
   const raiz = path.resolve(__dirname, '../../../../..');
-  const fontes = execFileSync('git', ['ls-files', 'packages/*/src', 'apps/web'], { cwd: raiz, encoding: 'utf8' })
-    .split('\n').filter((f) => /\.(ts|tsx|mjs)$/.test(f) && !/__tests__|\.test\.|\/e2e\//.test(f));
+  const listar = (pasta: string): string[] => readdirSync(path.join(raiz, pasta), { withFileTypes: true })
+    .flatMap((entrada) => {
+      if (['node_modules', '.next', 'dist', '.turbo'].includes(entrada.name)) return [];
+      const arquivo = `${pasta}/${entrada.name}`;
+      return entrada.isDirectory() ? listar(arquivo) : [arquivo];
+    });
+  const fontes = [...listar('packages'), ...listar('apps/web')]
+    .filter((f) => /^(packages\/[^/]+\/src|apps\/web)\//.test(f) && /\.(ts|tsx|mjs)$/.test(f) && !/__tests__|\.test\.|\/e2e\//.test(f));
   const apagam = fontes.filter((f) => /from\(['"]carteiras['"]\)[^;]*?\.delete\(/s.test(readFileSync(path.join(raiz, f), 'utf8')));
   expect(fontes.length).toBeGreaterThan(50);
-  expect(apagam).toEqual([]);
-  expect(Object.keys(carteiras)).not.toEqual(expect.arrayContaining([expect.stringMatching(/^(remove|delete|excluir)/)]));
+  expect(apagam).toEqual(['packages/api/src/repositories/carteiras.repository.ts']);
+  expect(Object.keys(carteiras).filter((k) => /^(remove|delete|excluir)/.test(k))).toEqual(['remove']);
 });
 it('cadastro do onboarding reutiliza UUID e mantém âncora em retry com edição', async () => {
   const { query } = mockClient({ data: { id: 'estavel' } });
@@ -174,4 +179,21 @@ it('cadastro do onboarding reutiliza UUID e mantém âncora em retry com ediçã
   expect(query.update).toHaveBeenCalledWith({ nome: 'Nu editado', saldo_inicial: -100 });
   expect(query.eq).toHaveBeenCalledWith('id', 'estavel');
   expect(query.eq).toHaveBeenCalledWith('user_id', 'u');
+});
+
+describe('excluir carteira (007)', () => {
+  it('apaga só a carteira do usuário', async () => {
+    const { client, query } = mockClient();
+    await carteiras.remove('id', 'user');
+    expect(client.from).toHaveBeenCalledWith('carteiras');
+    expect(query.delete).toHaveBeenCalled();
+    expect(query.eq).toHaveBeenCalledWith('id', 'id');
+    expect(query.eq).toHaveBeenCalledWith('user_id', 'user');
+  });
+  it.each(['42501', '23503'])('banco sem a 007 (%s: sem DELETE ou FK NO ACTION) vira SCHEMA_DESATUALIZADO logado', async (code) => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    mockClient({ error: { code, message: 'permission denied for table carteiras' } });
+    await expect(carteiras.remove('id', 'user')).rejects.toMatchObject({ code: 'SCHEMA_DESATUALIZADO', status: 503 });
+    expect(warn).toHaveBeenCalled();
+  });
 });

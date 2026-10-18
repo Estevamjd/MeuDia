@@ -32,3 +32,26 @@ export const VALOR_OCULTO = 'R$ •••••';
 export function comSinal(valor: number, negativo: boolean): number {
   return negativo ? -Math.abs(valor) : Math.abs(valor);
 }
+
+/** Lado de transferência cujo banco foi excluído (007: origem_id/destino_id NULL). */
+export const BANCO_EXCLUIDO = 'banco excluído';
+
+type LadosTransferencia = { origem_id: string | null; destino_id: string | null };
+
+/** "Nubank → Caixa"; o lado excluído vira "banco excluído". */
+export function rotuloTransferencia(tr: LadosTransferencia, nomes: ReadonlyMap<string, string>): string {
+  const nome = (id: string | null) => (id && nomes.get(id)) || BANCO_EXCLUIDO;
+  return `${nome(tr.origem_id)} → ${nome(tr.destino_id)}`;
+}
+
+export function detalheExclusaoTransferencia(tr: LadosTransferencia): string {
+  return tr.origem_id && tr.destino_id
+    ? 'Os dois bancos voltam ao saldo de antes da transferência.'
+    : 'O banco que sobrou volta ao saldo de antes da transferência.';
+}
+
+export function detalheExclusaoCarteira(nome: string, ultima: boolean): string {
+  return `Os lançamentos de ${nome} ficam como "Sem banco" e o saldo dos outros bancos não muda. Transferências com ele ficam como "${BANCO_EXCLUIDO}".${
+    ultima ? ' É o seu último banco: o Cofrinho volta a pedir onde fica seu dinheiro.' : ''
+  }`;
+}

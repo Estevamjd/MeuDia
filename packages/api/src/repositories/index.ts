@@ -27,3 +27,4 @@ export * as lembretesEnviadosRepository from './lembretes-enviados.repository';
 export * as carteirasRepository from './carteiras.repository';
 export * as transferenciasRepository from './transferencias.repository';
 export * as recebimentosRendaRepository from './recebimentos-renda.repository';
+export * as metasRepository from './metas.repository';

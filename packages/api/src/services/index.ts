@@ -17,3 +17,4 @@ export * as carteirasService from './carteiras.service';
 export type { PainelSaldo, RendaAReceber } from './carteiras.service';
 export * as lembretesService from './lembretes.service';
 export type { PushPayload, PushSender } from './lembretes.service';
+export * as metasService from './metas.service';

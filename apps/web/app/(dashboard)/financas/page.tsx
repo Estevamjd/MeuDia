@@ -10,7 +10,6 @@ import {
   useCarteiras,
   useCriarTransacao,
   useAtualizarTransacao,
-  useExcluirTransacao,
 } from '../../../hooks';
 
 import {
@@ -18,7 +17,6 @@ import {
   Modal,
   Input,
   Select,
-  ConfirmDialog,
   useToast,
 } from '../../../components/ui';
 import { AgentBannerAuto } from '../../../components/agent';
@@ -49,12 +47,10 @@ export default function FinancasPage() {
   // --- Mutations ---
   const criarTransacao = useCriarTransacao();
   const atualizarTransacao = useAtualizarTransacao();
-  const excluirTransacao = useExcluirTransacao();
 
   // --- Modal state ---
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingTransacao, setEditingTransacao] = useState<Transacao | null>(null);
-  const [deletingTransacao, setDeletingTransacao] = useState<Transacao | null>(null);
   // Novo: carteira escolhida ou a primeira ativa. Edição: exatamente a do lançamento (NULL em lançamento antigo =
   // "Sem carteira"); nunca cai na primeira carteira por conta própria.
   const carteiraId = editingTransacao
@@ -102,7 +98,6 @@ export default function FinancasPage() {
   const home = useFinancasHome(competencia, hojeISO, {
     onNovo: openAddModal,
     onEditar: openEditModal,
-    onExcluir: setDeletingTransacao,
   });
 
   // --- Handlers ---
@@ -167,19 +162,6 @@ export default function FinancasPage() {
     },
     [carteiraId, carteiras, formTipo, formCategoria, formDescricao, formValor, formData, formBanco, atualizarTransacao, editingTransacao, toast, resetForm],
   );
-
-  const handleExcluir = useCallback(() => {
-    if (!deletingTransacao) return;
-    excluirTransacao.mutate(deletingTransacao.id, {
-      onSuccess: () => {
-        toast.success('Lançamento excluído');
-        setDeletingTransacao(null);
-      },
-      onError: () => {
-        toast.error('Erro ao excluir lançamento');
-      },
-    });
-  }, [excluirTransacao, deletingTransacao, toast]);
 
   // --- Form JSX (shared between add and edit) ---
   const renderForm = (onSubmit: (e: React.FormEvent) => void, isSubmitting: boolean) => (
@@ -309,16 +291,6 @@ export default function FinancasPage() {
         {renderForm(handleSubmitEdit, atualizarTransacao.isPending)}
       </Modal>
 
-      {/* Delete Confirm */}
-      <ConfirmDialog
-        isOpen={!!deletingTransacao}
-        onClose={() => setDeletingTransacao(null)}
-        onConfirm={handleExcluir}
-        title="Excluir lançamento"
-        message={`Tem certeza que deseja excluir "${deletingTransacao?.descricao}"? Esta ação não pode ser desfeita.`}
-        confirmLabel="Excluir"
-        isLoading={excluirTransacao.isPending}
-      />
     </div>
   );
 }

@@ -2,8 +2,8 @@
 
 import { useId, useState, type ReactNode } from 'react';
 import { clsx } from 'clsx';
-import { CalendarClock, CalendarDays } from 'lucide-react';
-import type { EmSeteDias, SobraDoMes } from '@meudia/shared';
+import { CalendarClock } from 'lucide-react';
+import type { SobraDoMes } from '@meudia/shared';
 import { formatBRL, formatBRLSinal, formatDiaMes } from '../../../lib/financas-ui';
 import { VALOR_OCULTO } from '../../../lib/carteiras-ui';
 import { CardDashboard, VALOR_GRANDE } from './CardDashboard';
@@ -110,48 +110,6 @@ export function CardSobraMes({ sobra, escondido }: CardSobraMesProps) {
           <p className="pt-1 text-muted">
             O dinheiro guardado nos bancos não entra. Conta paga com &quot;Paguei&quot; já está nas despesas lançadas; renda com
             &quot;Recebi&quot;, nas receitas. Limites do orçamento não entram.
-          </p>
-        </>
-      }
-    />
-  );
-}
-
-export interface CardSeteDiasProps {
-  seteDias: EmSeteDias;
-  escondido: boolean;
-}
-
-/**
- * "Em 7 dias você terá" = guardado hoje + a receber − a pagar (só o que vem depois do saldo informado).
- * Recebi/Paguei não mudam o valor: o item sai de "a receber/a pagar" e entra no guardado.
- */
-export function CardSeteDias({ seteDias, escondido }: CardSeteDiasProps) {
-  const v = (n: number) => oculto(escondido, n);
-  return (
-    <CardBase
-      id="previsao-7dias"
-      titulo="Em 7 dias você terá"
-      icone={<CalendarDays size={20} />}
-      valor={seteDias.valor}
-      escondido={escondido}
-      conta={`Guardado ${seteDias.guardado < 0 ? '−' : ''}${v(seteDias.guardado)} + a receber ${v(seteDias.aReceber)} − a pagar ${v(seteDias.aPagar)}`}
-      rodape={`até ${formatDiaMes(seteDias.alvoISO)}`}
-      porque={
-        <>
-          <ul className="space-y-1">
-            <Linha rotulo="Guardado hoje nos bancos" valor={seteDias.guardado} escondido={escondido} />
-            {seteDias.rendasAReceber.map((r) => (
-              <Linha key={r.id} rotulo={`+ ${r.descricao} (a receber ${formatDiaMes(r.data)})`} valor={r.valor} sinal="+" escondido={escondido} />
-            ))}
-            {seteDias.contasAPagar.map((c) => (
-              <Linha key={c.id} rotulo={`− ${c.descricao} (${c.vencimento < seteDias.hojeISO ? 'vencida' : 'vence'} ${formatDiaMes(c.vencimento)})`} valor={c.valor} sinal="−" escondido={escondido} />
-            ))}
-            <Linha rotulo={`= Em ${formatDiaMes(seteDias.alvoISO)}`} valor={seteDias.valor} escondido={escondido} total />
-          </ul>
-          <p className="pt-1 text-muted">
-            Renda até {formatDiaMes(seteDias.ancoraISO)} e conta vencida antes dessa data não entram: o saldo informado já
-            pode incluir. Lançamentos, &quot;Recebi&quot; e &quot;Paguei&quot; já estão no guardado.
           </p>
         </>
       }

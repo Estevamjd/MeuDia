@@ -45,6 +45,7 @@ const ITENS_FINANCAS: NavItem[] = [
   { href: '/financas/carteiras', label: 'Bancos e carteira', emoji: '🏦' },
   { href: '/financas/contas', label: 'Contas', emoji: '🧾' },
   { href: '/financas/orcamento', label: 'Orçamento', emoji: '📊' },
+  { href: '/financas/metas', label: 'Metas', emoji: '🎯' },
   { href: '/assinaturas', label: 'Assinaturas', emoji: '💳' },
 ];
 
