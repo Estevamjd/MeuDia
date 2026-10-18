@@ -18,8 +18,12 @@ export interface MetaCardProps {
 export function MetaCard({ meta, sugestao, onGuardei, onExcluir }: MetaCardProps) {
   const alvo = Number(meta.valor_alvo);
   const guardado = Number(meta.valor_guardado);
-  const pct = Math.min(100, Math.floor((guardado / alvo) * 100));
-  const concluida = guardado >= alvo;
+  // Em centavos inteiros: (570 / 1000) * 100 dá 56,999… em ponto flutuante.
+  const alvoCentavos = Math.round(alvo * 100);
+  const guardadoCentavos = Math.round(guardado * 100);
+  const pct = alvoCentavos > 0 ? Math.min(100, Math.floor((guardadoCentavos * 100) / alvoCentavos)) : 100;
+  const concluida = guardadoCentavos >= alvoCentavos;
+  const faltaCentavos = alvoCentavos - guardadoCentavos;
   const alerta = sugestao && ['nao_cabe', 'sem_sobra', 'prazo_curto', 'prazo_passou'].includes(sugestao.tipo);
   return (
     <li className="space-y-3 rounded-card border border-border bg-card p-4" aria-label={meta.nome}>
@@ -48,7 +52,7 @@ export function MetaCard({ meta, sugestao, onGuardei, onExcluir }: MetaCardProps
         />
       </div>
       <p className={clsx('text-[13px]', concluida ? 'text-green' : 'text-muted')}>
-        {concluida ? 'Meta alcançada 🎉' : `Faltam ${formatBRL(alvo - guardado)}`}
+        {concluida ? 'Meta alcançada 🎉' : `Faltam ${formatBRL(faltaCentavos / 100)}`}
       </p>
       {!concluida && sugestao && (
         <div data-testid={`sugestao-${meta.id}`} className={clsx('space-y-1 rounded-lg p-3 text-[13px]', alerta ? 'bg-orange/10' : 'bg-card2')}>

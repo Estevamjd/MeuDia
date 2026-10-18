@@ -239,10 +239,12 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Bancos e carteira' }).click();
   await page.waitForURL(/\/financas\/carteiras$/);
   await expect(page.getByRole('heading', { name: 'Bancos e carteira', level: 1 })).toBeVisible();
-  // Só os cartões de banco (a lista de transferências também tem "Caixa → Nubank").
-  const lista = page.getByRole('listitem').filter({ hasText: 'Nubank' }).filter({ hasNotText: '→' });
+  // Só os cartões de banco (a lista de transferências também tem "Caixa → Nubank"): o cartão é o item com o botão "Excluir <banco>".
+  const cartaoBanco = (nome: string) =>
+    page.getByRole('listitem').filter({ has: page.getByRole('button', { name: `Excluir ${nome}`, exact: true }) });
+  const lista = cartaoBanco('Nubank');
   await expect(lista).toContainText(/R\$\s1\.575,00/);
-  await expect(page.getByRole('listitem').filter({ hasText: 'Caixa' }).filter({ hasNotText: '→' })).toContainText(/R\$\s100,00/);
+  await expect(cartaoBanco('Caixa')).toContainText(/R\$\s100,00/);
   await semScrollHorizontal();
   await shot('07-carteiras.png');
 
