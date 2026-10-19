@@ -3,9 +3,9 @@
  * O web resolve o id para o componente; qualquer nome desconhecido/legado cai em "Outros".
  */
 export type IconeCategoria =
-  | 'shopping-cart' | 'sandwich' | 'utensils-crossed' | 'bus' | 'fuel' | 'house' | 'lightbulb'
+  | 'shopping-cart' | 'utensils' | 'utensils-crossed' | 'bus' | 'fuel' | 'house' | 'lightbulb'
   | 'droplets' | 'wifi' | 'smartphone' | 'tv' | 'dumbbell' | 'pill' | 'book-open' | 'graduation-cap'
-  | 'hand' | 'sparkles' | 'scissors' | 'shirt' | 'paw-print' | 'gift' | 'party-popper' | 'plane'
+  | 'paintbrush' | 'eye' | 'sparkles' | 'scissors' | 'shirt' | 'paw-print' | 'gift' | 'party-popper' | 'plane'
   | 'sofa' | 'school' | 'repeat' | 'receipt' | 'wallet' | 'hand-coins' | 'scale' | 'tag';
 
 /** `gasto`: aparece nos seletores de gasto/conta; `entrada`/`sistema`: criadas pelo app. */
@@ -28,7 +28,7 @@ export const CATEGORIA_AJUSTE = 'Ajuste de saldo';
 
 export const CATEGORIAS: readonly CategoriaInfo[] = [
   { nome: 'Mercado', icone: 'shopping-cart', cor: '#4ade80', grupo: 'gasto', aliases: ['Supermercado', 'Feira'] },
-  { nome: 'Comida', icone: 'sandwich', cor: '#fb923c', grupo: 'gasto', aliases: ['Lanche', 'Comida/Lanche', 'Alimentação', 'Alimentacao', 'Delivery'] },
+  { nome: 'Comida', icone: 'utensils', cor: '#fb923c', grupo: 'gasto', aliases: ['Lanche', 'Comida/Lanche', 'Alimentação', 'Alimentacao', 'Delivery'] },
   { nome: 'Restaurante', icone: 'utensils-crossed', cor: '#f97316', grupo: 'gasto' },
   { nome: 'Transporte', icone: 'bus', cor: '#38bdf8', grupo: 'gasto', aliases: ['Uber', 'Ônibus'] },
   { nome: 'Combustível', icone: 'fuel', cor: '#facc15', grupo: 'gasto', aliases: ['Gasolina'] },
@@ -42,8 +42,10 @@ export const CATEGORIAS: readonly CategoriaInfo[] = [
   { nome: 'Saúde', icone: 'pill', cor: '#34d399', grupo: 'gasto', aliases: ['Farmácia', 'Saúde/Farmácia', 'Remédio'] },
   { nome: 'Curso', icone: 'book-open', cor: '#c084fc', grupo: 'gasto' },
   { nome: 'Faculdade', icone: 'graduation-cap', cor: '#a5b4fc', grupo: 'gasto' },
-  { nome: 'Unha', icone: 'hand', cor: '#f9a8d4', grupo: 'gasto', aliases: ['Manicure'] },
-  { nome: 'Estética', icone: 'sparkles', cor: '#e879f9', grupo: 'gasto', aliases: ['Sobrancelha', 'Sobrancelha/Estética'] },
+  { nome: 'Unha', icone: 'paintbrush', cor: '#f9a8d4', grupo: 'gasto', aliases: ['Manicure'] },
+  // Sobrancelha virou categoria própria (decisão 2); "Sobrancelha/Estética" (legado) segue em Estética.
+  { nome: 'Sobrancelha', icone: 'eye', cor: '#d8b4fe', grupo: 'gasto', aliases: ['Design de sobrancelha'] },
+  { nome: 'Estética', icone: 'sparkles', cor: '#e879f9', grupo: 'gasto', aliases: ['Sobrancelha/Estética'] },
   { nome: 'Cabelo', icone: 'scissors', cor: '#fda4af', grupo: 'gasto', aliases: ['Salão'] },
   { nome: 'Roupa', icone: 'shirt', cor: '#93c5fd', grupo: 'gasto', aliases: ['Roupas', 'Vestuário'] },
   { nome: 'Pet', icone: 'paw-print', cor: '#d6a36f', grupo: 'gasto' },

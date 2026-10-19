@@ -19,7 +19,7 @@ const iPhone = devices['iPhone 13'];
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: /(modo-runtime|novo-usuario|onboarding-loop|contas-saldo|excluir-metas|assistente|abas)\.spec\.ts$/,
+  testMatch: /(modo-runtime|novo-usuario|onboarding-loop|contas-saldo|excluir-metas|assistente|abas|config)\.spec\.ts$/,
   fullyParallel: false,
   workers: 1,
   retries: 0,

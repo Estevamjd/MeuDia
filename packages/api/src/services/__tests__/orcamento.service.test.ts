@@ -24,7 +24,7 @@ beforeEach(() => {
     { conta: { categoria: 'Casa', valor: 200 }, vencimento: '2026-01-10', situacao: 'vencida', pagamento: null },
     { conta: { categoria: 'Outros', valor: 50 }, vencimento: '2026-01-25', situacao: 'paga', pagamento: { pago_em: '2026-01-12' } },
   ] as never);
-  vi.mocked(transacoesDoMes).mockImplementation(async (_, ano, mes) => (ano === 2025 && mes === 12 ? [{ tipo: 'despesa', valor: 100 }] : [{ tipo: 'receita', valor: 800 }, { tipo: 'despesa', valor: 300 }]) as never);
+  vi.mocked(transacoesDoMes).mockImplementation(async (_, ano, mes) => (ano === 2025 && mes === 12 ? [{ data: '2025-12-10', tipo: 'despesa', valor: 100 }] : [{ data: '2026-01-10', tipo: 'receita', valor: 800 }, { data: '2026-01-10', tipo: 'despesa', valor: 300 }]) as never);
 });
 it('fixture de janeiro: max por categoria, prazo, deltas e dezembro anterior', async () => {
   // R11: a receita de 800 soma por cima da renda fixa de 1000 sem "Recebi" (1800 − 300).
@@ -32,7 +32,8 @@ it('fixture de janeiro: max por categoria, prazo, deltas e dezembro anterior', a
     rendaPrevista: 1000, rendaReal: 800, rendaDoMes: 1800, gastoReal: 300,
     entradas: { salarioRecebido: 0, salarioPrevisto: 1000, extras: 800, total: 800 },
     contasMes: 450, contasPagas: 250, contasFaltam: 200, gastoPrevisto: 550,
-    sobraPrevista: 450, pctComprometida: 0.45, pagasNoPrazo: 0.5,
+    // Fixture parcial (conta sem recorrência): nenhuma ocorrência a pagar → 1800 − 300.
+    sobraDoMes: 1500, pctComprometida: 0.45, pagasNoPrazo: 0.5,
     vsMesAnterior: { gastoReal: { absoluto: 200, percentual: 2 } }, selo: 'Atenção',
   });
   expect(recebimentos.findByCompetencias).toHaveBeenCalledWith('u', ['2026-01', '2025-12']);
@@ -81,20 +82,20 @@ describe('R11: renda do mês não some com entrada extra (bug das linhas 53-54)'
     vi.mocked(rendas.findAll).mockResolvedValue([{ id: 'r', valor: 900, ativo: true }] as never);
   });
   it('renda 900 sem recebimento + extra 100 → renda 1.000 (nunca 100), também no mês anterior', async () => {
-    vi.mocked(transacoesDoMes).mockResolvedValue([{ tipo: 'receita', valor: 100 }, { tipo: 'despesa', valor: 25 }] as never);
+    vi.mocked(transacoesDoMes).mockResolvedValue([{ data: '2026-10-10', tipo: 'receita', valor: 100 }, { data: '2026-10-10', tipo: 'despesa', valor: 25 }] as never);
     const r = await service.resumoFinanceiroMes('u', 2026, 10, '2026-10-17');
     expect(r).toMatchObject({ rendaDoMes: 1000, rendaReal: 100, gastoReal: 25 });
   });
   it('com "Recebi" a renda fixa não conta duas vezes', async () => {
     vi.mocked(recebimentos.findByCompetencias).mockResolvedValue([{ renda_id: 'r', competencia: '2026-10' }] as never);
     vi.mocked(transacoesDoMes).mockImplementation(async (_, _ano, mes) =>
-      (mes === 10 ? [{ tipo: 'receita', valor: 900 }, { tipo: 'receita', valor: 100 }] : []) as never);
+      (mes === 10 ? [{ data: '2026-10-10', tipo: 'receita', valor: 900 }, { data: '2026-10-10', tipo: 'receita', valor: 100 }] : []) as never);
     const r = await service.resumoFinanceiroMes('u', 2026, 10, '2026-10-17');
     expect(r).toMatchObject({ rendaDoMes: 1000, rendaReal: 1000 });
   });
   it('ajuste de saldo fica fora de renda e gasto', async () => {
     vi.mocked(transacoesDoMes).mockResolvedValue([
-      { tipo: 'receita', valor: 300, ajuste: true }, { tipo: 'despesa', valor: 50, ajuste: true }, { tipo: 'despesa', valor: 10 },
+      { data: '2026-10-10', tipo: 'receita', valor: 300, ajuste: true }, { data: '2026-10-10', tipo: 'despesa', valor: 50, ajuste: true }, { data: '2026-10-10', tipo: 'despesa', valor: 10 },
     ] as never);
     expect(await service.resumoFinanceiroMes('u', 2026, 10, '2026-10-17')).toMatchObject({ rendaReal: 0, rendaDoMes: 900, gastoReal: 10 });
   });
@@ -106,7 +107,7 @@ describe('DIAG-CARD-ENTROU §5: Análise com as fórmulas corrigidas', () => {
     vi.mocked(orcamento.findAll).mockResolvedValue([]);
     vi.mocked(rendas.findAll).mockResolvedValue([{ id: 'sal', valor: 943, ativo: true }] as never);
     vi.mocked(transacoesDoMes).mockImplementation(async (_, _ano, mes) =>
-      (mes === 10 ? [{ id: 'pix', tipo: 'receita', valor: 150 }, { id: 'g', tipo: 'despesa', valor: 574 }] : []) as never);
+      (mes === 10 ? [{ id: 'pix', data: '2026-10-10', tipo: 'receita', valor: 150 }, { id: 'g', data: '2026-10-10', tipo: 'despesa', valor: 574 }] : []) as never);
     vi.mocked(listarContasDoMes).mockResolvedValue([
       // Venceu antes de a conta existir no app (cadastrada 10/10): não conta.
       { conta: { valor: 500, categoria: 'Casa', created_at: '2026-10-10T15:00:00Z' }, vencimento: '2026-10-05', situacao: 'vencida', pagamento: null },
@@ -123,7 +124,7 @@ describe('DIAG-CARD-ENTROU §5: Análise com as fórmulas corrigidas', () => {
     vi.mocked(recebimentos.findByCompetencias).mockResolvedValue([{ renda_id: 'sal', competencia: '2026-10', transacao_id: 'rec' }] as never);
     vi.mocked(recebimentos.findByTransacoes).mockResolvedValue([{ renda_id: 'sal', competencia: '2026-10', transacao_id: 'rec' }] as never);
     vi.mocked(transacoesDoMes).mockImplementation(async (_, _ano, mes) =>
-      (mes === 10 ? [{ id: 'rec', tipo: 'receita', valor: 943 }, { id: 'pix', tipo: 'receita', valor: 150 }] : []) as never);
+      (mes === 10 ? [{ id: 'rec', data: '2026-10-10', tipo: 'receita', valor: 943 }, { id: 'pix', data: '2026-10-10', tipo: 'receita', valor: 150 }] : []) as never);
     const r = await service.resumoFinanceiroMes('u', 2026, 10, '2026-10-18');
     expect(r.entradas).toEqual({ salarioRecebido: 943, salarioPrevisto: 943, extras: 150, total: 1093 });
   });
@@ -131,10 +132,10 @@ describe('DIAG-CARD-ENTROU §5: Análise com as fórmulas corrigidas', () => {
   it('comparação com setembro: null sem lançamento (não-ajuste) em setembro; com dados, existe', async () => {
     expect((await service.resumoFinanceiroMes('u', 2026, 10, '2026-10-18')).vsMesAnterior).toBeNull();
     vi.mocked(transacoesDoMes).mockImplementation(async (_, _ano, mes) =>
-      (mes === 10 ? [{ id: 'g', tipo: 'despesa', valor: 574 }] : [{ id: 'aj', tipo: 'receita', valor: 9, ajuste: true }]) as never);
+      (mes === 10 ? [{ id: 'g', data: '2026-10-10', tipo: 'despesa', valor: 574 }] : [{ id: 'aj', data: '2026-09-10', tipo: 'receita', valor: 9, ajuste: true }]) as never);
     expect((await service.resumoFinanceiroMes('u', 2026, 10, '2026-10-18')).vsMesAnterior).toBeNull();
     vi.mocked(transacoesDoMes).mockImplementation(async (_, _ano, mes) =>
-      (mes === 10 ? [{ id: 'g', tipo: 'despesa', valor: 574 }] : [{ id: 's', tipo: 'despesa', valor: 474 }]) as never);
+      (mes === 10 ? [{ id: 'g', data: '2026-10-10', tipo: 'despesa', valor: 574 }] : [{ id: 's', data: '2026-09-10', tipo: 'despesa', valor: 474 }]) as never);
     expect((await service.resumoFinanceiroMes('u', 2026, 10, '2026-10-18')).vsMesAnterior).toEqual({ gastoReal: { absoluto: 100, percentual: 100 / 474 } });
   });
 
@@ -174,16 +175,56 @@ describe('Revisão Codex 1: Recebi de outra competência com a receita no mês a
 
   it('salário de agosto recebido (atrasado) em outubro conta como salário, não como extra', async () => {
     vi.mocked(transacoesDoMes).mockImplementation(async (_, _ano, mes) =>
-      (mes === 10 ? [{ id: 'rec-ago', tipo: 'receita', valor: 943 }, { id: 'pix', tipo: 'receita', valor: 150 }] : []) as never);
+      (mes === 10 ? [{ id: 'rec-ago', data: '2026-10-10', tipo: 'receita', valor: 943 }, { id: 'pix', data: '2026-10-10', tipo: 'receita', valor: 150 }] : []) as never);
     const r = await service.resumoFinanceiroMes('u', 2026, 10, '2026-10-18');
     expect(r.entradas).toMatchObject({ salarioRecebido: 943, extras: 150 });
   });
 
   it('salário de novembro recebido antes (antecipado) em outubro conta como salário, não como extra', async () => {
     vi.mocked(transacoesDoMes).mockImplementation(async (_, _ano, mes) =>
-      (mes === 10 ? [{ id: 'rec-nov', tipo: 'receita', valor: 943 }] : []) as never);
+      (mes === 10 ? [{ id: 'rec-nov', data: '2026-10-10', tipo: 'receita', valor: 943 }] : []) as never);
     const r = await service.resumoFinanceiroMes('u', 2026, 10, '2026-10-28');
     expect(r.entradas).toMatchObject({ salarioRecebido: 943, extras: 0 });
     expect(recebimentos.findByTransacoes).toHaveBeenCalledWith('u', ['rec-nov']);
+  });
+});
+
+
+describe('PR A2: uma sobra só (sobraDoMes); sem "Sobra prevista"', () => {
+  beforeEach(() => {
+    vi.mocked(rendas.findAll).mockResolvedValue([{ id: 'r', valor: 1000, ativo: true, dia_recebimento: 5, created_at: null }] as never);
+    vi.mocked(orcamento.findAll).mockResolvedValue([{ categoria: 'Lazer', valor_planejado: 100 }] as never);
+    // Aluguel 200 vencido e sem Paguei; gastos lançados 900.
+    vi.mocked(listarContasDoMes).mockResolvedValue([
+      { conta: { id: 'c', descricao: 'Aluguel', categoria: 'Casa', valor: 200, ativo: true, recorrencia: 'mensal', dia_vencimento: 10, mes_vencimento: null, data_vencimento: null, created_at: null },
+        vencimento: '2026-01-10', situacao: 'vencida', pagamento: null },
+    ] as never);
+    vi.mocked(transacoesDoMes).mockImplementation(async (_, ano) =>
+      (ano === 2026 ? [{ id: 'm', data: '2026-01-08', tipo: 'despesa', categoria: 'Mercado', valor: 900, ajuste: false }] : []) as never);
+  });
+
+  it('resumo traz sobraDoMes (renda do mês − despesas − contas sem Paguei) e não traz sobraPrevista', async () => {
+    const r = await service.resumoFinanceiroMes('u', 2026, 1, '2026-01-15');
+    expect(r).not.toHaveProperty('sobraPrevista');
+    // 1000 − (900 + 200) = −100 (a antiga "prevista" daria 1000 − 300 = 700).
+    expect(r).toMatchObject({ sobraDoMes: -100, gastoPrevisto: 300 });
+  });
+
+  it('selo usa a sobra do mês: negativa → Apertado (com a prevista positiva seria Atenção)', async () => {
+    expect((await service.resumoFinanceiroMes('u', 2026, 1, '2026-01-15')).selo).toBe('Apertado');
+  });
+
+  it('com o Paguei a conta sai das contas a pagar e entra uma vez só, como despesa lançada', async () => {
+    vi.mocked(listarContasDoMes).mockResolvedValue([
+      { conta: { id: 'c', descricao: 'Aluguel', categoria: 'Casa', valor: 200, ativo: true, recorrencia: 'mensal', dia_vencimento: 10, mes_vencimento: null, data_vencimento: null, created_at: null },
+        vencimento: '2026-01-10', situacao: 'paga', pagamento: { conta_id: 'c', competencia: '2026-01', pago_em: '2026-01-10', transacao_id: 'p' } },
+    ] as never);
+    vi.mocked(transacoesDoMes).mockImplementation(async (_, ano) => (ano === 2026 ? [
+      { id: 'm', data: '2026-01-08', tipo: 'despesa', categoria: 'Mercado', valor: 500, ajuste: false },
+      { id: 'p', data: '2026-01-10', tipo: 'despesa', categoria: 'Casa', valor: 200, ajuste: false },
+    ] : []) as never);
+    const r = await service.resumoFinanceiroMes('u', 2026, 1, '2026-01-15');
+    expect(r.sobraDoMes).toBe(300);
+    expect(r.selo).toBe('No controle');
   });
 });

@@ -86,7 +86,7 @@ it('excluir limite usa o id e invalida as mesmas chaves', async () => {
   expect(chavesInvalidadas()).toContainEqual(['resumo-financeiro-mes']);
 });
 
-it('criar renda invalida o resumo (sobra prevista atualiza ao salvar)', () => {
+it('criar renda invalida o resumo (a sobra do mês atualiza ao salvar)', () => {
   const { result } = renderHook(() => useCriarRenda() as unknown as MutationOpts<unknown>);
   result.current.onSuccess();
   expect(chavesInvalidadas()).toContainEqual(['rendas']);

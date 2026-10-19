@@ -290,7 +290,7 @@ test('novo usuário: cadastro → onboarding → finanças → logout → login'
   }
 
   // Links legais de Configurações abrem para quem está logado.
-  await tocar(page.getByRole('link', { name: 'Politica de Privacidade' }));
+  await tocar(page.getByRole('link', { name: 'Política de privacidade' }));
   await page.waitForURL(/\/privacidade$/);
   await semVoltarParaOnboarding(page, 1_000);
   expect(new URL(page.url()).pathname).toBe('/privacidade');

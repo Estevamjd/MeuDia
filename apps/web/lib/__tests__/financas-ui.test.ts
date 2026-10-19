@@ -9,7 +9,7 @@ import {
   partesCompetencia,
   referenciaMesAnterior,
   situacaoLimite,
-  tagSobraPrevista,
+  tagSobra,
   textoDelta,
   textoVencimento,
 } from '../financas-ui';
@@ -24,10 +24,10 @@ it('mascaraBRL: dígitos viram centavos; ignora não dígitos e zeros à esquerd
   expect(mascaraBRL('12345678901234').valor).toBe(12345678.9);
 });
 
-it('tagSobraPrevista: zero é "zerada" (neutra), não "positiva"', () => {
-  expect(tagSobraPrevista(0)).toEqual({ text: 'zerada', color: 'neutral' });
-  expect(tagSobraPrevista(0.01)).toEqual({ text: 'positiva', color: 'teal' });
-  expect(tagSobraPrevista(-10)).toEqual({ text: 'negativa', color: 'red' });
+it('tagSobra: zero é "zerada" (neutra), não "positiva"', () => {
+  expect(tagSobra(0)).toEqual({ text: 'zerada', color: 'neutral' });
+  expect(tagSobra(0.01)).toEqual({ text: 'positiva', color: 'teal' });
+  expect(tagSobra(-10)).toEqual({ text: 'negativa', color: 'red' });
 });
 
 it('separa ano e mês válidos', () => {

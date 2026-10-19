@@ -43,7 +43,7 @@ export const metasKeys = {
   lista: (userId: string | undefined) => ['metas', userId] as const,
 };
 
-/** Rendas e orçamento mudam a sobra prevista, % comprometida e o selo; rendas também a previsão de saldo. */
+/** Rendas e orçamento mudam a sobra do mês, % comprometida e o selo; rendas também a previsão de saldo. */
 export function chavesAfetadasPorOrcamento(): QueryKey[] {
   return [rendasKeys.todas, orcamentoKeys.todas, resumoKeys.todas, carteirasKeys.todas];
 }

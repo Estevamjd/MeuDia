@@ -200,7 +200,8 @@ describe('evolução do mês e categorias', () => {
       'Ajuste de saldo', 'Outros']) expect(nomes).toContain(n);
     expect(categoriaInfo('lanche').nome).toBe('Comida');
     expect(categoriaInfo('FARMACIA').nome).toBe('Saúde');
-    expect(categoriaInfo('Sobrancelha').nome).toBe('Estética');
+    expect(categoriaInfo('Sobrancelha').nome).toBe('Sobrancelha');
+    expect(categoriaInfo('Sobrancelha/Estética').nome).toBe('Estética');
     expect(categoriaInfo('Categoria inventada').nome).toBe('Outros');
     expect(categoriaInfo(null).icone).toBe('tag');
     expect(new Set(nomes).size).toBe(nomes.length);
