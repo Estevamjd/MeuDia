@@ -23,7 +23,7 @@ const EMAIL = `perf.${Date.now().toString(36)}@example.test`;
 
 /** Conteúdo principal de cada aba (já com dados do mock, não o skeleton). */
 const PRONTO = {
-  inicio: `location.pathname === '/financas' && !!document.querySelector('[data-testid="previsao-7dias-valor"]')`,
+  inicio: `location.pathname === '/financas' && !!document.querySelector('[data-testid="previsao-fim-mes-valor"]')`,
   contas: `location.pathname === '/financas/contas' && !!document.querySelector('[aria-label="Editar conta Aluguel"]')`,
   orcamento: `location.pathname === '/financas/orcamento' && !!document.querySelector('[aria-label="Editar renda Salário"]')`,
   carteiras: `location.pathname === '/financas/carteiras' && !!document.querySelector('[aria-label="Corrigir saldo de Nubank"]')`,
@@ -146,17 +146,18 @@ for (let rodada = 1; rodada <= RODADAS; rodada++) {
       expect(await page.evaluate(() => location.pathname)).toBe(CAMINHO[aba]);
     };
     const tab = (nome: string) => nav.getByRole('link', { name: nome });
-    const gaveta = async () => {
+    // Contas e Orçamento saíram da barra (PR A1): ficam no menu lateral.
+    const gaveta = async (nome: string) => {
       await page.getByRole('button', { name: 'Abrir menu' }).click();
-      return page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Bancos e carteira' });
+      return page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: nome });
     };
 
-    await trocar('Início → Contas', tab('Contas'), 'contas');
-    await trocar('Contas → Orçamento', tab('Orçamento'), 'orcamento');
+    await trocar('Início → Contas', await gaveta('Contas'), 'contas');
+    await trocar('Contas → Orçamento', await gaveta('Orçamento'), 'orcamento');
     await trocar('Orçamento → Início (volta)', tab('Início'), 'inicio');
-    await trocar('Início → Contas (volta)', tab('Contas'), 'contas');
-    await trocar('Contas → Orçamento (volta)', tab('Orçamento'), 'orcamento');
-    await trocar('Orçamento → Bancos (gaveta)', await gaveta(), 'carteiras');
+    await trocar('Início → Contas (volta)', await gaveta('Contas'), 'contas');
+    await trocar('Contas → Orçamento (volta)', await gaveta('Orçamento'), 'orcamento');
+    await trocar('Orçamento → Bancos (gaveta)', await gaveta('Bancos e carteira'), 'carteiras');
     await trocar('Bancos → Início (volta)', tab('Início'), 'inicio');
     medidas.push(rodadaAtual);
   });

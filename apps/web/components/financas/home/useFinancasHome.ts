@@ -1,19 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { Competencia, Transacao } from '@meudia/shared';
+import type { Competencia } from '@meudia/shared';
 import {
-  useVinculosTransacoes,
-  useDesfazerPagamento,
-  useDesfazerRecebimento,
-  useExcluirTransacao,
   useContas,
   useContasMes,
   useCriarRenda,
   usePainelSaldo,
   useReceberRenda,
-  useOrcamento,
-  usePushLembretes,
   useRendas,
   useResumoFinanceiroMes,
   useTransacoesMes,
@@ -21,7 +15,6 @@ import {
 import { useToast } from '../../ui';
 import { partesCompetencia } from '../../../lib/financas-ui';
 import { usePagamentoAcoes } from '../usePagamentoAcoes';
-import { AVISO_LEMBRETES_DISPENSADO_KEY, mostrarAvisoLembretes } from './AvisoLembretes';
 import type { FinancasHomeViewProps } from './FinancasHomeView';
 import { montarHome } from './montarHome';
 import { montarDashboard } from './montarDashboard';
@@ -30,45 +23,15 @@ import { lerEsconderValores, salvarEsconderValores } from '../../../lib/carteira
 
 const RENDA_PADRAO = 'Renda principal';
 
-function lerDispensado(): boolean {
-  try {
-    return localStorage.getItem(AVISO_LEMBRETES_DISPENSADO_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-interface AcoesLancamento {
-  onNovo: () => void;
-  onEditar: (t: Transacao) => void;
-}
-
-type Vinculo = 'recebimento' | 'pagamento';
-
-/** O que a confirmação diz além de "Excluir? Isso não pode ser desfeito.". */
-export function detalheExclusaoLancamento(t: Pick<Transacao, 'ajuste' | 'carteira_id'>, vinculo: Vinculo | undefined): string {
-  if (vinculo === 'pagamento') return 'Ele veio do "Paguei": o lançamento sai e a conta volta a ficar a pagar.';
-  if (vinculo === 'recebimento') return 'Ele veio do "Recebi": o lançamento sai e a renda volta a ficar a receber.';
-  if (t.ajuste) return 'É um ajuste de saldo: o saldo do banco volta ao que era antes da correção.';
-  return t.carteira_id ? 'O lançamento sai e o saldo do banco volta ao que era.' : 'O lançamento sai do mês.';
-}
-
 /** Container da home: chama os hooks e entrega as props prontas para `FinancasHomeView`. */
-export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes: AcoesLancamento): FinancasHomeViewProps {
+export function useFinancasHome(competencia: Competencia, hojeISO: string, onGastei: () => void): FinancasHomeViewProps {
   const { ano, mes } = partesCompetencia(competencia);
   const toast = useToast();
   const resumo = useResumoFinanceiroMes(ano, mes);
   const contas = useContasMes(competencia);
-  const orcamento = useOrcamento();
   const transacoes = useTransacoesMes(ano, mes);
-  const vinculos = useVinculosTransacoes((transacoes.data ?? []).map((t) => t.id));
-  const desfazerRecebimento = useDesfazerRecebimento();
-  const desfazerPagamentoVinculado = useDesfazerPagamento();
-  const excluirTransacao = useExcluirTransacao();
-  const [excluindo, setExcluindo] = useState<Transacao | null>(null);
   const rendas = useRendas();
   const contasCadastradas = useContas();
-  const push = usePushLembretes();
   const criarRenda = useCriarRenda();
   const { pagarConta, contaOcupada } = usePagamentoAcoes();
   const painel = usePainelSaldo(hojeISO);
@@ -76,11 +39,7 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
   const [recebendo, setRecebendo] = useState<RendaAReceberItem | null>(null);
   const [escondido, setEscondido] = useState(false);
   useEffect(() => setEscondido(lerEsconderValores()), []);
-  const [expandido, setExpandido] = useState(false);
   const [rendaAberta, setRendaAberta] = useState(false);
-  // Começa dispensado até ler o localStorage (no cliente): evita piscar o aviso.
-  const [avisoDispensado, setAvisoDispensado] = useState(true);
-  useEffect(() => setAvisoDispensado(lerDispensado()), []);
 
   const secoes = useMemo(
     () =>
@@ -90,11 +49,10 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
             hojeISO,
             resumo: resumo.data,
             ocorrencias: contas.data ?? [],
-            orcamento: orcamento.data ?? [],
             transacoes: transacoes.data ?? [],
           })
         : null,
-    [competencia, hojeISO, resumo.data, contas.data, orcamento.data, transacoes.data],
+    [competencia, hojeISO, resumo.data, contas.data, transacoes.data],
   );
 
   const dados = useMemo(
@@ -105,15 +63,10 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
   const carteiraPadrao = carteirasAtivas.find((c) => c.id === painel.data?.carteiraPadraoId)?.id ?? carteirasAtivas[0]?.id ?? null;
   const podePagar = !!painel.data && !painel.isError && !painel.isLoading;
 
-  // Falha em qualquer consulta que alimenta as seções, o onboarding ou o aviso vira erro (nada de lista vazia silenciosa).
-  const consultas = [resumo, contas, orcamento, transacoes, rendas, contasCadastradas];
+  // Falha em qualquer consulta que alimenta as seções ou o onboarding vira erro (nada de lista vazia silenciosa).
+  const consultas = [resumo, contas, transacoes, rendas, contasCadastradas];
   const comErro = consultas.filter((q) => q.isError);
   const carregando = resumo.isLoading || contas.isLoading || rendas.isLoading || contasCadastradas.isLoading;
-
-  const mapaVinculos = Object.fromEntries([
-    ...(vinculos.data?.recebimentos ?? []).filter((r) => r.transacao_id).map((r) => [r.transacao_id!, 'recebimento']),
-    ...(vinculos.data?.pagamentos ?? []).filter((p) => p.transacao_id).map((p) => [p.transacao_id!, 'pagamento']),
-  ]) as Record<string, Vinculo>;
 
   const rendaCadastrada = (rendas.data ?? []).some((r) => r.ativo);
   // Definições cadastradas (não as ocorrências do mês): conta anual/avulsa de outro mês também conta.
@@ -121,35 +74,7 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
   // Sem a lista de rendas carregada, só o resumo vazio garante que falta o passo 1.
   const mostrarBoasVindas = rendas.isSuccess ? !rendaCadastrada || !temContas : !!secoes?.vazio;
 
-  const vinculoDe = (t: Transacao) => mapaVinculos[t.id];
-  const fecharExclusao = () => setExcluindo(null);
-  const aoExcluir = (mensagem: string) => ({
-    onSuccess: () => {
-      void vinculos.refetch?.();
-      toast.success(mensagem);
-      setExcluindo(null);
-    },
-    onError: () => toast.error('Não foi possível excluir. Tente de novo.'),
-  });
-  // Lançamento vinculado nunca sai por DELETE (trg_vinculo_* da 006): excluir = desfazer o Recebi/Paguei.
-  const confirmarExclusao = (t: Transacao) => {
-    const r = vinculos.data?.recebimentos.find((x) => x.transacao_id === t.id);
-    if (r) return desfazerRecebimento.mutate({ rendaId: r.renda_id, competencia: r.competencia }, aoExcluir('Lançamento excluído. A renda voltou a ficar a receber.'));
-    const p = vinculos.data?.pagamentos.find((x) => x.transacao_id === t.id);
-    if (p) return desfazerPagamentoVinculado.mutate({ contaId: p.conta_id, competencia: p.competencia }, aoExcluir('Lançamento excluído. A conta voltou a ficar a pagar.'));
-    excluirTransacao.mutate(t.id, aoExcluir('Lançamento excluído'));
-  };
-
   return {
-    exclusao: excluindo
-      ? {
-          transacao: excluindo,
-          detalhe: detalheExclusaoLancamento(excluindo, vinculoDe(excluindo)),
-          carregando: excluirTransacao.isPending || desfazerRecebimento.isPending || desfazerPagamentoVinculado.isPending,
-          onConfirmar: () => confirmarExclusao(excluindo),
-          onCancelar: fecharExclusao,
-        }
-      : null,
     estado: carregando ? 'carregando' : comErro.length > 0 || !secoes ? 'erro' : 'pronto',
     onTentarDeNovo: () => {
       for (const q of comErro.length > 0 ? comErro : [resumo]) void q.refetch();
@@ -162,22 +87,6 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
           onCadastrarRenda: () => {
             criarRenda.reset();
             setRendaAberta(true);
-          },
-        }
-      : null,
-    avisoLembretes: mostrarAvisoLembretes(temContas, push.estado, avisoDispensado)
-      ? {
-          estado: push.estado,
-          ativando: push.ocupado,
-          onAtivar: () =>
-            void push.ativar().catch(() => toast.error('Não foi possível ativar os lembretes. Tente de novo.')),
-          onDispensar: () => {
-            setAvisoDispensado(true);
-            try {
-              localStorage.setItem(AVISO_LEMBRETES_DISPENSADO_KEY, '1');
-            } catch {
-              // Sem storage (modo privado): dispensa só nesta sessão.
-            }
           },
         }
       : null,
@@ -245,14 +154,6 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, acoes
           },
         }
       : null,
-    lancamentos: {
-      ...acoes,
-      vinculos: mapaVinculos,
-      acoesBloqueadas: !vinculos.isSuccess,
-      onExcluir: setExcluindo,
-      carregando: transacoes.isLoading,
-      expandido,
-      onAlternarExpandido: () => setExpandido((v) => !v),
-    },
+    onGastei,
   };
 }

@@ -21,14 +21,15 @@ export interface CardSaldoHojeProps {
   nomeMes: string;
   escondido: boolean;
   onAlternarOlho: () => void;
+  compacto?: boolean;
 }
 
 /** "Cofrinho" (quanto tem hoje): total das carteiras no total, chips por banco e "Começou o mês com". */
-export function CardSaldoHoje({ total, carteiras, comecouMes, nomeMes, escondido, onAlternarOlho }: CardSaldoHojeProps) {
+export function CardSaldoHoje({ total, carteiras, comecouMes, nomeMes, escondido, onAlternarOlho, compacto = false }: CardSaldoHojeProps) {
   const valor = (v: number) => (escondido ? VALOR_OCULTO : formatBRLSinal(v));
   if (carteiras.length === 0) {
     return (
-      <CardDashboard id="saldo-hoje" titulo="Cofrinho" icone={<Wallet size={20} />}>
+      <CardDashboard id="saldo-hoje" titulo="Cofrinho" icone={<Wallet size={20} />} compacto={compacto}>
         <p className="text-[15px] text-text">Diga onde fica seu dinheiro para ver quanto você tem hoje.</p>
         <Link
           href="/financas/carteiras?nova=1"
@@ -44,6 +45,7 @@ export function CardSaldoHoje({ total, carteiras, comecouMes, nomeMes, escondido
       id="saldo-hoje"
       titulo="Cofrinho"
       icone={<Wallet size={20} />}
+      compacto={compacto}
       acao={
         <button
           type="button"
@@ -68,7 +70,7 @@ export function CardSaldoHoje({ total, carteiras, comecouMes, nomeMes, escondido
         {carteiras.map((c) => (
           <li
             key={c.id}
-            className={clsx('max-w-full rounded-full border border-border bg-card2 px-3 py-1.5 text-[13px]', !c.noTotal && 'opacity-70')}
+            className={clsx('max-w-full rounded-full border border-border bg-card2 px-3 text-[13px]', compacto ? 'py-1' : 'py-1.5', !c.noTotal && 'opacity-70')}
           >
             <span className="text-muted">{c.nome}</span>{' '}
             <span className={clsx('font-medium tabular-nums', c.saldo < 0 && !escondido ? 'text-red' : 'text-text')}>{valor(c.saldo)}</span>

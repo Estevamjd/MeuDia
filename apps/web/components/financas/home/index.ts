@@ -1,12 +1,6 @@
-export { AlertaContas, type AlertaContasProps, type ContaAlerta } from './AlertaContas';
-export { AvisoLembretes, type AvisoLembretesProps, mostrarAvisoLembretes, AVISO_LEMBRETES_DISPENSADO_KEY } from './AvisoLembretes';
 export { BoasVindasFinancas, type BoasVindasFinancasProps } from './BoasVindasFinancas';
-export { EntradasSaidas, type EntradasSaidasProps } from './EntradasSaidas';
 export { FinancasHomeView, type FinancasHomeViewProps, type DashboardHome } from './FinancasHomeView';
-export { HeroSobra, type HeroSobraProps } from './HeroSobra';
-export { IndicadoresMes, type IndicadoresMesProps } from './IndicadoresMes';
 export { montarHome, type DadosHome, type ResumoHome, type SecoesHome } from './montarHome';
-export { OrcamentoResumo, type OrcamentoResumoProps, type CategoriaOrcamento } from './OrcamentoResumo';
 export { ProximasContas, type ProximasContasProps, type ContaProxima } from './ProximasContas';
 export { RendaSheet, type RendaSheetProps } from './RendaSheet';
-export { UltimosLancamentos, type UltimosLancamentosProps, LANCAMENTOS_VISIVEIS } from './UltimosLancamentos';
+export { UltimosGastos, type UltimosGastosProps } from './UltimosGastos';

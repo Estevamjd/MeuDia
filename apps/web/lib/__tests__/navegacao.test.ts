@@ -31,19 +31,19 @@ describe('Sidebar por APP_MODE', () => {
 });
 
 describe('BottomNav modo finanças', () => {
-  it('Início, Contas, + Lançar, Orçamento e Chat (nessa ordem)', () => {
+  it('5 abas: Início, Gastos, Metas, Bancos e Config (nessa ordem), todas links com ícone lucide', () => {
     const itens = itensBottomFinancas();
-    expect(itens.map((i) => i.label)).toEqual(['Início', 'Contas', 'Lançar', 'Orçamento', 'Chat']);
-    expect(itens.map((i) => i.tipo)).toEqual(['link', 'link', 'acoes', 'link', 'chat']);
+    expect(itens.map((i) => i.label)).toEqual(['Início', 'Gastos', 'Metas', 'Bancos', 'Config']);
+    expect(hrefs(itens)).toEqual(['/financas', '/financas/gastos', '/financas/metas', '/financas/carteiras', '/configuracoes']);
+    expect(itens.map((i) => i.icone)).toEqual(['house', 'receipt-text', 'target', 'landmark', 'settings']);
   });
 
-  it('todos os links apontam para rotas visíveis; "+" abre a folha de ações (sem rota)', () => {
+  it('todas apontam para rotas visíveis; sem "+" nem Chat na barra', () => {
     const itens = itensBottomFinancas();
     for (const href of hrefs(itens)) expect(isRotaVisivel(href, 'financas')).toBe(true);
-    expect(itens.find((i) => i.tipo === 'acoes')).not.toHaveProperty('href');
+    expect(itens.map((i) => i.label)).not.toContain('Lançar');
+    expect(itens.map((i) => i.label)).not.toContain('Chat');
     expect(HREF_NOVA_CONTA).toBe('/financas/contas?nova=1');
-    // Chat não tem rota (/chat não existe): abre o AgentPanel.
-    expect(itens.find((i) => i.tipo === 'chat')).not.toHaveProperty('href');
   });
 
   it('modo padrão continua com Início/Agenda/Hábitos/Finanças/Mais', () => {
@@ -68,5 +68,13 @@ describe('isNavAtivo', () => {
     expect(isNavAtivo('/financas/contas/abc', { href: '/financas/contas' })).toBe(true);
     expect(isNavAtivo('/financas/contas', { href: HREF_NOVA_CONTA })).toBe(true);
     expect(isNavAtivo('/financas/contasx', { href: '/financas/contas' })).toBe(false);
+  });
+
+  it('pathname com query string (filtros de Gastos) continua ativo', () => {
+    const gastos = { href: '/financas/gastos' };
+    expect(isNavAtivo('/financas/gastos?mes=2026-10', gastos)).toBe(true);
+    expect(isNavAtivo('/financas/gastos?aba=analise&categoria=Mercado', gastos)).toBe(true);
+    expect(isNavAtivo('/financas?mes=2026-10', { href: '/financas', exato: true })).toBe(true);
+    expect(isNavAtivo('/financas/gastos?mes=2026-10', { href: '/financas', exato: true })).toBe(false);
   });
 });

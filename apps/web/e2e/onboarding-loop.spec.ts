@@ -118,7 +118,7 @@ test('onboarding sem loop: cadastro → onboarding → home', async ({ page }) =
 
   await page.waitForURL(/\/financas$/);
   await semVoltarParaOnboarding(page);
-  await expect(page.getByRole('heading', { name: 'Finanças', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Início', level: 1 })).toBeVisible();
   await shot('financas-apos-onboarding');
 
   const perfil = await (await fetch(`${MOCK_URL}/__mock/state`)).json();

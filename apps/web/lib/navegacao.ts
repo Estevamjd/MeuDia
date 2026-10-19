@@ -90,26 +90,28 @@ export const MENU_MAIS_PADRAO: readonly NavItem[] = [
 /** Abre o modal "Nova conta" que já existe em /financas/contas. */
 export const HREF_NOVA_CONTA = '/financas/contas?nova=1';
 
-export type ItemBottomFinancas =
-  | ({ tipo: 'link' } & NavItem)
-  // "+" abre a folha Gastei · Entrou dinheiro · Transferir (sem rota própria).
-  | { tipo: 'acoes'; label: string; emoji: string; href?: never }
-  | { tipo: 'chat'; label: string; emoji: string; href?: never };
+/** Nome do ícone lucide (kebab-case) de cada aba; o componente mapeia para o ícone. */
+export type IconeAba = 'house' | 'receipt-text' | 'target' | 'landmark' | 'settings';
 
+export type ItemBottomFinancas = NavItem & { icone: IconeAba };
+
+// 5 abas fixas (BRIEF-ICONES-ABAS §0.1): o "+" virou o botão Gastei, Contas fica no card da Início e no drawer,
+// Orçamento no drawer e Chat no ícone do header.
 const BOTTOM_FINANCAS: ItemBottomFinancas[] = [
-  { tipo: 'link', href: '/financas', label: 'Início', emoji: '🏠', exato: true },
-  { tipo: 'link', href: '/financas/contas', label: 'Contas', emoji: '🧾' },
-  { tipo: 'acoes', label: 'Lançar', emoji: '+' },
-  { tipo: 'link', href: '/financas/orcamento', label: 'Orçamento', emoji: '📊' },
-  // Chat abre o AgentPanel do layout (sem rota própria).
-  { tipo: 'chat', label: 'Chat', emoji: '💬' },
+  { href: '/financas', label: 'Início', emoji: '🏠', icone: 'house', exato: true },
+  { href: '/financas/gastos', label: 'Gastos', emoji: '🧾', icone: 'receipt-text' },
+  { href: '/financas/metas', label: 'Metas', emoji: '🎯', icone: 'target' },
+  { href: '/financas/carteiras', label: 'Bancos', emoji: '🏦', icone: 'landmark' },
+  { href: '/configuracoes', label: 'Config', emoji: '⚙️', icone: 'settings' },
 ];
 
 export function itensBottomFinancas(mode: AppMode = 'financas'): ItemBottomFinancas[] {
   return filtrarPorModo(BOTTOM_FINANCAS, mode);
 }
 
+/** Ativo pela rota; query string (`?mes=…`, `?aba=…`) é ignorada dos dois lados. */
 export function isNavAtivo(pathname: string, item: Pick<NavItem, 'href' | 'exato'>): boolean {
+  const rota = pathname.split('?')[0] ?? pathname;
   const href = item.href.split('?')[0] ?? item.href;
-  return pathname === href || (!item.exato && pathname.startsWith(href + '/'));
+  return rota === href || (!item.exato && rota.startsWith(href + '/'));
 }

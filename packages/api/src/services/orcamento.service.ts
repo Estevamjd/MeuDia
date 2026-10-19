@@ -1,5 +1,5 @@
-import { hojeSP, calcularSelo, AppError, gastoDoMes, rendaDoMes } from '@meudia/shared';
-import { rendasRepository, orcamentoRepository, transacaoRepository, recebimentosRendaRepository } from '../repositories';
+import { hojeSP, calcularSelo, AppError, entradasDoMes, gastoDoMes, pagasEmDia, rendaDoMes } from '@meudia/shared';
+import { rendasRepository, orcamentoRepository, transacaoRepository, recebimentosRendaRepository, carteirasRepository } from '../repositories';
 import { rendaInsertSchema, orcamentoInsertSchema } from '../validators';
 import { listarContasDoMes } from './contas-pagar.service';
 import { transacoesDoMes } from './financas.service';
@@ -28,12 +28,16 @@ export async function resumoFinanceiroMes(userId: string, ano: number, mes: numb
   const competencia = comp(ano, mes);
   const [anoAnt, mesAnt] = mes === 1 ? [ano - 1, 12] : [ano, mes - 1];
   const competenciaAnterior = comp(anoAnt, mesAnt);
-  const [rendas, orcamento, contas, transacoes, anteriores, recebimentos] = await Promise.all([
+  const [rendas, orcamento, contas, transacoes, anteriores, recebimentos, carteiras] = await Promise.all([
     rendasRepository.findAll(userId, { ativo: true }), orcamentoRepository.findAll(userId),
     listarContasDoMes(userId, competencia, hojeISO), transacoesDoMes(userId, ano, mes),
     transacoesDoMes(userId, anoAnt, mesAnt),
     recebimentosRendaRepository.findByCompetencias(userId, [competencia, competenciaAnterior]),
+    carteirasRepository.findAll(userId),
   ]);
+  // DIAG §5.1: o vínculo do salário vem pela receita do mês, não pela competência do "Recebi" (atrasado ou antecipado).
+  const receitasDoMes = transacoes.filter(t => t.tipo === 'receita' && !t.ajuste).map(t => t.id);
+  const vinculosSalario = receitasDoMes.length ? await recebimentosRendaRepository.findByTransacoes(userId, receitasDoMes) : [];
   const rendaPrevista = dinheiro(rendas.filter(r => r.ativo).reduce((s, r) => s + Number(r.valor), 0));
   // R11: renda do mês = receitas lançadas (sem ajuste) + rendas fixas sem "Recebi" na competência.
   // Receita avulsa soma por cima da renda prevista, nunca a substitui. Ajustes ficam fora de renda e gasto.
@@ -53,18 +57,22 @@ export async function resumoFinanceiroMes(userId: string, ano: number, mes: numb
     categorias.set(categoria, (categorias.get(categoria) ?? 0) + Number(historica?.valor ?? c.conta.valor));
   }
   const contasMes = dinheiro([...categorias.values()].reduce((s, v) => s + v, 0));
+  const contasPagas = dinheiro(contas.filter(c => c.pagamento).reduce((s, c) => s + Number((c.pagamento?.transacao_id ? porId.get(c.pagamento.transacao_id) : undefined)?.valor ?? c.conta.valor), 0));
   for (const o of orcamento) categorias.set(o.categoria, Math.max(categorias.get(o.categoria) ?? 0, Number(o.valor_planejado)));
   const gastoPrevisto = dinheiro([...categorias.values()].reduce((s, v) => s + v, 0));
   const sobraPrevista = dinheiro(rendaPrevista - gastoPrevisto);
-  const sobraReal = dinheiro(atual.rendaDoMes - atual.gasto);
-  const sobraAnterior = dinheiro(anterior.rendaDoMes - anterior.gasto);
+  // "Contas fixas: X% do salário": base = rendas fixas (DIAG §5.3).
   const pctComprometida = rendaPrevista === 0 ? null : contasMes / rendaPrevista;
-  const vencidas = contas.filter(c => c.vencimento <= hojeISO);
-  const pagas = vencidas.filter(c => c.pagamento && c.pagamento.pago_em <= c.vencimento).length;
+  // DIAG §5.4: comparar só quando o mês anterior tem algum lançamento de verdade (ajuste não conta).
+  const anteriorTemDados = anteriores.some(t => !t.ajuste);
   return {
-    rendaPrevista, rendaReal: atual.renda, rendaDoMes: atual.rendaDoMes, gastoReal: atual.gasto, contasMes, gastoPrevisto, sobraPrevista, sobraReal, pctComprometida,
-    pagasNoPrazo: vencidas.length === 0 ? null : pagas / vencidas.length,
-    vsMesAnterior: { gastoReal: delta(atual.gasto, anterior.gasto), sobraReal: delta(sobraReal, sobraAnterior) },
+    rendaPrevista, rendaReal: atual.renda, rendaDoMes: atual.rendaDoMes, gastoReal: atual.gasto,
+    // DIAG §5.1: salário (receita ligada a um "Recebi") separado dos extras.
+    entradas: entradasDoMes(transacoes, rendas, vinculosSalario),
+    contasMes, contasPagas, contasFaltam: dinheiro(contasMes - contasPagas), gastoPrevisto, sobraPrevista, pctComprometida,
+    // DIAG §5.5: só contas que venceram depois do cadastro delas e da âncora mais antiga das carteiras.
+    pagasNoPrazo: pagasEmDia(contas, hojeISO, carteiras.map(c => c.saldo_inicial_em)),
+    vsMesAnterior: anteriorTemDados ? { gastoReal: delta(atual.gasto, anterior.gasto) } : null,
     selo: calcularSelo({ rendaPrevista, contasMes, sobraPrevista, pctComprometida, temContaVencida: contas.some(c => c.situacao === 'vencida') }),
   };
 }

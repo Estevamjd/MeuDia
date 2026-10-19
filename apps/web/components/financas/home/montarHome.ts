@@ -1,26 +1,12 @@
-import type { Competencia, OcorrenciaConta, OrcamentoCategoria, Selo, Transacao } from '@meudia/shared';
-import { linhasOrcamento, ordenarOcorrencias, referenciaMesAnterior, textoDelta } from '../../../lib/financas-ui';
-import type { AlertaContasProps } from './AlertaContas';
-import type { EntradasSaidasProps } from './EntradasSaidas';
-import type { HeroSobraProps } from './HeroSobra';
-import type { IndicadoresMesProps } from './IndicadoresMes';
-import type { OrcamentoResumoProps } from './OrcamentoResumo';
+import type { Competencia, OcorrenciaConta, Transacao } from '@meudia/shared';
+import { ultimasDespesas } from '@meudia/shared';
+import { ordenarOcorrencias } from '../../../lib/financas-ui';
 import type { ContaProxima } from './ProximasContas';
 
-/** Campos de `resumoFinanceiroMes` usados pela home. */
+/** Campos de `resumoFinanceiroMes` usados pela Início. */
 export interface ResumoHome {
   rendaPrevista: number;
   rendaReal: number;
-  /** R11: receitas lançadas + rendas fixas sem "Recebi" (ausente em resumos antigos). */
-  rendaDoMes?: number;
-  gastoReal: number;
-  gastoPrevisto: number;
-  sobraPrevista: number;
-  sobraReal: number;
-  pctComprometida: number | null;
-  pagasNoPrazo: number | null;
-  vsMesAnterior: { gastoReal: { absoluto: number; percentual: number | null } };
-  selo: Selo | null;
 }
 
 export interface DadosHome {
@@ -28,23 +14,21 @@ export interface DadosHome {
   hojeISO: string;
   resumo: ResumoHome;
   ocorrencias: readonly OcorrenciaConta[];
-  orcamento: readonly OrcamentoCategoria[];
   transacoes: readonly Transacao[];
 }
 
+/** Início resumida (decisão 7): só o que cabe numa tela; o resto foi para Gastos › Análise. */
 export interface SecoesHome {
   /** Sem renda prevista nem recebida: só o card de boas-vindas (sem "R$ 0,00"). */
   vazio: boolean;
-  hero: HeroSobraProps;
-  entradasSaidas: EntradasSaidasProps;
-  alerta: Omit<AlertaContasProps, 'hojeISO'> | null;
-  proximasContas: { contas: ContaProxima[]; totalMes: number } | null;
-  orcamento: OrcamentoResumoProps | null;
-  indicadores: IndicadoresMesProps;
-  transacoes: Transacao[];
+  /** `null` = nenhuma conta no mês. */
+  contasAVencer: { contas: ContaProxima[]; totalMes: number } | null;
+  /** 3 despesas mais recentes do mês (sem ajustes). */
+  ultimosGastos: Transacao[];
 }
 
-const MAX_ITENS = 3;
+const MAX_CONTAS = 2;
+const MAX_GASTOS = 3;
 
 const paraContaProxima = (oc: OcorrenciaConta): ContaProxima => ({
   contaId: oc.conta.id,
@@ -56,45 +40,15 @@ const paraContaProxima = (oc: OcorrenciaConta): ContaProxima => ({
   categoria: oc.conta.categoria,
 });
 
-/** Dados dos hooks → props das seções da home (puro, sem React). */
-export function montarHome({ competencia, hojeISO, resumo, ocorrencias, orcamento, transacoes }: DadosHome): SecoesHome {
+/** Dados dos hooks → props das seções da Início (puro, sem React). */
+export function montarHome({ competencia, resumo, ocorrencias, transacoes }: DadosHome): SecoesHome {
+  // Vencidas primeiro (destacadas dentro do card, sem banner separado), depois por vencimento.
   const pendentes = ordenarOcorrencias(ocorrencias).filter((oc) => oc.situacao !== 'paga');
-  const urgentes = pendentes.filter((oc) => oc.situacao === 'vencida' || oc.vencimento === hojeISO);
-  const textoGasto = textoDelta(resumo.vsMesAnterior.gastoReal, referenciaMesAnterior(competencia));
-  const categorias = linhasOrcamento(orcamento, transacoes)
-    .flatMap((l) => (l.limite === null ? [] : [{ categoria: l.categoria, gasto: l.gasto, limite: l.limite }]))
-    .slice(0, MAX_ITENS);
-
   return {
     vazio: resumo.rendaPrevista === 0 && resumo.rendaReal === 0,
-    hero: {
-      sobraReal: resumo.sobraReal,
-      sobraPrevista: resumo.sobraPrevista,
-      selo: resumo.selo,
-      gastoReal: resumo.gastoReal,
-      // Mesma base da sobra (R11): a entrada extra soma, não substitui a renda fixa.
-      rendaBase: resumo.rendaDoMes ?? (resumo.rendaReal || resumo.rendaPrevista),
-    },
-    entradasSaidas: {
-      rendaReal: resumo.rendaReal,
-      rendaPrevista: resumo.rendaPrevista,
-      gastoReal: resumo.gastoReal,
-      gastoPrevisto: resumo.gastoPrevisto,
-      comparativoGasto: textoGasto ? { texto: textoGasto, aumentou: resumo.vsMesAnterior.gastoReal.absoluto > 0 } : null,
-    },
-    alerta: urgentes.length
-      ? {
-          contas: urgentes.map((oc) => ({ id: oc.conta.id, descricao: oc.conta.descricao, vencimento: oc.vencimento })),
-          href: '#proximas-contas',
-        }
+    contasAVencer: ocorrencias.length
+      ? { contas: pendentes.slice(0, MAX_CONTAS).map(paraContaProxima), totalMes: ocorrencias.length }
       : null,
-    proximasContas: ocorrencias.length
-      ? { contas: pendentes.slice(0, MAX_ITENS).map(paraContaProxima), totalMes: ocorrencias.length }
-      : null,
-    orcamento: categorias.length ? { categorias } : null,
-    indicadores: { pctComprometida: resumo.pctComprometida, pagasNoPrazo: resumo.pagasNoPrazo },
-    transacoes: [...transacoes].sort(
-      (a, b) => b.data.localeCompare(a.data) || (b.created_at ?? '').localeCompare(a.created_at ?? ''),
-    ),
+    ultimosGastos: ultimasDespesas(transacoes, { mes: competencia }).dias.flatMap((d) => d.itens).slice(0, MAX_GASTOS),
   };
 }

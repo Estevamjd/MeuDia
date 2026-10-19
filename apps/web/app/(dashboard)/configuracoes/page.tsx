@@ -5,9 +5,12 @@ import { useRouter } from 'next/navigation';
 import { Trash2, AlertTriangle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '../../../hooks/useAuth';
+import { useAppMode } from '../../../components/AppModeProvider';
+import { LembretesPush } from '../../../components/financas/LembretesPush';
 
 export default function ConfiguracoesPage() {
   const { user } = useAuth();
+  const financas = useAppMode() === 'financas';
   const router = useRouter();
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmText, setConfirmText] = useState('');
@@ -41,6 +44,14 @@ export default function ConfiguracoesPage() {
         <h2 className="mb-3 text-sm font-semibold text-text">Conta</h2>
         <p className="text-sm text-muted">{user?.email ?? 'Carregando...'}</p>
       </section>
+
+      {/* Notificações (o aviso "Ative os lembretes" saiu da Início e veio para cá) */}
+      {financas && (
+        <section aria-labelledby="config-notificacoes" className="space-y-3">
+          <h2 id="config-notificacoes" className="text-sm font-semibold text-text">Notificações</h2>
+          <LembretesPush />
+        </section>
+      )}
 
       {/* Links legais */}
       <section className="rounded-card border border-border bg-card p-5">

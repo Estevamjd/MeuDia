@@ -2,7 +2,8 @@
 // Nunca toca um Supabase real. Uso: node e2e/mock-supabase/server.mjs [porta]
 // Endpoints de apoio: GET /__mock/state (dump), POST /__mock/reset, GET /__mock/health,
 // POST /__mock/clock {"now": ISO | null} (relógio injetável só do mock: datas default, JWT e now()),
-// GET /__mock/stats e POST /__mock/stats/reset (contagem de chamadas, para a medição de e2e/perf).
+// GET /__mock/stats e POST /__mock/stats/reset (contagem de chamadas, para a medição de e2e/perf),
+// POST /__mock/seed {"email", "tables": {tabela: linhas[]}} (dados por teste do usuário já cadastrado; mesmos CHECKs/FKs).
 // MOCK_LATENCY_MS (env): atraso artificial em cada chamada de Auth/PostgREST, simulando a rede até o Supabase.
 import http from 'node:http';
 import { corrigirSaldo } from './corrigir-saldo.mjs';
@@ -800,6 +801,22 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
     if (url.pathname === '/__mock/stats') return send(res, 200, stats);
+    if (url.pathname === '/__mock/seed' && req.method === 'POST') {
+      const u = users.get(String(body?.email || '').toLowerCase());
+      if (!u) return send(res, 404, { message: 'mock seed: usuário não encontrado' });
+      const inseridas = {};
+      for (const [table, rows] of Object.entries(body.tables ?? {})) {
+        inseridas[table] = rows.map((raw) => {
+          const row = { id: crypto.randomUUID(), ...(DEFAULTS[table]?.() ?? { created_at: nowIso() }), ...raw, user_id: u.id };
+          checkRow(table, row);
+          checkFks(table, row);
+          checkUnique(table, row);
+          rowsOf(table).push(row);
+          return row;
+        });
+      }
+      return send(res, 200, inseridas);
+    }
     if (!url.pathname.startsWith('/__mock/')) {
       stats[req.headers.origin ? 'navegador' : 'servidor'] += 1;
       const rota = `${req.method} ${url.pathname}`;

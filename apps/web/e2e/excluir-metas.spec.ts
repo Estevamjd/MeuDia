@@ -52,7 +52,9 @@ async function cadastrarCenario(page: Page, nome: string, diaSalario: number) {
   await modalRenda.getByRole('button', { name: 'Salvar' }).click();
   await expect(modalRenda).toBeHidden();
 
-  await bottomNav.getByRole('link', { name: 'Contas' }).click();
+  // Contas saiu da barra: fica no menu lateral e no card "Contas a vencer".
+  await page.getByRole('button', { name: 'Abrir menu' }).click();
+  await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Contas' }).click();
   await page.waitForURL(/\/financas\/contas$/);
   await tocar(page.getByRole('button', { name: 'Nova conta' }).first());
   const modal = page.getByRole('dialog', { name: 'Nova conta' });
@@ -83,9 +85,18 @@ test('excluir lançamentos, transferências e banco; criar, guardar e excluir me
     await dialog.getByRole('button', { name: 'Excluir', exact: true }).click();
     await expect(dialog).toBeHidden();
   };
+  const nav = page.getByRole('navigation', { name: 'Navegação principal' });
+  const aba = async (nome: 'Início' | 'Gastos') => {
+    await nav.getByRole('link', { name: nome }).click();
+    await page.waitForURL(nome === 'Início' ? /\/financas$/ : /\/financas\/gastos/);
+  };
+  // O "+" virou o botão "Gastei" (Início); "Voltar" leva ao menu com Entrou dinheiro/Transferir.
   const acao = async (nome: RegExp) => {
-    await page.getByRole('navigation', { name: 'Navegação principal' }).getByRole('button', { name: 'Lançar' }).click();
-    await page.getByRole('dialog', { name: 'O que aconteceu?' }).getByRole('button', { name: nome }).click();
+    await tocar(page.getByRole('region', { name: 'Últimos gastos' }).getByRole('button', { name: 'Gastei' }));
+    if (!nome.test('Gastei')) {
+      await page.getByRole('dialog', { name: 'Gastei' }).getByRole('button', { name: 'Voltar' }).click();
+      await page.getByRole('dialog', { name: 'O que aconteceu?' }).getByRole('button', { name: nome }).click();
+    }
     return page.getByRole('dialog');
   };
   const gastar = async (descricao: string) => {
@@ -111,17 +122,21 @@ test('excluir lançamentos, transferências e banco; criar, guardar e excluir me
   await shot('01-inicio-cofrinho.png');
   await gastar('Lanche');
   await expect(hoje).toHaveText(brl('260,00'));
+  // Editar/excluir lançamento fica em Gastos › Últimas despesas.
+  await aba('Gastos');
   await tocar(page.getByRole('button', { name: 'Excluir lançamento Lanche', exact: true }));
-  await expect(hoje).toHaveText(brl('260,00'));
   await confirmar('Excluir lançamento', '02-confirmar-excluir-gasto.png');
-  await expect(hoje).toHaveText(brl('285,00'));
   await expect(page.getByRole('button', { name: 'Excluir lançamento Lanche', exact: true })).toHaveCount(0);
+  await aba('Início');
+  await expect(hoje).toHaveText(brl('285,00'));
 
   await tocar(page.getByRole('button', { name: 'Paguei Internet' }));
   await expect(hoje).toHaveText(brl('175,00'));
+  await aba('Gastos');
   await tocar(page.getByRole('button', { name: 'Excluir lançamento Internet', exact: true }));
   await expect(page.getByRole('dialog', { name: 'Excluir lançamento' })).toContainText('a conta volta a ficar a pagar');
   await confirmar('Excluir lançamento');
+  await aba('Início');
   await expect(page.getByRole('button', { name: 'Paguei Internet' })).toBeVisible();
   await expect(hoje).toHaveText(brl('285,00'));
 
@@ -141,7 +156,7 @@ test('excluir lançamentos, transferências e banco; criar, guardar e excluir me
   await confirmar('Excluir banco', '03-confirmar-excluir-banco.png');
   await expect(caixa).toContainText(/R\$\s150,00/);
   await expect(page.getByRole('button', { name: 'Excluir Nubank', exact: true })).toHaveCount(0);
-  await page.goto('/financas');
+  await page.goto('/financas/gastos');
   await expect(page.getByRole('listitem').filter({ hasText: 'Compra preservada' })).toContainText('Sem banco');
   // Remove o gasto preservado para restaurar a sobra do exemplo: 2.200 − 110 = 2.090.
   await tocar(page.getByRole('button', { name: 'Excluir lançamento Compra preservada', exact: true }));
