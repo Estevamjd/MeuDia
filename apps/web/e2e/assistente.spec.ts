@@ -59,8 +59,8 @@ test('assistente no iPhone: X visível e tocável; fecha por X, backdrop e arras
   // Banner "Instalar MeuDia" visível de propósito: o painel tem de ficar acima dele.
   await expect(page.getByText('Instalar MeuDia')).toBeVisible();
 
-  const bottomNav = page.getByRole('navigation', { name: 'Navegação principal' });
-  const gatilho = bottomNav.getByRole('button', { name: 'Chat' });
+  // Chat saiu da barra de abas: é o ícone do header.
+  const gatilho = page.getByRole('button', { name: 'Abrir assistente' });
   const painel = page.getByRole('dialog', { name: 'Agente MeuDia' });
   const x = painel.getByRole('button', { name: 'Fechar assistente' });
 
@@ -79,7 +79,7 @@ test('assistente no iPhone: X visível e tocável; fecha por X, backdrop e arras
   expect(await page.evaluate(() => getComputedStyle(document.body).overflow), 'scroll do body travado').toBe('hidden');
   await page.screenshot({ path: path.join(pastaEvidencias('contas-saldo'), '09-assistente-aberto.png'), fullPage: false });
 
-  // ── 2. Toca no X → fecha e o foco volta para o "Chat" da BottomNav ─────────
+  // ── 2. Toca no X → fecha e o foco volta para o ícone do header ─────────
   await x.tap();
   await expect(painel).toBeHidden();
   await expect(gatilho).toBeFocused();

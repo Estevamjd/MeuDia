@@ -2,28 +2,28 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { Transacao } from '@meudia/shared';
-import Page from '../page';
+import { useLancamentoModais } from '../LancamentoModais';
 const m = vi.hoisted(() => ({
   criar: vi.fn(), atualizar: vi.fn(), carteiras: [] as unknown[],
   consulta: { isPending: false, isError: false, isSuccess: true },
   editar: null as Transacao | null,
 }));
-vi.mock('../../../../hooks', () => ({
+vi.mock('../../../hooks', () => ({
   useCarteiras: () => ({ data: m.consulta.isSuccess ? m.carteiras : undefined, ...m.consulta }),
   useCriarTransacao: () => ({ mutate: m.criar }), useAtualizarTransacao: () => ({ mutate: m.atualizar }),
 }));
-vi.mock('../../../../components/ui', async (original) => ({ ...await original<object>(), useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
-vi.mock('../../../../components/AppModeProvider', () => ({ useAppMode: () => 'financas' }));
-vi.mock('../../../../components/financas/home/useFinancasHome', () => ({ useFinancasHome: (_c: unknown, _d: unknown, a: object) => a }));
-vi.mock('../../../../components/financas/home/FinancasHomeView', () => ({
-  FinancasHomeView: ({ onNovo, onEditar }: { onNovo: () => void; onEditar: (t: Transacao) => void }) => (
+vi.mock('../../ui', async (original) => ({ ...await original<object>(), useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
+/** A Início e Gastos usam o mesmo hook: botões de abrir + os modais. */
+function Page() {
+  const { abrirNovo, abrirEdicao, modais } = useLancamentoModais();
+  return (
     <>
-      <button onClick={onNovo}>Novo lançamento</button>
-      <button onClick={() => onEditar(m.editar!)}>Editar lançamento</button>
+      <button onClick={abrirNovo}>Novo lançamento</button>
+      <button onClick={() => abrirEdicao(m.editar!)}>Editar lançamento</button>
+      {modais}
     </>
-  ),
-}));
-vi.mock('../../../../components/financas/LancamentoRapidoSheet', () => ({ LancamentoRapidoSheet: () => null }));
+  );
+}
 afterEach(cleanup);
 beforeEach(() => {
   vi.clearAllMocks();

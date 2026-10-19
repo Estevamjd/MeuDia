@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { clsx } from 'clsx';
-import { Menu } from 'lucide-react';
+import { Menu, MessageCircle } from 'lucide-react';
 import { useAppMode } from '../AppModeProvider';
 import { tabsTopbar } from '../../lib/topbar';
 import { NavDrawer } from './NavDrawer';
@@ -18,6 +18,9 @@ const PAGE_TITLES: Record<string, string> = {
   '/financas': '💰 Finanças',
   '/financas/contas': '🧾 Contas',
   '/financas/orcamento': '📊 Orçamento',
+  '/financas/gastos': '🧾 Gastos',
+  '/financas/metas': '🎯 Metas',
+  '/financas/carteiras': '🏦 Bancos',
   '/compras': '🛒 Compras',
   '/veiculo': '🚗 Veículo',
   '/assinaturas': '💳 Assinaturas',
@@ -29,9 +32,12 @@ const DRAWER_ID = 'menu-lateral';
 interface TopbarProps {
   /** Usado pelo "Sair" do menu lateral (modo Finanças). */
   onSignOut?: () => void;
+  /** Modo Finanças: ícone do assistente no header (abre o AgentPanel do layout). */
+  onOpenChat?: () => void;
+  chatAberto?: boolean;
 }
 
-export function Topbar({ onSignOut }: TopbarProps) {
+export function Topbar({ onSignOut, onOpenChat, chatAberto = false }: TopbarProps) {
   const pathname = usePathname();
   const mode = useAppMode();
   const tabs = tabsTopbar(mode);
@@ -49,8 +55,9 @@ export function Topbar({ onSignOut }: TopbarProps) {
         style={{
           background: 'rgba(16,16,26,0.95)',
           backdropFilter: 'blur(12px)',
-          paddingLeft: 'max(2rem, env(safe-area-inset-left))',
-          paddingRight: 'max(2rem, env(safe-area-inset-right))',
+          // Finanças no celular: mesma margem de 1rem do conteúdo (a Início precisa caber sem rolar).
+          paddingLeft: comDrawer ? 'max(1rem, env(safe-area-inset-left))' : 'max(2rem, env(safe-area-inset-left))',
+          paddingRight: comDrawer ? 'max(1rem, env(safe-area-inset-right))' : 'max(2rem, env(safe-area-inset-right))',
           paddingTop: 'env(safe-area-inset-top)',
         }}
       >
@@ -73,7 +80,19 @@ export function Topbar({ onSignOut }: TopbarProps) {
               <Menu size={22} aria-hidden="true" />
             </button>
           )}
-          <span className="truncate font-syne text-base font-bold text-text">{pageTitle}</span>
+          <span className="min-w-0 flex-1 truncate font-syne text-base font-bold text-text">{pageTitle}</span>
+          {comDrawer && onOpenChat && (
+            <button
+              type="button"
+              onClick={onOpenChat}
+              aria-label="Abrir assistente"
+              aria-haspopup="dialog"
+              aria-expanded={chatAberto}
+              className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-accent transition-colors hover:bg-card2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent md:hidden"
+            >
+              <MessageCircle size={22} aria-hidden="true" />
+            </button>
+          )}
         </div>
 
         {/* Desktop: show tabs */}

@@ -84,14 +84,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         <div className={clsx('relative z-10 flex flex-1 flex-col', financas && 'min-w-0')}>
-          <Topbar onSignOut={signOut} />
+          <Topbar onSignOut={signOut} onOpenChat={financas ? () => setAgentOpen(true) : undefined} chatAberto={agentOpen} />
           <main
             className={clsx(
               'flex-1 overflow-y-auto p-8 md:pb-8',
-              // Modo Finanças: espaço da BottomNav + safe-area; sem overflow horizontal em 375px.
-              financas ? 'min-w-0 overflow-x-hidden pb-[calc(6rem+env(safe-area-inset-bottom))]' : 'pb-24',
+              // Modo Finanças: espaço da BottomNav (~53px, folga de 7px) + safe-area, ou o do banner de instalação enquanto ele
+              // aparece (`--reserva-banner`, InstallPrompt.tsx), para ele nunca cobrir botão; topo mais curto no celular para a Início caber
+              // em 390×844 sem rolar; sem overflow horizontal em 375px.
+              financas
+                ? 'min-w-0 overflow-x-hidden pb-[max(calc(3.75rem+env(safe-area-inset-bottom)),var(--reserva-banner,0px))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-2 md:p-8'
+                : 'pb-[max(6rem,var(--reserva-banner,0px))]',
             )}
-            style={{
+            style={financas ? undefined : {
               paddingLeft: 'max(2rem, env(safe-area-inset-left))',
               paddingRight: 'max(2rem, env(safe-area-inset-right))',
             }}
@@ -101,9 +105,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </div>
 
-      {financas && <BottomNav onOpenChat={() => setAgentOpen(true)} chatAberto={agentOpen} />}
+      {financas && <BottomNav />}
 
-      {/* Agente IA (no modo Finanças o "Chat" da BottomNav substitui o FAB no mobile).
+      {/* Agente IA (no modo Finanças o ícone do header substitui o FAB no mobile).
           O painel vai em portal no body com z-agente: fica acima de BottomNav/banner/modais em qualquer ordem. */}
       <AgentFAB onClick={() => setAgentOpen(true)} className={financas ? 'hidden md:flex' : undefined} />
       <AgentPanel isOpen={agentOpen} onClose={() => setAgentOpen(false)} />

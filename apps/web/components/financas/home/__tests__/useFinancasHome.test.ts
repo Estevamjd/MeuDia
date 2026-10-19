@@ -12,14 +12,11 @@ const consulta = (data: unknown, over: { isLoading?: boolean; isError?: boolean 
   ...over,
 });
 
-const resumoOk = {
-  rendaPrevista: 5000, rendaReal: 5000, gastoReal: 2100, gastoPrevisto: 3200, sobraPrevista: 1800, sobraReal: 2900,
-  pctComprometida: 0.64, pagasNoPrazo: 1, vsMesAnterior: { gastoReal: { absoluto: 0, percentual: null } }, selo: 'No controle',
-};
+const resumoOk = { rendaPrevista: 5000, rendaReal: 5000 };
 
 const contaCadastrada = { id: 'c1', ativo: true };
 
-type NomeConsulta = 'resumo' | 'contas' | 'orcamento' | 'transacoes' | 'rendas' | 'definicoes';
+type NomeConsulta = 'resumo' | 'contas' | 'transacoes' | 'rendas' | 'definicoes';
 let q: Record<NomeConsulta, ReturnType<typeof consulta>>;
 const preparar = (
   erros: Partial<Record<NomeConsulta, boolean>> = {},
@@ -28,7 +25,6 @@ const preparar = (
   q = {
     resumo: consulta(resumoOk, { isError: !!erros.resumo }),
     contas: consulta([], { isError: !!erros.contas }),
-    orcamento: consulta([], { isError: !!erros.orcamento }),
     transacoes: consulta([], { isError: !!erros.transacoes }),
     rendas: consulta(dados.rendas ?? [], { isError: !!erros.rendas }),
     definicoes: consulta(dados.definicoes ?? [], { isError: !!erros.definicoes }),
@@ -38,48 +34,32 @@ const preparar = (
 const m = vi.hoisted(() => ({
   pagar: vi.fn(),
   painel: { data: undefined as unknown, isLoading: false, isError: false, error: null as unknown },
-  push: { estado: 'inativo', ocupado: false, ativar: vi.fn(() => Promise.resolve()) },
   criarRenda: { mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false },
   toast: { error: vi.fn(), success: vi.fn() },
-  vinculos: { recebimentos: [] as unknown[], pagamentos: [] as unknown[] },
-  excluir: { mutate: vi.fn(), isPending: false },
-  desfazerPagamento: { mutate: vi.fn(), isPending: false },
-  desfazerRecebimento: { mutate: vi.fn(), isPending: false },
 }));
 
 vi.mock('../../../../hooks', () => ({
   useResumoFinanceiroMes: () => q.resumo,
   useContas: () => q.definicoes,
   useContasMes: () => q.contas,
-  useOrcamento: () => q.orcamento,
   useTransacoesMes: () => q.transacoes,
   useRendas: () => q.rendas,
-  usePushLembretes: () => m.push,
   useCriarRenda: () => m.criarRenda,
   usePainelSaldo: () => m.painel,
-  useVinculosTransacoes: () => ({ data: m.vinculos, isSuccess: true, refetch: vi.fn() }),
-  useDesfazerRecebimento: () => m.desfazerRecebimento,
-  useDesfazerPagamento: () => m.desfazerPagamento,
-  useExcluirTransacao: () => m.excluir,
   useReceberRenda: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false }),
 }));
 vi.mock('../../../ui', () => ({ useToast: () => m.toast }));
 vi.mock('../../usePagamentoAcoes', () => ({ usePagamentoAcoes: () => ({ pagarConta: m.pagar, desfazerPagamento: vi.fn(), contaOcupada: null }) }));
 
-const DISPENSADO_KEY = 'meudia:aviso-lembretes-dispensado';
-
 beforeEach(() => {
   vi.clearAllMocks();
   m.painel = { data: undefined, isLoading: false, isError: false, error: null };
-  m.push.estado = 'inativo';
   m.criarRenda.isError = false;
-  m.vinculos = { recebimentos: [], pagamentos: [] };
-  localStorage.clear();
 });
 afterEach(cleanup);
 
-const acoes = { onNovo: vi.fn(), onEditar: vi.fn() };
-const montar = () => renderHook(() => useFinancasHome('2026-10', '2026-10-16', acoes)).result;
+const onGastei = vi.fn();
+const montar = () => renderHook(() => useFinancasHome('2026-10', '2026-10-16', onGastei)).result;
 const usar = () => montar().current;
 
 describe('useFinancasHome', () => {
@@ -88,7 +68,7 @@ describe('useFinancasHome', () => {
     expect(usar().estado).toBe('pronto');
   });
 
-  it.each(['contas', 'orcamento', 'transacoes', 'rendas', 'definicoes'] as const)(
+  it.each(['contas', 'transacoes', 'rendas', 'definicoes'] as const)(
     'falha em %s vira erro (não lista vazia) e "Tentar de novo" refaz ela',
     (nome) => {
       preparar({ [nome]: true });
@@ -111,7 +91,6 @@ describe('useFinancasHome', () => {
     expect(q.contas.refetch).toHaveBeenCalled();
     expect(q.transacoes.refetch).toHaveBeenCalled();
     expect(q.resumo.refetch).not.toHaveBeenCalled();
-    expect(q.orcamento.refetch).not.toHaveBeenCalled();
   });
 
   it('falha no resumo: erro e refaz o resumo', () => {
@@ -172,37 +151,6 @@ describe('useFinancasHome: onboarding', () => {
   });
 });
 
-describe('useFinancasHome: aviso de lembretes', () => {
-  it('sem contas não aparece', () => {
-    preparar();
-    expect(usar().avisoLembretes).toBeNull();
-  });
-
-  it('com contas e lembretes inativos aparece; "Ativar" usa a ação do push', () => {
-    preparar({}, { definicoes: [contaCadastrada] });
-    const aviso = usar().avisoLembretes;
-    expect(aviso).not.toBeNull();
-    aviso?.onAtivar();
-    expect(m.push.ativar).toHaveBeenCalled();
-  });
-
-  it('lembretes ativos: não aparece', () => {
-    preparar({}, { definicoes: [contaCadastrada] });
-    m.push.estado = 'ativo';
-    expect(usar().avisoLembretes).toBeNull();
-  });
-
-  it('dispensar esconde e grava no localStorage; dispensado antes não aparece', () => {
-    preparar({}, { definicoes: [contaCadastrada] });
-    const r = montar();
-    act(() => r.current.avisoLembretes?.onDispensar());
-    expect(r.current.avisoLembretes).toBeNull();
-    expect(localStorage.getItem(DISPENSADO_KEY)).toBe('1');
-    cleanup();
-    expect(usar().avisoLembretes).toBeNull();
-  });
-});
-
 it.each(['carregando', 'erro'])('Paguei bloqueado com painel %s, inclusive chamada direta', (estado) => {
   preparar();
   m.painel.isLoading = estado === 'carregando';
@@ -252,56 +200,3 @@ it.each([['arquivada', 'primeira'], ['segunda', 'segunda'], [null, 'primeira']])
     expect(result.current.dashboard!.recebiSheet.carteiraPadrao).toBe(esperada);
   });
 
-describe('useFinancasHome: excluir lançamento (sempre com confirmação)', () => {
-  const tx = (id: string, over: Record<string, unknown> = {}) => ({
-    id, user_id: 'u', tipo: 'despesa', categoria: 'Comida', descricao: id, valor: 25, data: '2026-10-16', banco: null,
-    automatico: false, created_at: null, carteira_id: 'n', ajuste: false, ...over,
-  }) as never;
-
-  it('Gastei: nada some antes de confirmar; confirmar exclui o lançamento', () => {
-    preparar();
-    const r = montar();
-    act(() => r.current.lancamentos.onExcluir(tx('gasto')));
-    expect(m.excluir.mutate).not.toHaveBeenCalled();
-    expect(r.current.exclusao?.detalhe).toBe('O lançamento sai e o saldo do banco volta ao que era.');
-    act(() => r.current.exclusao?.onConfirmar());
-    expect(m.excluir.mutate).toHaveBeenCalledWith('gasto', expect.anything());
-    expect(m.desfazerPagamento.mutate).not.toHaveBeenCalled();
-    // Cancelar fecha sem apagar.
-    act(() => r.current.lancamentos.onExcluir(tx('outro')));
-    act(() => r.current.exclusao?.onCancelar());
-    expect(r.current.exclusao).toBeNull();
-    expect(m.excluir.mutate).toHaveBeenCalledTimes(1);
-  });
-
-  it('lançamento do Paguei: confirmação avisa e excluir chama desfazer_pagamento (nunca DELETE direto)', () => {
-    preparar();
-    m.vinculos = { recebimentos: [], pagamentos: [{ conta_id: 'luz', competencia: '2026-10', transacao_id: 'pag' }] };
-    const r = montar();
-    act(() => r.current.lancamentos.onExcluir(tx('pag')));
-    expect(r.current.exclusao?.detalhe).toBe('Ele veio do "Paguei": o lançamento sai e a conta volta a ficar a pagar.');
-    act(() => r.current.exclusao?.onConfirmar());
-    expect(m.desfazerPagamento.mutate).toHaveBeenCalledWith({ contaId: 'luz', competencia: '2026-10' }, expect.anything());
-    expect(m.excluir.mutate).not.toHaveBeenCalled();
-  });
-
-  it('lançamento do Recebi: excluir chama desfazer_recebimento; renda volta a ficar a receber', () => {
-    preparar();
-    m.vinculos = { recebimentos: [{ renda_id: 'r', competencia: '2026-10', transacao_id: 'rec' }], pagamentos: [] };
-    const r = montar();
-    act(() => r.current.lancamentos.onExcluir(tx('rec', { tipo: 'receita' })));
-    expect(r.current.exclusao?.detalhe).toBe('Ele veio do "Recebi": o lançamento sai e a renda volta a ficar a receber.');
-    act(() => r.current.exclusao?.onConfirmar());
-    expect(m.desfazerRecebimento.mutate).toHaveBeenCalledWith({ rendaId: 'r', competencia: '2026-10' }, expect.anything());
-    expect(m.excluir.mutate).not.toHaveBeenCalled();
-  });
-
-  it('ajuste de saldo pode ser excluído (o saldo volta ao anterior); lançamento sem banco não fala de saldo', () => {
-    preparar();
-    const r = montar();
-    act(() => r.current.lancamentos.onExcluir(tx('aj', { ajuste: true })));
-    expect(r.current.exclusao?.detalhe).toBe('É um ajuste de saldo: o saldo do banco volta ao que era antes da correção.');
-    act(() => r.current.lancamentos.onExcluir(tx('sem', { carteira_id: null })));
-    expect(r.current.exclusao?.detalhe).toBe('O lançamento sai do mês.');
-  });
-});

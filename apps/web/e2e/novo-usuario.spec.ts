@@ -118,7 +118,7 @@ test('novo usuário: cadastro → onboarding → finanças → logout → login'
 
   await page.waitForURL(/\/financas$/);
   await semVoltarParaOnboarding(page);
-  await expect(page.getByRole('heading', { name: 'Finanças', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Início', level: 1 })).toBeVisible();
   await shot('financas-apos-onboarding');
 
   const perfil = await (await fetch(`${MOCK_URL}/__mock/state`)).json();
@@ -209,7 +209,9 @@ test('novo usuário: cadastro → onboarding → finanças → logout → login'
   await shot('conta-paga');
 
   // ── 6. Orçamento ───────────────────────────────────────────────────────────
-  await bottomNav.getByRole('link', { name: 'Orçamento' }).click();
+  // Orçamento saiu da barra: continua no menu lateral.
+  await page.getByRole('button', { name: 'Abrir menu' }).click();
+  await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Orçamento' }).click();
   await page.waitForURL(/\/financas\/orcamento/);
   await expect(page.getByRole('heading', { name: 'Orçamento', level: 1 })).toBeVisible();
   await shot('orcamento');
@@ -224,9 +226,9 @@ test('novo usuário: cadastro → onboarding → finanças → logout → login'
   await expect(page.getByText('Mercado').first()).toBeVisible();
   await shot('limite-salvo');
 
-  // ── 7. Novo lançamento ─────────────────────────────────────────────────────
-  await bottomNav.getByRole('link', { name: 'Início' }).click();
-  await page.waitForURL(/\/financas$/);
+  // ── 7. Novo lançamento (aba Gastos) ────────────────────────────────────────
+  await bottomNav.getByRole('link', { name: 'Gastos' }).click();
+  await page.waitForURL(/\/financas\/gastos$/);
   await tocar(page.getByRole('button', { name: 'Novo lançamento' }));
   const modalLanc = page.getByRole('dialog', { name: 'Novo lançamento' });
   await expect(modalLanc).toBeVisible();
@@ -243,7 +245,7 @@ test('novo usuário: cadastro → onboarding → finanças → logout → login'
   await shot('lancamento-criado');
 
   // ── 8. Chat ────────────────────────────────────────────────────────────────
-  await bottomNav.getByRole('button', { name: 'Chat' }).click();
+  await page.getByRole('button', { name: 'Abrir assistente' }).click();
   const painel = page.getByRole('dialog', { name: 'Agente MeuDia' });
   await expect(painel).toBeVisible();
   await shot('chat-aberto');
@@ -263,7 +265,7 @@ test('novo usuário: cadastro → onboarding → finanças → logout → login'
 
   // ── 9. Drawer: abrir e visitar cada item ───────────────────────────────────
   const itensDrawer: { label: string; url: RegExp; titulo: RegExp }[] = [
-    { label: 'Resumo do mês', url: /\/financas$/, titulo: /Finanças/ },
+    { label: 'Resumo do mês', url: /\/financas$/, titulo: /Início/ },
     { label: 'Bancos e carteira', url: /\/financas\/carteiras$/, titulo: /Bancos e carteira/ },
     { label: 'Contas', url: /\/financas\/contas$/, titulo: /Contas/ },
     { label: 'Orçamento', url: /\/financas\/orcamento$/, titulo: /Orçamento/ },

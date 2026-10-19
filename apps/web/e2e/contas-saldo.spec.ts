@@ -59,12 +59,19 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
     const { scroll, largura } = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, largura: window.innerWidth }));
     expect(scroll, 'scroll horizontal em 390px').toBeLessThanOrEqual(largura);
   };
+  // O "+" saiu da barra: "Gastei" na Início abre a folha no gasto; "Voltar" leva a Entrou dinheiro/Transferir.
   const abrirAcao = async (acao: RegExp) => {
-    await bottomNav.getByRole('button', { name: 'Lançar' }).click();
+    await tocar(page.getByRole('region', { name: 'Últimos gastos' }).getByRole('button', { name: 'Gastei' }));
+    if (acao.test('Gastei')) return page.getByRole('dialog');
+    await page.getByRole('dialog', { name: 'Gastei' }).getByRole('button', { name: 'Voltar' }).click();
     const menu = page.getByRole('dialog', { name: 'O que aconteceu?' });
     await expect(menu).toBeVisible();
     await menu.getByRole('button', { name: acao }).click();
     return page.getByRole('dialog');
+  };
+  const irPara = async (aba: 'Início' | 'Gastos', url: RegExp) => {
+    await bottomNav.getByRole('link', { name: aba }).click();
+    await page.waitForURL(url);
   };
 
   // ── Cadastro + onboarding "Onde fica seu dinheiro?" ─────────────────────────
@@ -113,8 +120,9 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await expect(chips).toContainText(/Nubank\s*R\$\s650,00/);
   await expect(chips).toContainText(/Caixa\s*R\$\s150,00/);
 
-  // 3. Contas pendentes: luz R$ 120 (20/10) e internet R$ 100 (25/10).
-  await bottomNav.getByRole('link', { name: 'Contas' }).click();
+  // 3. Contas pendentes: luz R$ 120 (20/10) e internet R$ 100 (25/10). Contas fica no menu lateral.
+  await page.getByRole('button', { name: 'Abrir menu' }).click();
+  await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Contas' }).click();
   await page.waitForURL(/\/financas\/contas$/);
   await page.waitForLoadState('networkidle');
   for (const [nome, valor, dia] of [['Luz', '120', '20'], ['Internet', '100', '25']] as const) {
@@ -166,7 +174,7 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await folha.getByRole('button', { name: 'Salvar gasto' }).click();
   await confirmarToast('Gasto salvo');
   await expect(hoje).toHaveText(brl('775,00'));
-  await expect(page.getByRole('list', { name: 'Legenda dos gastos por categoria' })).toContainText(/Comida\s*R\$\s25,00/);
+  await expect(page.getByRole('region', { name: 'Últimos gastos' })).toContainText(/R\$\s25,00/);
   await expect(fimMes).toHaveText(/^−R\$\s145,00$/);
 
   // 6. Só agora a renda: R$ 900 dia 5 (sem Recebi) entra na renda do mês: sobra 1.000 − 245 = 755.
@@ -183,9 +191,6 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   // Viewport (o que a usuária vê no iPhone): topo da home e rolada até os gráficos.
   await page.evaluate(() => window.scrollTo(0, 0));
   await shot('02-home-dashboard-viewport.png', false);
-  await page.getByRole('region', { name: 'Gastos do mês por categoria' }).evaluate((el) => el.scrollIntoView({ block: 'start' }));
-  await page.evaluate(() => window.scrollBy(0, -72)); // folga para o header fixo não cobrir o título do card
-  await shot('02b-home-graficos-viewport.png', false);
 
   // "por quê?" do fim do mês = renda e cada conta.
   await tocar(page.getByRole('button', { name: 'por quê? No fim do mês sobra' }));
@@ -207,9 +212,19 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await confirmarToast('Recebido: Renda principal');
   await expect(hoje).toHaveText(brl('1.675,00'));
   await expect(fimMes).toHaveText(brl('755,00'));
-  await expect(page.getByRole('region', { name: 'Salário a receber' })).toHaveCount(0);
-  // Renda do mês R$ 1.000 (900 + 100 extra), gasto R$ 25: o "Saiu" segue só com o gasto (sem transferência).
-  await expect(page.getByRole('region', { name: 'Entrou e saiu no mês' })).toContainText(/Saiu\s*R\$\s25,00/);
+  await expect(page.getByText('A receber: Renda principal', { exact: false })).toHaveCount(0);
+  // Gastos › Análise: salário recebido 900 de 900 + extra 100; o "Saiu" segue só com o gasto (sem transferência).
+  await irPara('Gastos', /\/financas\/gastos$/);
+  await expect(page.getByRole('listitem').filter({ hasText: 'Comida' })).toContainText(/R\$\s25,00/);
+  await page.getByRole('tab', { name: 'Análise' }).click();
+  await page.waitForURL(/aba=analise/);
+  await expect(page.getByRole('region', { name: 'Gastos do mês por categoria' })).toContainText(/Comida\s*R\$\s25,00/);
+  await expect(page.getByRole('region', { name: 'Entrou' })).toContainText(/Salário\s*recebido R\$\s900,00 de R\$\s900,00/);
+  await expect(page.getByRole('region', { name: 'Entrou' })).toContainText(/Extras\s*R\$\s100,00/);
+  await expect(page.getByRole('region', { name: 'Saiu' })).toContainText(/Saiu\s*R\$\s25,00/);
+  await page.getByRole('region', { name: 'Gastos do mês por categoria' }).evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  await page.evaluate(() => window.scrollBy(0, -72)); // folga para o header fixo não cobrir o título do card
+  await shot('02b-analise-graficos-viewport.png', false);
 
   // Banco: transferência fora de transacoes; Recebi = receita Salário + recebimento.
   const estado = await (await fetch(`${MOCK_URL}/__mock/state`)).json();
@@ -227,6 +242,7 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await expect(confirmar).toContainText('Excluir? Isso não pode ser desfeito. Ele veio do "Recebi": o lançamento sai e a renda volta a ficar a receber.');
   await confirmar.getByRole('button', { name: 'Excluir' }).click();
   await confirmarToast('Lançamento excluído. A renda voltou a ficar a receber.');
+  await irPara('Início', /\/financas$/);
   await expect(hoje).toHaveText(brl('775,00'));
   await tocar(page.getByRole('button', { name: 'Recebi Renda principal' }));
   await modalRecebi.getByRole('radio', { name: 'Nubank' }).click();
@@ -292,7 +308,8 @@ async function cadastrarCenario(page: Page, nome: string, diaSalario: number) {
   await modalRenda.getByRole('button', { name: 'Salvar' }).click();
   await expect(modalRenda).toBeHidden();
 
-  await bottomNav.getByRole('link', { name: 'Contas' }).click();
+  await page.getByRole('button', { name: 'Abrir menu' }).click();
+  await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Contas' }).click();
   await page.waitForURL(/\/financas\/contas$/);
   await tocar(page.getByRole('button', { name: 'Nova conta' }).first());
   const modal = page.getByRole('dialog', { name: 'Nova conta' });

@@ -1,19 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import type { ContaPagar, OcorrenciaConta, OrcamentoCategoria, Transacao } from '@meudia/shared';
-import { AlertaContas } from '../AlertaContas';
-import { AvisoLembretes, mostrarAvisoLembretes } from '../AvisoLembretes';
+import type { ContaPagar, OcorrenciaConta, SobraDoMes, Transacao } from '@meudia/shared';
 import { BoasVindasFinancas } from '../BoasVindasFinancas';
 import { RendaSheet } from '../RendaSheet';
-import { EntradasSaidas } from '../EntradasSaidas';
-import { FinancasHomeView, type FinancasHomeViewProps } from '../FinancasHomeView';
-import { HeroSobra } from '../HeroSobra';
-import { IndicadoresMes } from '../IndicadoresMes';
+import { FinancasHomeView, type DashboardHome, type FinancasHomeViewProps } from '../FinancasHomeView';
 import { montarHome, type ResumoHome } from '../montarHome';
-import { OrcamentoResumo } from '../OrcamentoResumo';
 import { ProximasContas } from '../ProximasContas';
-import { UltimosLancamentos } from '../UltimosLancamentos';
 
 afterEach(cleanup);
 
@@ -35,15 +28,7 @@ const ocorrencia = (c: ContaPagar, vencimento: string, situacao: OcorrenciaConta
 const transacao = (id: string, descricao: string, valor: number, data: string, tipo: Transacao['tipo'] = 'despesa', categoria = 'Alimentação'): Transacao => ({
   id, user_id: 'u1', tipo, categoria, descricao, valor, data, banco: null, automatico: false, created_at: `${data}T12:00:00Z`,
 });
-const limite = (categoria: string, valor_planejado: number): OrcamentoCategoria => ({
-  id: `o-${categoria}`, user_id: 'u1', categoria, valor_planejado, created_at: null, updated_at: null,
-});
-
-const resumo = (over: Partial<ResumoHome> = {}): ResumoHome => ({
-  rendaPrevista: 5000, rendaReal: 5000, gastoReal: 2100, gastoPrevisto: 3200, sobraPrevista: 1800, sobraReal: 2900,
-  pctComprometida: 0.64, pagasNoPrazo: 1, vsMesAnterior: { gastoReal: { absoluto: -120, percentual: -0.05 } },
-  selo: 'No controle', ...over,
-});
+const resumo = (over: Partial<ResumoHome> = {}): ResumoHome => ({ rendaPrevista: 5000, rendaReal: 5000, ...over });
 
 const ocorrencias = [
   ocorrencia(conta('c1', 'Luz', 180), '2026-10-16', 'pendente'),
@@ -52,97 +37,36 @@ const ocorrencias = [
   ocorrencia(conta('c4', 'Academia', 120), '2026-10-25', 'pendente'),
   ocorrencia(conta('c5', 'Streaming', 39.9), '2026-10-28', 'pendente'),
 ];
-const transacoes = Array.from({ length: 7 }, (_, i) =>
-  transacao(`t${i}`, `Mercado ${i + 1}`, 50 + i, `2026-10-${String(i + 1).padStart(2, '0')}`),
-);
+const transacoes = [
+  ...Array.from({ length: 7 }, (_, i) => transacao(`t${i}`, `Mercado ${i + 1}`, 50 + i, `2026-10-${String(i + 1).padStart(2, '0')}`)),
+  transacao('rec', 'Pix', 150, '2026-10-15', 'receita', 'Entrada extra'),
+  { ...transacao('aj', 'Ajuste', 30, '2026-10-15'), ajuste: true },
+];
+const sobra: SobraDoMes = {
+  competencia: '2026-10', renda: { lancada: 0, aReceber: 2000, total: 2000 }, rendasAReceber: [], despesasLancadas: 1200,
+  contasAPagar: [], despesas: 1500, valor: 500,
+};
+const dashboard = (over: Partial<DashboardHome> = {}): DashboardHome => ({
+  saldo: { total: 1280, carteiras: [{ id: 'n', nome: 'Nubank', saldo: 980, noTotal: true }, { id: 'c', nome: 'Caixa', saldo: 300, noTotal: true }], comecouMes: null, nomeMes: 'outubro' },
+  sobraMes: sobra,
+  rendasAReceber: [{ rendaId: 'r1', descricao: 'Salário', valor: 2000, data: '2026-10-20', competencia: '2026-10' }],
+  fatias: [], evolucao: [], escondido: false, onAlternarOlho: vi.fn(), onRecebi: vi.fn(),
+  recebiSheet: { renda: null, carteiras: [], carteiraPadrao: null, salvando: false, onClose: vi.fn(), onConfirmar: vi.fn() },
+  ...over,
+});
 
 const viewProps = (over: Partial<FinancasHomeViewProps> = {}, dados: Partial<Parameters<typeof montarHome>[0]> = {}): FinancasHomeViewProps => ({
   estado: 'pronto',
   hojeISO: HOJE,
   secoes: montarHome({
-    competencia: '2026-10', hojeISO: HOJE, resumo: resumo(), ocorrencias, orcamento: [limite('Alimentação', 500)], transacoes, ...dados,
+    competencia: '2026-10', hojeISO: HOJE, resumo: resumo(), ocorrencias, transacoes, ...dados,
   }),
   boasVindas: null,
-  avisoLembretes: null,
   rendaSheet: { open: false, onClose: vi.fn(), onSalvar: vi.fn() },
   onPagar: vi.fn(),
-  lancamentos: { expandido: false, onAlternarExpandido: vi.fn(), onNovo: vi.fn(), onEditar: vi.fn(), onExcluir: vi.fn() },
+  onGastei: vi.fn(),
+  dashboard: dashboard(),
   ...over,
-});
-
-describe('HeroSobra', () => {
-  it('mostra a sobra real, a prevista na sublinha, o selo e o uso da renda', () => {
-    render(<HeroSobra sobraReal={2900} sobraPrevista={1800} selo="No controle" gastoReal={2100} rendaBase={5000} />);
-    expect(texto()).toContain('Sobra do mês');
-    expect(texto()).toContain('R$ 2.900,00');
-    expect(texto()).toContain('Prevista: R$ 1.800,00');
-    expect(texto()).toContain('No controle');
-    expect(texto()).toContain('Você já usou 42% da renda');
-    expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('42');
-  });
-
-  it('negativo leva "−" e cor vermelha; valor não quebra linha', () => {
-    render(<HeroSobra sobraReal={-250} sobraPrevista={100} selo="Apertado" gastoReal={5250} rendaBase={5000} />);
-    const valor = screen.getByText((_, el) => el?.tagName === 'P' && texto(el as HTMLElement) === '−R$ 250,00');
-    expect(valor.className).toContain('text-red');
-    expect(valor.className).toContain('whitespace-nowrap');
-    expect(valor.className).toContain('tabular-nums');
-    expect(valor.getAttribute('style')).toContain('clamp(1.5rem, 8vw, 2rem)');
-  });
-
-  it('gasto acima da renda: aria-valuenow limitado a 100, % real no aria-valuetext', () => {
-    render(<HeroSobra sobraReal={-2500} sobraPrevista={100} selo="Apertado" gastoReal={7500} rendaBase={5000} />);
-    const barra = screen.getByRole('progressbar');
-    expect(barra.getAttribute('aria-valuenow')).toBe('100');
-    expect(barra.getAttribute('aria-valuemax')).toBe('100');
-    expect(barra.getAttribute('aria-valuetext')).toBe('150% da renda usada');
-    expect(texto()).toContain('Você já usou 150% da renda');
-  });
-});
-
-describe('EntradasSaidas', () => {
-  it('um valor por campo: real em destaque e previsto na sublinha; comparativo só se ≠ 0', () => {
-    render(
-      <EntradasSaidas rendaReal={5000} rendaPrevista={5200} gastoReal={2100} gastoPrevisto={3200}
-        comparativoGasto={{ texto: 'R$ 120,00 a menos que em setembro', aumentou: false }} />,
-    );
-    expect(texto()).toContain('Entrou');
-    expect(texto()).toContain('de R$ 5.200,00 previstos');
-    expect(texto()).toContain('Saiu');
-    expect(texto()).toContain('de R$ 3.200,00 previstos');
-    expect(texto()).toContain('a menos que em setembro');
-    expect(texto()).not.toContain(' / ');
-  });
-
-  it('valores grandes: fonte fluida, sem quebra, cards com min-w-0 (375px)', () => {
-    render(<EntradasSaidas rendaReal={100000} rendaPrevista={100000} gastoReal={100000} gastoPrevisto={100000} comparativoGasto={null} />);
-    const valores = screen.getAllByText((_, el) => el?.tagName === 'P' && texto(el as HTMLElement) === 'R$ 100.000,00');
-    expect(valores).toHaveLength(2);
-    for (const v of valores) {
-      expect(v.className).toContain('whitespace-nowrap');
-      expect(v.className).not.toContain('text-lg');
-      expect(v.getAttribute('style')).toContain('clamp(0.95rem, 4.6vw, 1.125rem)');
-      expect(v.parentElement?.className).toContain('min-w-0');
-    }
-  });
-
-  it('sem comparativo quando o gasto não mudou', () => {
-    render(<EntradasSaidas rendaReal={0} rendaPrevista={0} gastoReal={0} gastoPrevisto={0} comparativoGasto={null} />);
-    expect(texto()).not.toMatch(/mês anterior|a mais|a menos/);
-  });
-});
-
-describe('AlertaContas', () => {
-  it('conta vencendo hoje/vencida com link para marcar como paga', () => {
-    render(<AlertaContas contas={[{ id: 'c1', descricao: 'Luz', vencimento: HOJE }, { id: 'c2', descricao: 'Internet', vencimento: '2026-10-12' }]} hojeISO={HOJE} href="#proximas-contas" />);
-    expect(screen.getByRole('alert').textContent).toContain('2 contas pedem atenção · Luz vence hoje');
-    expect(screen.getByRole('link', { name: 'Ver e marcar como paga' }).getAttribute('href')).toBe('#proximas-contas');
-  });
-
-  it('sem contas urgentes não renderiza nada', () => {
-    const { container } = render(<AlertaContas contas={[]} hojeISO={HOJE} href="#x" />);
-    expect(container.innerHTML).toBe('');
-  });
 });
 
 describe('ProximasContas', () => {
@@ -165,35 +89,6 @@ describe('ProximasContas', () => {
     render(<ProximasContas contas={[]} totalMes={2} hojeISO={HOJE} onPagar={vi.fn()} />);
     expect(texto()).toContain('Todas as contas do mês estão pagas.');
     expect(screen.queryByRole('button', { name: /Paguei/ })).toBeNull();
-  });
-});
-
-describe('OrcamentoResumo', () => {
-  it('mostra gasto, limite e quanto resta; vermelho quando estoura', () => {
-    render(<OrcamentoResumo categorias={[{ categoria: 'Alimentação', gasto: 320, limite: 500 }, { categoria: 'Lazer', gasto: 250, limite: 200 }]} />);
-    expect(texto()).toContain('R$ 320,00 de R$ 500,00');
-    expect(texto()).toContain('restam R$ 180,00');
-    expect(texto()).toContain('passou R$ 50,00 do limite');
-    expect(screen.getByText('passou', { exact: false }).className).toContain('text-red');
-    expect(screen.getByRole('link', { name: 'Ver orçamento' }).getAttribute('href')).toBe('/financas/orcamento');
-  });
-
-  it('sem categorias com limite não renderiza', () => {
-    const { container } = render(<OrcamentoResumo categorias={[]} />);
-    expect(container.innerHTML).toBe('');
-  });
-});
-
-describe('IndicadoresMes', () => {
-  it('chips de renda comprometida e pagas em dia', () => {
-    render(<IndicadoresMes pctComprometida={0.64} pagasNoPrazo={1} />);
-    expect(texto()).toContain('Renda comprometida64%');
-    expect(texto()).toContain('Pagas em dia100%');
-  });
-
-  it('oculta "Pagas em dia" quando nada venceu', () => {
-    render(<IndicadoresMes pctComprometida={0.3} pagasNoPrazo={null} />);
-    expect(texto()).not.toContain('Pagas em dia');
   });
 });
 
@@ -221,54 +116,6 @@ describe('BoasVindasFinancas', () => {
     expect(segmentosAtivos()).toBe(2);
     expect(screen.getByRole('link', { name: 'Adicionar conta' }).getAttribute('href')).toBe('/financas/contas?nova=1');
     expect(screen.queryByRole('button', { name: 'Cadastrar minha renda' })).toBeNull();
-  });
-});
-
-describe('AvisoLembretes', () => {
-  const props = { estado: 'inativo' as const, onAtivar: vi.fn(), onDispensar: vi.fn() };
-
-  it.each([
-    [true, 'inativo', false, true],
-    [true, 'requer-instalacao', false, true],
-    [false, 'inativo', false, false],
-    [true, 'ativo', false, false],
-    [true, 'carregando', false, false],
-    [true, 'nao-suportado', false, false],
-    [true, 'inativo', true, false],
-  ] as const)('visibilidade: contas=%s estado=%s dispensado=%s → %s', (temContas, estado, dispensado, esperado) => {
-    expect(mostrarAvisoLembretes(temContas, estado, dispensado)).toBe(esperado);
-  });
-
-  it('"Ativar" chama a ação; "Dispensar" chama onDispensar', () => {
-    const onAtivar = vi.fn();
-    const onDispensar = vi.fn();
-    render(<AvisoLembretes {...props} onAtivar={onAtivar} onDispensar={onDispensar} />);
-    expect(texto()).toContain('Ative os lembretes');
-    expect(texto()).toContain('Receba um aviso no iPhone antes de cada conta vencer.');
-    fireEvent.click(screen.getByRole('button', { name: 'Ativar' }));
-    expect(onAtivar).toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Dispensar' }));
-    expect(onDispensar).toHaveBeenCalled();
-  });
-
-  it('"Como ativar" expande com aria-expanded', () => {
-    render(<AvisoLembretes {...props} />);
-    const botao = screen.getByRole('button', { name: 'Como ativar' });
-    expect(botao.getAttribute('aria-expanded')).toBe('false');
-    expect(texto()).not.toContain('Adicionar à Tela de Início');
-    fireEvent.click(botao);
-    expect(botao.getAttribute('aria-expanded')).toBe('true');
-    expect(texto()).toContain(
-      'No iPhone, abra o MeuDia no Safari, toque em Compartilhar e depois em Adicionar à Tela de Início. Abra o app pela Tela de Início e toque em Ativar.',
-    );
-  });
-
-  it('sem o app instalado, "Ativar" mostra o passo a passo em vez de pedir permissão', () => {
-    const onAtivar = vi.fn();
-    render(<AvisoLembretes {...props} estado="requer-instalacao" onAtivar={onAtivar} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Ativar' }));
-    expect(onAtivar).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Como ativar' }).getAttribute('aria-expanded')).toBe('true');
   });
 });
 
@@ -324,63 +171,68 @@ describe('RendaSheet', () => {
   });
 });
 
-describe('UltimosLancamentos', () => {
-  const props = { expandido: false, onAlternarExpandido: vi.fn(), onNovo: vi.fn(), onEditar: vi.fn(), onExcluir: vi.fn() };
-
-  it('mostra 5 e "Ver todos"; editar/excluir chamam os callbacks', () => {
-    const onEditar = vi.fn();
-    const onExcluir = vi.fn();
-    render(<UltimosLancamentos {...props} onEditar={onEditar} onExcluir={onExcluir} transacoes={transacoes} />);
-    expect(screen.getAllByRole('listitem')).toHaveLength(5);
-    expect(screen.getByRole('button', { name: 'Ver todos (7)' })).toBeTruthy();
-    expect(texto()).toContain('−R$ 50,00');
-    fireEvent.click(screen.getByRole('button', { name: 'Editar lançamento Mercado 1' }));
-    expect(onEditar).toHaveBeenCalledWith(transacoes[0]);
-    fireEvent.click(screen.getByRole('button', { name: 'Excluir lançamento Mercado 2' }));
-    expect(onExcluir).toHaveBeenCalledWith(transacoes[1]);
-    semTransacaoSemAcento();
+describe('montarHome (Início resumida)', () => {
+  it('contas a vencer: até 2 não pagas, vencidas primeiro; últimos gastos: 3 despesas mais recentes (sem receita/ajuste)', () => {
+    const s = montarHome({ competencia: '2026-10', hojeISO: HOJE, resumo: resumo(), ocorrencias, transacoes });
+    expect(s.contasAVencer?.contas.map((c) => c.descricao)).toEqual(['Internet', 'Luz']);
+    expect(s.contasAVencer?.totalMes).toBe(5);
+    expect(s.ultimosGastos.map((t) => t.descricao)).toEqual(['Mercado 7', 'Mercado 6', 'Mercado 5']);
   });
 
-  it('vazio: mensagem e botão "Novo lançamento"', () => {
-    const onNovo = vi.fn();
-    render(<UltimosLancamentos {...props} onNovo={onNovo} transacoes={[]} />);
-    expect(texto()).toContain('Nenhum lançamento neste mês.');
-    fireEvent.click(screen.getByRole('button', { name: 'Novo lançamento' }));
-    expect(onNovo).toHaveBeenCalled();
-  });
-});
-
-describe('montarHome', () => {
-  it('alerta com vencidas e de hoje; próximas = 3 não pagas, vencidas primeiro', () => {
-    const s = montarHome({ competencia: '2026-10', hojeISO: HOJE, resumo: resumo(), ocorrencias, orcamento: [], transacoes: [] });
-    expect(s.alerta?.contas.map((c) => c.descricao)).toEqual(['Internet', 'Luz']);
-    expect(s.proximasContas?.contas.map((c) => c.descricao)).toEqual(['Internet', 'Luz', 'Academia']);
-    expect(s.proximasContas?.totalMes).toBe(5);
-    expect(s.entradasSaidas.comparativoGasto?.texto.replace(/\s/g, ' ')).toBe('R$ 120,00 a menos que em setembro');
-    expect(s.orcamento).toBeNull();
+  it('uma sobra só: nada de HeroSobra, Entrou/Saiu, chips ou alerta separado na Início', () => {
+    const s = montarHome({ competencia: '2026-10', hojeISO: HOJE, resumo: resumo(), ocorrencias, transacoes });
+    expect(Object.keys(s).sort()).toEqual(['contasAVencer', 'ultimosGastos', 'vazio']);
   });
 
-  it('gasto igual ao mês anterior: sem comparativo; sem renda: vazio', () => {
-    const s = montarHome({
-      competencia: '2026-10', hojeISO: HOJE, ocorrencias: [], orcamento: [], transacoes: [],
-      resumo: resumo({ rendaPrevista: 0, rendaReal: 0, vsMesAnterior: { gastoReal: { absoluto: 0, percentual: null } } }),
-    });
-    expect(s.entradasSaidas.comparativoGasto).toBeNull();
+  it('sem renda: vazio; sem contas: sem card', () => {
+    const s = montarHome({ competencia: '2026-10', hojeISO: HOJE, ocorrencias: [], transacoes: [], resumo: resumo({ rendaPrevista: 0, rendaReal: 0 }) });
     expect(s.vazio).toBe(true);
-    expect(s.alerta).toBeNull();
-    expect(s.proximasContas).toBeNull();
+    expect(s.contasAVencer).toBeNull();
   });
 });
 
-describe('FinancasHomeView', () => {
-  it('com dados: todas as seções, sem "real / previsto" nem "igual ao mês anterior"', () => {
+describe('FinancasHomeView (Início resumida, decisão 7)', () => {
+  const regioes = () => screen.getAllByRole('region').map((r) => r.getAttribute('aria-labelledby') && document.getElementById(r.getAttribute('aria-labelledby')!)?.textContent);
+
+  it('só Cofrinho → No fim do mês sobra → Contas a vencer → Últimos gastos, nessa ordem', () => {
     render(<FinancasHomeView {...viewProps()} />);
-    for (const titulo of ['Sobra do mês', 'Entrou', 'Saiu', 'Contas a vencer', 'Orçamento', 'Renda comprometida', 'Últimos lançamentos']) {
-      expect(texto()).toContain(titulo);
-    }
-    expect(screen.getByRole('alert').textContent).toContain('2 contas pedem atenção');
-    expect(texto()).not.toMatch(/real \/ previst|igual ao mês anterior|Vamos montar seu mês/);
+    expect(regioes()).toEqual(['Cofrinho', 'No fim do mês sobra', 'Contas a vencer', 'Últimos gastos']);
+    expect(texto()).not.toMatch(/Sobra do mês|Prevista|Entrou|Renda comprometida|Pagas em dia|Gastos do mês por categoria|Evolução do mês|Ative os lembretes|pedem atenção|Orçamento/);
+    expect(screen.queryByRole('alert')).toBeNull();
     semTransacaoSemAcento();
+  });
+
+  it('No fim do mês sobra com barra: % usado = despesas ÷ renda do mês, limitado a 100', () => {
+    const { rerender } = render(<FinancasHomeView {...viewProps()} />);
+    const barra = screen.getByRole('progressbar', { name: 'Renda do mês usada' });
+    expect(barra.getAttribute('aria-valuenow')).toBe('75');
+    expect(texto()).toContain('usou 75%');
+    rerender(<FinancasHomeView {...viewProps({ dashboard: dashboard({ sobraMes: { ...sobra, despesas: 3000, valor: -1000 } }) })} />);
+    expect(screen.getByRole('progressbar', { name: 'Renda do mês usada' }).getAttribute('aria-valuenow')).toBe('100');
+    expect(texto()).toContain('usou 150%');
+  });
+
+  it('Contas a vencer: vencida destacada no card, "Ver todas" e a linha "A receber" com Recebi', () => {
+    const onRecebi = vi.fn();
+    render(<FinancasHomeView {...viewProps({ dashboard: dashboard({ onRecebi }) })} />);
+    const card = screen.getByRole('region', { name: 'Contas a vencer' });
+    expect(card.querySelectorAll('[data-conta]')).toHaveLength(2);
+    expect(screen.getByText('venceu há 4 dias', { exact: false }).className).toContain('text-red');
+    expect(screen.getByRole('link', { name: 'Ver todas as contas (5)' }).getAttribute('href')).toBe('/financas/contas');
+    expect(texto()).toContain('A receber: Salário dia 20');
+    fireEvent.click(screen.getByRole('button', { name: 'Recebi Salário' }));
+    expect(onRecebi).toHaveBeenCalledWith(expect.objectContaining({ rendaId: 'r1' }));
+  });
+
+  it('Últimos gastos: 3 itens, "Ver todos" leva a Gastos e "Gastei" abre o lançamento', () => {
+    const onGastei = vi.fn();
+    render(<FinancasHomeView {...viewProps({ onGastei })} />);
+    const card = screen.getByRole('region', { name: 'Últimos gastos' });
+    expect(card.querySelectorAll('li')).toHaveLength(3);
+    expect(card.textContent).not.toContain('Pix');
+    expect(screen.getByRole('link', { name: /Ver todos os gastos/ }).getAttribute('href')).toBe('/financas/gastos');
+    fireEvent.click(screen.getByRole('button', { name: 'Gastei' }));
+    expect(onGastei).toHaveBeenCalled();
   });
 
   it('"Paguei" na home chama onPagar', () => {
@@ -390,34 +242,24 @@ describe('FinancasHomeView', () => {
     expect(onPagar).toHaveBeenCalledWith(expect.objectContaining({ contaId: 'c2', competencia: '2026-10' }));
   });
 
-  it('aviso de lembretes aparece quando recebido e some quando null', () => {
-    const { rerender } = render(<FinancasHomeView {...viewProps()} />);
-    expect(texto()).not.toContain('Ative os lembretes');
-    rerender(<FinancasHomeView {...viewProps({ avisoLembretes: { estado: 'inativo', onAtivar: vi.fn(), onDispensar: vi.fn() } })} />);
-    expect(texto()).toContain('Ative os lembretes');
-  });
-
   it('renda cadastrada sem contas: card no passo 2 acima do resumo', () => {
     render(<FinancasHomeView {...viewProps({ boasVindas: { rendaCadastrada: true, onCadastrarRenda: vi.fn() } })} />);
     expect(texto()).toContain('Passo 2 de 2');
-    expect(texto()).toContain('Sobra do mês');
+    expect(texto()).toContain('No fim do mês sobra');
   });
 
-  it('usuária nova (vazio): só o card de boas-vindas, sem "R$ 0,00"', () => {
+  it('usuária nova (vazio, sem banco): só o convite e as boas-vindas, sem "R$ 0,00"', () => {
     const onCadastrarRenda = vi.fn();
-    const props = viewProps({ boasVindas: { rendaCadastrada: false, onCadastrarRenda } }, {
-      resumo: resumo({ rendaPrevista: 0, rendaReal: 0, gastoReal: 0, gastoPrevisto: 0, sobraPrevista: 0, sobraReal: 0, pctComprometida: null, pagasNoPrazo: null, selo: null, vsMesAnterior: { gastoReal: { absoluto: 0, percentual: null } } }),
-      ocorrencias: [], orcamento: [], transacoes: [],
+    const props = viewProps({ boasVindas: { rendaCadastrada: false, onCadastrarRenda }, dashboard: dashboard({ saldo: { total: 0, carteiras: [], comecouMes: null, nomeMes: 'outubro' } }) }, {
+      resumo: resumo({ rendaPrevista: 0, rendaReal: 0 }), ocorrencias: [], transacoes: [],
     });
     render(<FinancasHomeView {...props} />);
     expect(props.secoes?.vazio).toBe(true);
     expect(texto()).toContain('Vamos montar seu mês');
     expect(texto()).not.toContain('R$');
-    expect(texto()).not.toMatch(/Sobra do mês|Contas a vencer|Últimos lançamentos|Renda comprometida/);
-    expect(texto()).toContain('Passo 1 de 2');
+    expect(texto()).not.toMatch(/No fim do mês sobra|Contas a vencer|Últimos gastos/);
     fireEvent.click(screen.getByRole('button', { name: 'Cadastrar minha renda' }));
     expect(onCadastrarRenda).toHaveBeenCalled();
-    semTransacaoSemAcento();
   });
 
   it('carregando e erro', () => {
@@ -431,30 +273,14 @@ describe('FinancasHomeView', () => {
   });
 });
 
-it('erro amigável do painel mantém resumo e bloqueia Paguei enquanto bancos não carregam', () => {
+it('erro amigável do painel mantém o resumo e bloqueia Paguei enquanto bancos não carregam', () => {
   const pagar = vi.fn();
-  render(<FinancasHomeView {...viewProps({ erroPainel: 'O MeuDia está terminando uma atualização. Tente de novo em alguns minutos.', pagamentoBloqueado: true, onPagar: pagar })} />);
+  render(<FinancasHomeView {...viewProps({ dashboard: null, erroPainel: 'O MeuDia está terminando uma atualização. Tente de novo em alguns minutos.', pagamentoBloqueado: true, onPagar: pagar })} />);
   expect(screen.getAllByRole('alert').some((alerta) => alerta.textContent?.includes('terminando uma atualização'))).toBe(true);
-  expect(texto()).toContain('Sobra do mês');
+  expect(texto()).toContain('Contas a vencer');
   for (const botao of screen.getAllByRole('button', { name: /^Paguei / })) {
     expect((botao as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(botao);
   }
   expect(pagar).not.toHaveBeenCalled();
-});
-
-describe('FinancasHomeView: confirmação de exclusão', () => {
-  it('"Excluir? Isso não pode ser desfeito." + efeito, Cancelar e Excluir; fechada sem pedido', () => {
-    const onConfirmar = vi.fn();
-    const onCancelar = vi.fn();
-    const { rerender } = render(<FinancasHomeView {...viewProps()} />);
-    expect(screen.queryByRole('dialog', { name: 'Excluir lançamento' })).toBeNull();
-    rerender(<FinancasHomeView {...viewProps({ exclusao: { transacao: transacoes[0]!, detalhe: 'A conta volta a ficar a pagar.', carregando: false, onConfirmar, onCancelar } })} />);
-    const dialogo = screen.getByRole('dialog', { name: 'Excluir lançamento' });
-    expect(dialogo.textContent).toContain('Excluir? Isso não pode ser desfeito. A conta volta a ficar a pagar.');
-    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
-    expect(onCancelar).toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Excluir' }));
-    expect(onConfirmar).toHaveBeenCalled();
-  });
 });

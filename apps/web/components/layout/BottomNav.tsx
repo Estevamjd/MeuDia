@@ -3,42 +3,37 @@
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
+import { clsx } from 'clsx';
+import { House, Landmark, ReceiptText, Settings, Target, type LucideIcon } from 'lucide-react';
 import { useAppMode } from '../AppModeProvider';
-import { LancamentoRapidoSheet } from '../financas/LancamentoRapidoSheet';
 import {
   BOTTOM_TABS_PADRAO,
   MENU_MAIS_PADRAO,
   isNavAtivo,
   itensBottomFinancas,
+  type IconeAba,
 } from '../../lib/navegacao';
 
 const TABS_PRINCIPAIS = BOTTOM_TABS_PADRAO;
 const MENU_MAIS = MENU_MAIS_PADRAO;
 
-interface BottomNavProps {
-  /** Abre o AgentPanel do layout (item "Chat" do modo Finanças). */
-  onOpenChat?: () => void;
-  chatAberto?: boolean;
-}
-
-export function BottomNav({ onOpenChat, chatAberto = false }: BottomNavProps) {
+export function BottomNav() {
   const mode = useAppMode();
-  return mode === 'financas' ? (
-    <BottomNavFinancas onOpenChat={onOpenChat} chatAberto={chatAberto} />
-  ) : (
-    <BottomNavPadrao />
-  );
+  return mode === 'financas' ? <BottomNavFinancas /> : <BottomNavPadrao />;
 }
 
-const ITEM_CLASSES =
-  'flex min-h-[44px] min-w-[44px] flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
+const ICONES: Record<IconeAba, LucideIcon> = {
+  house: House,
+  'receipt-text': ReceiptText,
+  target: Target,
+  landmark: Landmark,
+  settings: Settings,
+};
 
-function BottomNavFinancas({ onOpenChat, chatAberto }: BottomNavProps) {
+/** 5 abas fixas com rótulo sempre visível; a ativa tem cor accent, traço no topo e `aria-current="page"`. */
+function BottomNavFinancas() {
   const pathname = usePathname();
-  const [acoesAbertas, setAcoesAbertas] = useState(false);
   return (
-    <>
-    <LancamentoRapidoSheet open={acoesAbertas} onClose={() => setAcoesAbertas(false)} />
     <nav
       aria-label="Navegação principal"
       className="fixed bottom-0 left-0 right-0 z-nav border-t border-white/10 bg-card/95 backdrop-blur-xl md:hidden"
@@ -48,62 +43,28 @@ function BottomNavFinancas({ onOpenChat, chatAberto }: BottomNavProps) {
         paddingRight: 'env(safe-area-inset-right)',
       }}
     >
-      <div className="flex items-center gap-1 px-2 py-1">
+      <div className="flex items-stretch px-1">
         {itensBottomFinancas().map((item) => {
-          if (item.tipo === 'chat') {
-            if (!onOpenChat) return null;
-            return (
-              <button
-                key="chat"
-                type="button"
-                onClick={onOpenChat}
-                aria-haspopup="dialog"
-                aria-expanded={chatAberto}
-                className={`${ITEM_CLASSES} ${chatAberto ? 'text-accent' : 'text-gray-500'}`}
-              >
-                <span className="text-xl" aria-hidden="true">{item.emoji}</span>
-                <span className="text-[10px] font-medium">{item.label}</span>
-              </button>
-            );
-          }
-
-          if (item.tipo === 'acoes') {
-            return (
-              <button
-                key="acoes"
-                type="button"
-                onClick={() => setAcoesAbertas(true)}
-                aria-label={item.label}
-                aria-haspopup="dialog"
-                aria-expanded={acoesAbertas}
-                className="flex min-h-[44px] min-w-[44px] flex-1 items-center justify-center rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-              >
-                <span
-                  aria-hidden="true"
-                  className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent2 text-2xl font-bold leading-none text-white shadow-[0_4px_16px_rgba(124,106,255,0.4)]"
-                >
-                  {item.emoji}
-                </span>
-              </button>
-            );
-          }
-
           const ativo = isNavAtivo(pathname, item);
+          const Icone = ICONES[item.icone];
           return (
             <Link
               key={item.href}
               href={item.href}
               aria-current={ativo ? 'page' : undefined}
-              className={`${ITEM_CLASSES} ${ativo ? 'text-accent' : 'text-gray-500'}`}
+              className={clsx(
+                'relative flex min-h-[52px] min-w-[44px] flex-1 flex-col items-center justify-center gap-0.5 px-1 pb-1 pt-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent',
+                ativo ? 'text-accent' : 'text-gray-500',
+              )}
             >
-              <span className="text-xl" aria-hidden="true">{item.emoji}</span>
-              <span className="text-[10px] font-medium">{item.label}</span>
+              {ativo && <span aria-hidden="true" className="absolute left-1/2 top-0 h-[3px] w-7 -translate-x-1/2 rounded-full bg-accent" />}
+              <Icone size={22} aria-hidden="true" />
+              <span className="text-[11px] font-medium leading-tight">{item.label}</span>
             </Link>
           );
         })}
       </div>
     </nav>
-    </>
   );
 }
 

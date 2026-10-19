@@ -9,7 +9,7 @@ import { SeletorCarteira } from '../SeletorCarteira';
 import { CardSaldoHoje } from '../home/CardSaldoHoje';
 import { CardSobraMes } from '../home/CardPrevisao';
 import * as CardPrevisao from '../home/CardPrevisao';
-import { CardRendaAReceber, textoRecebimento } from '../home/CardRendaAReceber';
+import { LinhaRendaAReceber, textoRecebimento } from '../home/CardRendaAReceber';
 import { GraficoCategorias } from '../home/GraficoCategorias';
 import { montarDashboard } from '../home/montarDashboard';
 import { montarCarteirasOnboarding } from '../../../lib/onboarding';
@@ -122,7 +122,6 @@ describe('CardSobraMes (decisão final do Estevam)', () => {
     render(<CardSobraMes sobra={negativa} escondido={false} />);
     expect(screen.getByTestId('previsao-fim-mes-valor').className).toContain('text-red');
     expect(linha('previsao-fim-mes-conta')).toBe('Renda R$ 100,00 − despesas R$ 400,00 = faltam R$ 300,00');
-    expect(texto()).toContain('Faltam R$ 300,00');
     fireEvent.click(screen.getByRole('button', { name: 'por quê? No fim do mês sobra' }));
     expect(texto()).toContain('+ Receitas lançadas no mês+R$ 100,00');
     expect(texto()).toContain('− Despesas lançadas no mês−R$ 290,00');
@@ -139,12 +138,13 @@ describe('CardSobraMes (decisão final do Estevam)', () => {
   });
 });
 
-describe('CardRendaAReceber', () => {
-  it('Recebi chama o callback com a renda', () => {
+describe('LinhaRendaAReceber (dentro de Contas a vencer)', () => {
+  it('"A receber: Salário dia 5" e Recebi chama o callback com a renda', () => {
     const onRecebi = vi.fn();
     const renda = { rendaId: 'r', descricao: 'Salário', valor: 900, data: '2026-10-05', competencia: '2026-10' };
-    render(<CardRendaAReceber rendas={[renda]} hojeISO="2026-10-17" onRecebi={onRecebi} />);
-    expect(texto()).toContain('era para cair em 05/10');
+    render(<ul><LinhaRendaAReceber renda={renda} hojeISO="2026-10-17" onRecebi={onRecebi} /></ul>);
+    expect(texto()).toContain('A receber: Salário dia 5');
+    expect(texto()).toContain('R$ 900,00 · era para cair em 05/10');
     fireEvent.click(screen.getByRole('button', { name: 'Recebi Salário' }));
     expect(onRecebi).toHaveBeenCalledWith(renda);
     expect(textoRecebimento('2026-10-17', '2026-10-17')).toBe('cai hoje');

@@ -11,19 +11,24 @@ interface CardDashboardProps {
   children: ReactNode;
   className?: string;
   acao?: ReactNode;
+  /** Início (sem rolar em 390×844): menos respiro e sem o quadrado do ícone. */
+  compacto?: boolean;
 }
 
 /** Card do dashboard: título pequeno, ícone à direita e conteúdo com valores grandes. */
-export function CardDashboard({ id, titulo, icone, corIcone = 'bg-accent/[0.14] text-accent', children, className, acao }: CardDashboardProps) {
+export function CardDashboard({ id, titulo, icone, corIcone = 'bg-accent/[0.14] text-accent', children, className, acao, compacto = false }: CardDashboardProps) {
   return (
-    <section aria-labelledby={id} className={clsx('min-w-0 space-y-3 rounded-xl border border-border bg-card p-5', className)}>
-      <div className="flex items-start justify-between gap-3">
-        <h2 id={id} className="pt-1 text-[13px] font-medium text-muted">
+    <section
+      aria-labelledby={id}
+      className={clsx('min-w-0 rounded-xl border border-border bg-card', compacto ? 'space-y-2 px-4 py-3' : 'space-y-3 p-5', className)}
+    >
+      <div className={clsx('flex justify-between gap-3', compacto ? 'items-center' : 'items-start')}>
+        <h2 id={id} className={clsx('text-[13px] font-medium text-muted', !compacto && 'pt-1')}>
           {titulo}
         </h2>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className={clsx('flex shrink-0 items-center gap-1', compacto && '-my-3 -mr-2')}>
           {acao}
-          {icone && (
+          {icone && !compacto && (
             <span aria-hidden="true" className={clsx('flex h-10 w-10 items-center justify-center rounded-xl', corIcone)}>
               {icone}
             </span>

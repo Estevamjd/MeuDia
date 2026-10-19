@@ -1,46 +1,21 @@
 import { Button, SkeletonCard, SkeletonList } from '../../ui';
-import { AlertaContas } from './AlertaContas';
-import { AvisoLembretes, type AvisoLembretesProps } from './AvisoLembretes';
 import { BoasVindasFinancas, type BoasVindasFinancasProps } from './BoasVindasFinancas';
-import { EntradasSaidas } from './EntradasSaidas';
-import { HeroSobra } from './HeroSobra';
-import { IndicadoresMes } from './IndicadoresMes';
 import type { SecoesHome } from './montarHome';
-import { OrcamentoResumo } from './OrcamentoResumo';
 import { ProximasContas, type ContaProxima } from './ProximasContas';
 import { RendaSheet, type RendaSheetProps } from './RendaSheet';
-import { UltimosLancamentos, type UltimosLancamentosProps } from './UltimosLancamentos';
-import { CardSaldoHoje, type CardSaldoHojeProps } from './CardSaldoHoje';
+import { UltimosGastos } from './UltimosGastos';
+import { CardSaldoHoje } from './CardSaldoHoje';
 import { CardSobraMes } from './CardPrevisao';
-import { CardRendaAReceber, type RendaAReceberItem } from './CardRendaAReceber';
-import { GraficoCategorias } from './GraficoCategorias';
-import { GraficoEvolucao } from './GraficoEvolucao';
+import type { RendaAReceberItem } from './CardRendaAReceber';
+import type { DadosDashboard } from './montarDashboard';
 import { RecebiSheet, type RecebiSheetProps } from './RecebiSheet';
-import { ConfirmarExclusao } from '../ConfirmarExclusao';
-import type { Transacao } from '@meudia/shared';
-import type { FatiaCategoria, PontoEvolucao, SobraDoMes } from '@meudia/shared';
 
-/** Cards do dashboard (Cofrinho, sobra do mês, Recebi e gráficos). `null` = painel indisponível: só o resumo do mês. */
-export interface DashboardHome {
-  saldo: Omit<CardSaldoHojeProps, 'escondido' | 'onAlternarOlho'>;
-  /** `null` fora do mês corrente ou sem carteira. */
-  sobraMes: SobraDoMes | null;
-  rendasAReceber: RendaAReceberItem[];
-  fatias: FatiaCategoria[];
-  evolucao: PontoEvolucao[];
+/** Cofrinho, sobra do mês e Recebi (gráficos ficam em Gastos › Análise). `null` = painel indisponível. */
+export interface DashboardHome extends DadosDashboard {
   escondido: boolean;
   onAlternarOlho: () => void;
   onRecebi: (renda: RendaAReceberItem) => void;
   recebiSheet: RecebiSheetProps;
-}
-
-/** Confirmação de exclusão de um lançamento; `null` = fechada. */
-export interface ExclusaoLancamento {
-  transacao: Transacao;
-  detalhe: string;
-  carregando: boolean;
-  onConfirmar: () => void;
-  onCancelar: () => void;
 }
 
 export interface FinancasHomeViewProps {
@@ -51,21 +26,19 @@ export interface FinancasHomeViewProps {
   hojeISO: string;
   /** `null` quando renda e contas já existem (onboarding concluído). */
   boasVindas: BoasVindasFinancasProps | null;
-  /** `null` quando o aviso não se aplica (sem contas, lembretes ativos/indisponíveis ou dispensado). */
-  avisoLembretes: AvisoLembretesProps | null;
   rendaSheet: RendaSheetProps;
   contaOcupada?: string;
   pagamentoBloqueado?: boolean;
   erroPainel?: string;
   onPagar: (conta: ContaProxima) => void;
-  lancamentos: Omit<UltimosLancamentosProps, 'transacoes'>;
+  /** Abre a folha de lançamento já no "Gastei" (Voltar leva a Entrou dinheiro/Transferir). */
+  onGastei: () => void;
   dashboard?: DashboardHome | null;
-  exclusao?: ExclusaoLancamento | null;
 }
 
 /**
- * Home de Finanças (pura), ordem do BRIEF: Cofrinho → No fim do mês sobra → Recebi → contas a vencer → rosca →
- * evolução → sobra/entrou/saiu → limites → indicadores → lançamentos.
+ * Início resumida (decisão 7), nesta ordem e só isto: Cofrinho → No fim do mês sobra → Contas a vencer (com "A receber")
+ * → 3 últimos gastos. Cabe em 390×844 acima da barra de abas sem rolar (e2e/abas.spec.ts).
  */
 export function FinancasHomeView({
   estado,
@@ -73,19 +46,17 @@ export function FinancasHomeView({
   secoes,
   hojeISO,
   boasVindas,
-  avisoLembretes,
   rendaSheet,
   contaOcupada,
   pagamentoBloqueado,
   erroPainel,
   onPagar,
-  lancamentos,
+  onGastei,
   dashboard = null,
-  exclusao = null,
 }: FinancasHomeViewProps) {
   if (estado === 'carregando') {
     return (
-      <div className="space-y-4" aria-busy="true">
+      <div className="space-y-3" aria-busy="true">
         <SkeletonCard />
         <SkeletonList count={3} />
       </div>
@@ -105,72 +76,38 @@ export function FinancasHomeView({
     );
   }
 
-  const { vazio } = secoes;
   const d = dashboard;
   // Usuária nova sem banco: só o convite do "Cofrinho" (sem cards vazios nem "R$ 0,00").
-  const soConvite = !!d && vazio && d.saldo.carteiras.length === 0;
+  const soConvite = !!d && secoes.vazio && d.saldo.carteiras.length === 0;
+  const rendasAReceber = d && !soConvite ? d.rendasAReceber : [];
+  const contas = secoes.contasAVencer ?? (rendasAReceber.length ? { contas: [], totalMes: 0 } : null);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-2.5">
       {erroPainel && <p role="alert" className="rounded-card border border-border bg-card p-4 text-sm text-muted">{erroPainel}</p>}
-      {secoes.alerta && <AlertaContas {...secoes.alerta} hojeISO={hojeISO} />}
-
-      {avisoLembretes && <AvisoLembretes {...avisoLembretes} />}
 
       {boasVindas && <BoasVindasFinancas {...boasVindas} />}
 
-      {d && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <CardSaldoHoje {...d.saldo} escondido={d.escondido} onAlternarOlho={d.onAlternarOlho} />
-          {!soConvite && (
-            <>
-              {d.sobraMes && <CardSobraMes sobra={d.sobraMes} escondido={d.escondido} />}
-              {d.rendasAReceber.length > 0 && (
-                <div className="sm:col-span-2">
-                  <CardRendaAReceber rendas={d.rendasAReceber} hojeISO={hojeISO} onRecebi={d.onRecebi} />
-                </div>
-              )}
-            </>
-          )}
-        </div>
+      {d && <CardSaldoHoje {...d.saldo} escondido={d.escondido} onAlternarOlho={d.onAlternarOlho} compacto />}
+      {d && !soConvite && d.sobraMes && <CardSobraMes sobra={d.sobraMes} escondido={d.escondido} />}
+
+      {contas && (
+        <ProximasContas
+          {...contas}
+          pagamentoBloqueado={pagamentoBloqueado}
+          hojeISO={hojeISO}
+          contaOcupada={contaOcupada}
+          onPagar={onPagar}
+          rendasAReceber={rendasAReceber}
+          onRecebi={d?.onRecebi}
+        />
       )}
 
-      {secoes.proximasContas && (
-        <ProximasContas pagamentoBloqueado={pagamentoBloqueado} {...secoes.proximasContas} hojeISO={hojeISO} contaOcupada={contaOcupada} onPagar={onPagar} />
-      )}
-
-      {d && !soConvite && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <GraficoCategorias fatias={d.fatias} escondido={d.escondido} />
-          <GraficoEvolucao pontos={d.evolucao} escondido={d.escondido} />
-        </div>
-      )}
-
-      {!vazio && (
-        <>
-          <HeroSobra {...secoes.hero} />
-          <EntradasSaidas {...secoes.entradasSaidas} />
-        </>
-      )}
-
-      {secoes.orcamento && <OrcamentoResumo {...secoes.orcamento} />}
-
-      {!vazio && <IndicadoresMes {...secoes.indicadores} />}
-
-      {(!vazio || lancamentos.carregando || secoes.transacoes.length > 0) && (
-        <UltimosLancamentos {...lancamentos} transacoes={secoes.transacoes} />
-      )}
+      {/* "Gastei" sempre à mão (o "+" saiu da barra); só a usuária sem banco vê apenas o convite. */}
+      {!soConvite && <UltimosGastos gastos={secoes.ultimosGastos} onGastei={onGastei} />}
 
       <RendaSheet {...rendaSheet} />
       {d && <RecebiSheet {...d.recebiSheet} />}
-      <ConfirmarExclusao
-        isOpen={!!exclusao}
-        onClose={() => exclusao?.onCancelar()}
-        onConfirm={() => exclusao?.onConfirmar()}
-        titulo="Excluir lançamento"
-        detalhe={exclusao?.detalhe}
-        isLoading={exclusao?.carregando}
-      />
     </div>
   );
 }

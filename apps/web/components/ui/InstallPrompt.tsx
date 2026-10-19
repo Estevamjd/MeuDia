@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, type RefObject } from 'react';
 import { Download, Share, X, Plus } from 'lucide-react';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -25,6 +25,31 @@ function detectPlatform(): Platform {
 const CONTAINER =
   'fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-4 right-4 z-banner md:bottom-4 md:left-auto md:right-6';
 
+/** Variável CSS com o espaço que o banner ocupa a partir do rodapé (+8px); o `main` do layout reserva esse espaço. */
+export const VAR_RESERVA_BANNER = '--reserva-banner';
+
+/**
+ * Enquanto o banner está na tela, publica em `--reserva-banner` a distância do topo dele até o fim do viewport.
+ * Assim nenhum conteúdo acionável fica preso atrás do banner: rolando até o fim, tudo para acima dele.
+ */
+function useReservaBanner(ref: RefObject<HTMLElement>, visivel: boolean) {
+  useEffect(() => {
+    const el = ref.current;
+    const raiz = document.documentElement;
+    if (!visivel || !el) return;
+    const medir = () => raiz.style.setProperty(VAR_RESERVA_BANNER, `${Math.ceil(window.innerHeight - el.getBoundingClientRect().top + 8)}px`);
+    medir();
+    const obs = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(medir);
+    obs?.observe(el);
+    window.addEventListener('resize', medir);
+    return () => {
+      obs?.disconnect();
+      window.removeEventListener('resize', medir);
+      raiz.style.removeProperty(VAR_RESERVA_BANNER);
+    };
+  }, [ref, visivel]);
+}
+
 function isStandalone(): boolean {
   if (typeof window === 'undefined') return false;
   return (
@@ -38,6 +63,9 @@ export function InstallPrompt() {
   const [showIOSPrompt, setShowIOSPrompt] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [platform, setPlatform] = useState<Platform>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  const iosVisivel = platform === 'ios' && showIOSPrompt && !dismissed;
+  useReservaBanner(ref, iosVisivel || (!!deferredPrompt && !dismissed));
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -79,9 +107,9 @@ export function InstallPrompt() {
   };
 
   // iOS prompt
-  if (platform === 'ios' && showIOSPrompt && !dismissed) {
+  if (iosVisivel) {
     return (
-      <div className={`${CONTAINER} md:w-96`}>
+      <div ref={ref} className={`${CONTAINER} md:w-96`}>
         <div className="rounded-card border border-accent/30 bg-card p-4 shadow-lg shadow-accent/10">
           <div className="mb-3 flex items-center justify-between">
             <p className="text-sm font-semibold text-text">Instalar MeuDia</p>
@@ -120,7 +148,7 @@ export function InstallPrompt() {
   if (!deferredPrompt || dismissed) return null;
 
   return (
-    <div className={`${CONTAINER} md:w-80`}>
+    <div ref={ref} className={`${CONTAINER} md:w-80`}>
       <div className="flex items-center gap-3 rounded-card border border-accent/30 bg-card p-4 shadow-lg shadow-accent/10">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/[0.14]">
           <Download size={20} className="text-accent" />
