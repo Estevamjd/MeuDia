@@ -41,7 +41,7 @@ import {
   partesCompetencia,
   rotuloCompetencia,
   SITUACAO_LIMITE_UI,
-  tagSobraPrevista,
+  tagSobra,
   type LinhaOrcamento,
   type SituacaoLimite,
 } from '../../../../lib/financas-ui';
@@ -377,7 +377,7 @@ export default function OrcamentoPage() {
         </button>
       </div>
 
-      {/* Renda × gasto previsto × sobra prevista (atualiza ao salvar renda/limite) */}
+      {/* Renda × gasto previsto × "No fim do mês sobra" (a sobra única do app, igual à da Início) */}
       {resumo.isError && (
         <ErroCarregamento
           mensagem="Não foi possível carregar a previsão do mês (renda, gasto e sobra)."
@@ -396,10 +396,10 @@ export default function OrcamentoPage() {
           <StatCard label="Renda prevista" value={formatBRL(resumo.data.rendaPrevista)} icon={<TrendingUp size={16} />} />
           <StatCard label="Gasto previsto" value={formatBRL(resumo.data.gastoPrevisto)} icon={<TrendingDown size={16} />} />
           <StatCard
-            label="Sobra prevista"
-            value={formatBRL(resumo.data.sobraPrevista)}
+            label="No fim do mês sobra"
+            value={formatBRL(resumo.data.sobraDoMes)}
             icon={<PiggyBank size={16} />}
-            tag={tagSobraPrevista(resumo.data.sobraPrevista)}
+            tag={tagSobra(resumo.data.sobraDoMes)}
           />
         </section>
       ) : null}
@@ -467,7 +467,7 @@ export default function OrcamentoPage() {
           <EmptyState
             icon={<Wallet size={40} />}
             title="Nenhuma renda cadastrada"
-            description="Cadastre sua renda para ver a sobra prevista e o selo do mês."
+            description="Cadastre sua renda para ver quanto sobra no fim do mês."
             actionLabel="Cadastrar renda"
             onAction={() => setRendaAberta({ renda: null })}
           />

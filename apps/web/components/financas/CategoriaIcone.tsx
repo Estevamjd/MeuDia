@@ -1,16 +1,17 @@
 import { clsx } from 'clsx';
 import {
-  BookOpen, Bus, Droplets, Dumbbell, Fuel, Gift, GraduationCap, Hand, HandCoins, House, Lightbulb, PartyPopper,
-  PawPrint, Pill, Plane, Receipt, Repeat, Sandwich, Scale, School, Scissors, Shirt, ShoppingCart, Smartphone, Sofa,
-  Sparkles, Tag, Tv, UtensilsCrossed, Wallet, Wifi, type LucideIcon,
+  BookOpen, Bus, Droplets, Dumbbell, Eye, Fuel, Gift, GraduationCap, HandCoins, House, Lightbulb, Paintbrush, PartyPopper,
+  PawPrint, Pill, Plane, Receipt, Repeat, Scale, School, Scissors, Shirt, ShoppingCart, Smartphone, Sofa,
+  Sparkles, Tag, Tv, Utensils, UtensilsCrossed, Wallet, Wifi, type LucideIcon,
 } from 'lucide-react';
 import { categoriaInfo, type IconeCategoria } from '@meudia/shared';
 
-const ICONES: Record<IconeCategoria, LucideIcon> = {
-  'shopping-cart': ShoppingCart, sandwich: Sandwich, 'utensils-crossed': UtensilsCrossed, bus: Bus, fuel: Fuel,
+/** id do mapa (shared) → componente do lucide-react. Exportado para o teste que confere o lucide instalado. */
+export const ICONES_CATEGORIA: Record<IconeCategoria, LucideIcon> = {
+  'shopping-cart': ShoppingCart, utensils: Utensils, 'utensils-crossed': UtensilsCrossed, bus: Bus, fuel: Fuel,
   house: House, lightbulb: Lightbulb, droplets: Droplets, wifi: Wifi, smartphone: Smartphone, tv: Tv,
-  dumbbell: Dumbbell, pill: Pill, 'book-open': BookOpen, 'graduation-cap': GraduationCap, hand: Hand,
-  sparkles: Sparkles, scissors: Scissors, shirt: Shirt, 'paw-print': PawPrint, gift: Gift,
+  dumbbell: Dumbbell, pill: Pill, 'book-open': BookOpen, 'graduation-cap': GraduationCap, paintbrush: Paintbrush,
+  eye: Eye, sparkles: Sparkles, scissors: Scissors, shirt: Shirt, 'paw-print': PawPrint, gift: Gift,
   'party-popper': PartyPopper, plane: Plane, sofa: Sofa, school: School, repeat: Repeat, receipt: Receipt,
   wallet: Wallet, 'hand-coins': HandCoins, scale: Scale, tag: Tag,
 };
@@ -27,12 +28,13 @@ interface CategoriaIconeProps {
 /** Ícone da categoria num quadrado com fundo suave da mesma cor (padrão dos cards do dashboard). Decorativo. */
 export function CategoriaIcone({ categoria, tamanho = 'md', className }: CategoriaIconeProps) {
   const info = categoriaInfo(categoria);
-  const Icone = ICONES[info.icone] ?? Tag;
+  const Icone = ICONES_CATEGORIA[info.icone] ?? Tag;
   const t = TAMANHOS[tamanho];
   return (
     <span
       aria-hidden="true"
       data-categoria-icone={info.nome}
+      data-icone={info.icone}
       className={clsx('inline-flex shrink-0 items-center justify-center rounded-xl', t.caixa, className)}
       style={{ backgroundColor: `${info.cor}24`, color: info.cor }}
     >

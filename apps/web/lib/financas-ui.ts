@@ -53,8 +53,8 @@ export function mascaraBRL(texto: string): { digitos: string; exibicao: string; 
   return { digitos, exibicao: digitos ? formatBRL(valor) : '', valor };
 }
 
-/** Selo da sobra prevista no orçamento: zero não é "positiva". */
-export function tagSobraPrevista(sobra: number): { text: string; color: 'teal' | 'red' | 'neutral' } {
+/** Selo do "No fim do mês sobra" no Orçamento: zero não é "positiva". */
+export function tagSobra(sobra: number): { text: string; color: 'teal' | 'red' | 'neutral' } {
   if (sobra > 0) return { text: 'positiva', color: 'teal' };
   if (sobra < 0) return { text: 'negativa', color: 'red' };
   return { text: 'zerada', color: 'neutral' };
@@ -81,7 +81,7 @@ export const SITUACAO_UI: Record<SituacaoOcorrencia, { label: string; color: 'gr
 export const SELO_UI: Record<Selo, { color: 'green' | 'yellow' | 'red'; descricao: string }> = {
   'No controle': { color: 'green', descricao: 'Suas contas cabem com folga na renda do mês.' },
   Atenção: { color: 'yellow', descricao: 'Mais de 70% da renda comprometida ou alguma conta vencida.' },
-  Apertado: { color: 'red', descricao: 'As contas passam de 90% da renda ou a sobra prevista é negativa.' },
+  Apertado: { color: 'red', descricao: 'As contas passam de 90% da renda ou o que sobra no fim do mês é negativo.' },
 };
 
 const ORDEM_SITUACAO: Record<SituacaoOcorrencia, number> = { vencida: 0, pendente: 1, paga: 2 };

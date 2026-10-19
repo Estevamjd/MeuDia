@@ -6,3 +6,4 @@ export * from './selo';
 export * from './saldo';
 export * from './metas';
 export * from './gastos';
+export * from './renda-principal';

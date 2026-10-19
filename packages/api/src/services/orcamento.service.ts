@@ -1,4 +1,4 @@
-import { hojeSP, calcularSelo, AppError, entradasDoMes, gastoDoMes, pagasEmDia, rendaDoMes } from '@meudia/shared';
+import { hojeSP, calcularSelo, AppError, entradasDoMes, gastoDoMes, pagasEmDia, rendaDoMes, sobraDoMes } from '@meudia/shared';
 import { rendasRepository, orcamentoRepository, transacaoRepository, recebimentosRendaRepository, carteirasRepository } from '../repositories';
 import { rendaInsertSchema, orcamentoInsertSchema } from '../validators';
 import { listarContasDoMes } from './contas-pagar.service';
@@ -60,7 +60,11 @@ export async function resumoFinanceiroMes(userId: string, ano: number, mes: numb
   const contasPagas = dinheiro(contas.filter(c => c.pagamento).reduce((s, c) => s + Number((c.pagamento?.transacao_id ? porId.get(c.pagamento.transacao_id) : undefined)?.valor ?? c.conta.valor), 0));
   for (const o of orcamento) categorias.set(o.categoria, Math.max(categorias.get(o.categoria) ?? 0, Number(o.valor_planejado)));
   const gastoPrevisto = dinheiro([...categorias.values()].reduce((s, v) => s + v, 0));
-  const sobraPrevista = dinheiro(rendaPrevista - gastoPrevisto);
+  // Uma sobra só no app: "No fim do mês sobra" (sobraDoMes), a mesma da Início. A antiga "Sobra prevista" saiu.
+  const sobra = sobraDoMes({
+    competencia, transacoes, rendas, recebimentos,
+    contas: contas.map(c => c.conta), pagamentos: contas.flatMap(c => (c.pagamento ? [c.pagamento] : [])),
+  }).valor;
   // "Contas fixas: X% do salário": base = rendas fixas (DIAG §5.3).
   const pctComprometida = rendaPrevista === 0 ? null : contasMes / rendaPrevista;
   // DIAG §5.4: comparar só quando o mês anterior tem algum lançamento de verdade (ajuste não conta).
@@ -69,10 +73,10 @@ export async function resumoFinanceiroMes(userId: string, ano: number, mes: numb
     rendaPrevista, rendaReal: atual.renda, rendaDoMes: atual.rendaDoMes, gastoReal: atual.gasto,
     // DIAG §5.1: salário (receita ligada a um "Recebi") separado dos extras.
     entradas: entradasDoMes(transacoes, rendas, vinculosSalario),
-    contasMes, contasPagas, contasFaltam: dinheiro(contasMes - contasPagas), gastoPrevisto, sobraPrevista, pctComprometida,
+    contasMes, contasPagas, contasFaltam: dinheiro(contasMes - contasPagas), gastoPrevisto, sobraDoMes: sobra, pctComprometida,
     // DIAG §5.5: só contas que venceram depois do cadastro delas e da âncora mais antiga das carteiras.
     pagasNoPrazo: pagasEmDia(contas, hojeISO, carteiras.map(c => c.saldo_inicial_em)),
     vsMesAnterior: anteriorTemDados ? { gastoReal: delta(atual.gasto, anterior.gasto) } : null,
-    selo: calcularSelo({ rendaPrevista, contasMes, sobraPrevista, pctComprometida, temContaVencida: contas.some(c => c.situacao === 'vencida') }),
+    selo: calcularSelo({ rendaPrevista, contasMes, sobraDoMes: sobra, pctComprometida, temContaVencida: contas.some(c => c.situacao === 'vencida') }),
   };
 }
