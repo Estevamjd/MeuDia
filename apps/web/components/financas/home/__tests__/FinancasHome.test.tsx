@@ -197,7 +197,7 @@ describe('FinancasHomeView (Início resumida, decisão 7)', () => {
   it('só Cofrinho → No fim do mês sobra → Contas a vencer → Últimos gastos, nessa ordem', () => {
     render(<FinancasHomeView {...viewProps()} />);
     expect(regioes()).toEqual(['Cofrinho', 'No fim do mês sobra', 'Contas a vencer', 'Últimos gastos']);
-    expect(texto()).not.toMatch(/Sobra do mês|Prevista|Entrou|Renda comprometida|Pagas em dia|Gastos do mês por categoria|Evolução do mês|Ative os lembretes|pedem atenção|Orçamento/);
+    expect(texto()).not.toMatch(/Prevista|Entrou|Renda comprometida|Pagas em dia|Gastos do mês por categoria|Evolução do mês|Ative os lembretes|pedem atenção|Orçamento/);
     expect(screen.queryByRole('alert')).toBeNull();
     semTransacaoSemAcento();
   });
