@@ -104,7 +104,7 @@ describe('CardSobraMes (decisão final do Estevam)', () => {
     render(<CardSobraMes sobra={sobra} escondido={false} />);
     expect(texto()).toContain('No fim do mês sobra');
     expect(linha('previsao-fim-mes-valor')).toBe('R$ 2.090,00');
-    expect(linha('previsao-fim-mes-conta')).toBe('Renda R$ 2.200,00 − despesas R$ 110,00 = sobra R$ 2.090,00');
+    expect(linha('previsao-fim-mes-conta')).toBe('Renda R$ 2.200,00 − gastos lançados R$ 0,00 − contas a pagar R$ 110,00 = sobra R$ 2.090,00');
     expect(texto()).not.toContain('Internet');
     const botao = screen.getByRole('button', { name: 'por quê? No fim do mês sobra' });
     fireEvent.click(botao);
@@ -121,7 +121,7 @@ describe('CardSobraMes (decisão final do Estevam)', () => {
     const negativa = { ...sobra, renda: { lancada: 100, aReceber: 0, total: 100 }, rendasAReceber: [], despesasLancadas: 290, despesas: 400, valor: -300 };
     render(<CardSobraMes sobra={negativa} escondido={false} />);
     expect(screen.getByTestId('previsao-fim-mes-valor').className).toContain('text-red');
-    expect(linha('previsao-fim-mes-conta')).toBe('Renda R$ 100,00 − despesas R$ 400,00 = faltam R$ 300,00');
+    expect(linha('previsao-fim-mes-conta')).toBe('Renda R$ 100,00 − gastos lançados R$ 290,00 − contas a pagar R$ 110,00 = faltam R$ 300,00');
     fireEvent.click(screen.getByRole('button', { name: 'por quê? No fim do mês sobra' }));
     expect(texto()).toContain('+ Receitas lançadas no mês+R$ 100,00');
     expect(texto()).toContain('− Despesas lançadas no mês−R$ 290,00');

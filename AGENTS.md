@@ -46,6 +46,7 @@ Quando o dono corrigir um agente, conserte e adicione a linha aqui. Se a regra j
 | Novo lançamento escolhe carteira ativa quando existir | `NovoLancamento.test.tsx` |
 | Editar lançamento antigo (sem carteira) não troca carteira/banco; Salvar não trava se a consulta de carteiras falhar | `NovoLancamento.test.tsx` |
 | "No fim do mês sobra" = renda do mês (`rendaDoMes`) − despesas lançadas − contas da competência sem "Paguei"; não soma saldo; Recebi/Paguei não contam em dobro | `sobraDoMes` em `saldo.ts` + `saldo.test.ts`, `ContasSaldo.test.tsx`, `contas-saldo.spec.ts` (aceite 235 / 2.200 / 110) |
+| Card da sobra na Início mostra "Sobra até agora" (renda do mês − gastos lançados, sem contas a pagar) acima do "No fim do mês sobra", e a conta curta e o "por quê?" dizem que o fim do mês desconta as contas a pagar | `CardPrevisao.tsx` + `home/__tests__/CardPrevisao.test.tsx` (Júlia 100: 619 até agora, 519 no fim), `ContasSaldo.test.tsx`, `contas-saldo.spec.ts`, `e2e/abas.spec.ts` (Início sem rolar) |
 | O card "Em 7 dias você terá" saiu (PR #21) e não volta sem pedido do dono; `emSeteDias`/`ancoraPrevisao` não existem mais | `ContasSaldo.test.tsx` (card ausente), `contas-saldo.spec.ts` (previsão A), `excluir-metas.spec.ts` |
 | Ajuste de saldo fora de "Gastos por Categoria" do Início | `inicio/__tests__/GastosPorCategoria.test.tsx` |
 | Recebi sempre com carteira ativa (padrão arquivada cai na primeira ativa, no front e no banco) | `RecebiSheet.test.tsx`, `useFinancasHome.test.ts`, `tests/006_carteiras.sql` |

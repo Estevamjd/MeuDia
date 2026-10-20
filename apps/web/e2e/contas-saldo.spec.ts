@@ -145,7 +145,7 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await expect(page.getByText('Em 7 dias você terá')).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Cofrinho' })).toBeVisible();
   await expect(fimMes).toHaveText(/^−R\$\s120,00$/);
-  await expect(page.getByTestId('previsao-fim-mes-conta')).toHaveText(/^Renda R\$\s100,00 − despesas R\$\s220,00 = faltam R\$\s120,00$/);
+  await expect(page.getByTestId('previsao-fim-mes-conta')).toHaveText(/^Renda R\$\s100,00 − gastos lançados R\$\s0,00 − contas a pagar R\$\s220,00 = faltam R\$\s120,00$/);
 
   // 4. Transferir R$ 50 Caixa → Nubank: total igual, Nubank 700 · Caixa 100; gasto do mês não muda.
   folha = await abrirAcao(/Transferir/);
@@ -341,7 +341,7 @@ test('previsão A: fim do mês = 2.090 e o card "Em 7 dias" não aparece', async
   await expect(page.getByTestId('saldo-hoje-valor')).toHaveText(brl('235,00'));
   await expect(page.getByRole('region', { name: 'Cofrinho' })).toBeVisible();
   await expect(page.getByTestId('previsao-fim-mes-valor')).toHaveText(brl('2.090,00'));
-  await expect(page.getByTestId('previsao-fim-mes-conta')).toHaveText(/^Renda R\$\s2\.200,00 − despesas R\$\s110,00 = sobra R\$\s2\.090,00$/);
+  await expect(page.getByTestId('previsao-fim-mes-conta')).toHaveText(/^Renda R\$\s2\.200,00 − gastos lançados R\$\s0,00 − contas a pagar R\$\s110,00 = sobra R\$\s2\.090,00$/);
   await expect(page.getByText('Em 7 dias você terá')).toHaveCount(0);
   expect(erros, 'erros na página ou respostas HTTP ≥ 400').toEqual([]);
 });
