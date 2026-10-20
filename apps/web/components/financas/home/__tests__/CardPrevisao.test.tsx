@@ -10,7 +10,7 @@ afterEach(cleanup);
 const texto = () => (document.body.textContent ?? '').replace(/\s/g, ' ');
 const linha = (id: string) => screen.getByTestId(id).textContent?.replace(/\s/g, ' ');
 
-describe('CardSobraMes: "Sobra até agora" × "No fim do mês sobra"', () => {
+describe('CardSobraMes: "Sobra do mês" × "No fim do mês sobra"', () => {
   // Renda 1.000, gastos lançados 381, Júlia 100 ainda sem "Paguei".
   const sobra: SobraDoMes = {
     competencia: '2026-10', renda: { lancada: 1000, aReceber: 0, total: 1000 }, rendasAReceber: [],
@@ -20,12 +20,12 @@ describe('CardSobraMes: "Sobra até agora" × "No fim do mês sobra"', () => {
 
   it('até agora não desconta a conta a pagar; fim do mês desconta e diz isso', () => {
     render(<CardSobraMes sobra={sobra} escondido={false} />);
-    expect(texto()).toContain('Sobra até agora');
+    expect(texto()).toContain('Sobra do mês');
     expect(linha('sobra-ate-agora-valor')).toBe('R$ 619,00');
     expect(linha('previsao-fim-mes-valor')).toBe('R$ 519,00');
     expect(linha('previsao-fim-mes-conta')).toBe('Renda R$ 1.000,00 − gastos lançados R$ 381,00 − contas a pagar R$ 100,00 = sobra R$ 519,00');
     fireEvent.click(screen.getByRole('button', { name: 'por quê? No fim do mês sobra' }));
-    expect(texto()).toContain('Sobra até agora = renda do mês − gastos já lançados (contas ainda não pagas não entram).');
+    expect(texto()).toContain('Sobra do mês = renda do mês − gastos já lançados (contas ainda não pagas não entram).');
     expect(texto()).toContain('No fim do mês sobra = desconta também as contas a pagar.');
     expect(texto()).toContain('− Júlia (vence 25/10)−R$ 100,00');
   });

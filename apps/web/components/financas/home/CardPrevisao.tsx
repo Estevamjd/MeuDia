@@ -29,7 +29,7 @@ export interface CardSobraMesProps {
 const emCentavos = (n: number) => Math.round(n * 100) / 100 || 0; // "|| 0" tira o −0 (−R$ 0,00)
 
 /**
- * "Sobra até agora" = renda do mês − gastos já lançados (contas ainda não pagas não entram).
+ * "Sobra do mês" = renda do mês − gastos já lançados (contas ainda não pagas não entram).
  * "No fim do mês sobra" = renda do mês − despesas do mês (lançadas + contas ainda não pagas). Sem saldo guardado.
  * Compacto (Início sem rolar): "até agora" numa linha, valor, barra do quanto da renda do mês já está comprometido e a conta numa linha.
  */
@@ -49,7 +49,7 @@ export function CardSobraMes({ sobra, escondido }: CardSobraMesProps) {
     <section aria-labelledby="previsao-fim-mes" className="min-w-0 space-y-1.5 rounded-xl border border-border bg-card px-4 py-2">
       <div className="space-y-0.5">
         <p className="flex items-baseline justify-between gap-3 text-[13px] leading-tight">
-          <span className="text-muted">Sobra até agora</span>
+          <span className="text-muted">Sobra do mês</span>
           <span
             data-testid="sobra-ate-agora-valor"
             className={clsx('whitespace-nowrap font-medium tabular-nums', ateAgora < 0 && !escondido ? 'text-red' : 'text-text')}
@@ -115,7 +115,7 @@ export function CardSobraMes({ sobra, escondido }: CardSobraMesProps) {
             <Linha rotulo="= No fim do mês sobra" valor={sobra.valor} escondido={escondido} total />
           </ul>
           <p className="pt-1 text-muted">
-            Sobra até agora = renda do mês − gastos já lançados (contas ainda não pagas não entram). No fim do mês sobra =
+            Sobra do mês = renda do mês − gastos já lançados (contas ainda não pagas não entram). No fim do mês sobra =
             desconta também as contas a pagar.
           </p>
           <p className="text-muted">

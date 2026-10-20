@@ -101,7 +101,7 @@ test('5 abas, Início sem rolar em 390×844, Ver todos, Chat no header, Gastei e
   await expect(ultimos.getByRole('listitem')).toHaveCount(3);
   await expect(page.getByTestId('saldo-hoje-valor')).toHaveText(brl('1.280,00'));
   await expect(page.getByRole('region', { name: 'Contas a vencer' }).locator('[data-conta]')).toHaveCount(2);
-  await expect(page.getByText('Sobra do mês', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Sobra do mês', { exact: true })).toHaveCount(1);
   const caixaNav = (await nav.boundingBox())!;
 
   // ── Banner "Instalar MeuDia" visível (iOS, após 2s) não cobre o "Gastei" (revisão Codex 2) ──
