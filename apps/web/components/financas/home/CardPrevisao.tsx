@@ -26,7 +26,7 @@ export interface CardSobraMesProps {
   escondido: boolean;
 }
 
-const emCentavos = (n: number) => Math.round(n * 100) / 100;
+const emCentavos = (n: number) => Math.round(n * 100) / 100 || 0; // "|| 0" tira o −0 (−R$ 0,00)
 
 /**
  * "Sobra até agora" = renda do mês − gastos já lançados (contas ainda não pagas não entram).

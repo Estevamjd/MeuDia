@@ -36,6 +36,12 @@ describe('CardSobraMes: "Sobra até agora" × "No fim do mês sobra"', () => {
     expect(screen.getByTestId('sobra-ate-agora-valor').className).toContain('text-red');
   });
 
+  it('centavos: 0,30 − (0,10 + 0,20) dá zero, sem sinal nem vermelho', () => {
+    render(<CardSobraMes sobra={{ ...sobra, renda: { lancada: 0.3, aReceber: 0, total: 0.3 }, despesasLancadas: 0.1 + 0.2, despesas: 100.3, valor: -100 }} escondido={false} />);
+    expect(linha('sobra-ate-agora-valor')).toBe('R$ 0,00');
+    expect(screen.getByTestId('sobra-ate-agora-valor').className).not.toContain('text-red');
+  });
+
   it('ocultar valores esconde também o "até agora", sem vermelho', () => {
     render(<CardSobraMes sobra={{ ...sobra, despesasLancadas: 2000, despesas: 2100, valor: -1100 }} escondido />);
     expect(texto()).not.toMatch(/R\$ \d/);
