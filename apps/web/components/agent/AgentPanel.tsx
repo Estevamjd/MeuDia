@@ -36,6 +36,9 @@ import {
   type AbaAgente,
 } from '../../lib/agente-modo';
 import { AgentChat } from './AgentChat';
+import { CardGastoIA } from './CardGastoIA';
+import { deveConsultarIA, pedirPropostaIA } from '../../lib/ia/cliente';
+import type { PropostaGasto } from '../../lib/ia/proposta';
 import { NotificacaoItem } from './NotificacaoItem';
 
 type Tab = AbaAgente;
@@ -72,6 +75,10 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
   const marcarTodasLidas = useMarcarTodasLidas();
   const dispensar = useDispensarNotificacao();
   const criarCompromisso = useCriarCompromisso();
+
+  // Card do gasto que o assistente (IA) entendeu: só local até o Confirmar; `id` reinicia o card a cada proposta.
+  const [proposta, setProposta] = useState<{ id: number; dados: PropostaGasto } | null>(null);
+  const [consultandoIA, setConsultandoIA] = useState(false);
 
   // Cada abertura começa na aba inicial do modo (Finanças: Chat).
   useEffect(() => {
@@ -209,6 +216,17 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
       }));
       // Adicionar a mensagem atual que acabou de ser enviada
       historico.push({ role: 'user', conteudo: texto });
+
+      // Gasto em linguagem natural: a IA (servidor) só devolve o card; nada é gravado antes do Confirmar.
+      // Sem card (fallback, cota, erro, timeout), segue com as regras, sem erro na tela.
+      if (deveConsultarIA(texto)) {
+        setConsultandoIA(true);
+        const dados = await pedirPropostaIA(texto).finally(() => setConsultandoIA(false));
+        if (dados) {
+          setProposta({ id: Date.now(), dados });
+          return;
+        }
+      }
 
       // Processar e gerar resposta do agente
       const resposta = processarMensagem(texto, contexto, historico);
@@ -376,9 +394,25 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
             <AgentChat
               mensagens={mensagensModo}
               isLoading={loadingChat}
-              isSending={enviarMensagem.isPending}
+              isSending={enviarMensagem.isPending || consultandoIA}
               onEnviar={handleEnviarChat}
               onAcao={handleAcao}
+              rodape={
+                proposta && (
+                  <CardGastoIA
+                    key={proposta.id}
+                    proposta={proposta.dados}
+                    onConfirmado={(resumoGasto) => {
+                      setProposta(null);
+                      void enviarMensagem.mutateAsync({ role: 'agent', conteudo: resumoGasto }).catch(() => {});
+                    }}
+                    onCancelado={() => {
+                      setProposta(null);
+                      void enviarMensagem.mutateAsync({ role: 'agent', conteudo: 'Tudo bem, não salvei esse gasto.' }).catch(() => {});
+                    }}
+                  />
+                )
+              }
               sugestoesIniciais={sugestoesAgente(mode, () => acoesRapidasPadrao(contexto))}
               dicaInicial={
                 mode === 'financas' ? 'Pergunte sobre gastos, contas, orçamento ou assinaturas.' : undefined

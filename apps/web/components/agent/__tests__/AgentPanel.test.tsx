@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { NotificacaoAgente } from '@meudia/shared';
 import { AppModeProvider } from '../../AppModeProvider';
 import { AgentPanel, LIMIAR_ARRASTE_FECHAR } from '../AgentPanel';
 
 const push = vi.fn();
+const gasteiMutate = vi.fn();
 const marcarLida = vi.fn();
 const marcarTodasLidas = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
@@ -48,6 +49,10 @@ vi.mock('../../../hooks', () => ({
   }),
   useRegistrosHoje: () => ({ data: [] }),
   useResumoMensal: () => ({ data: { saldo: 0, totalDespesas: 0, totalReceitas: 0 } }),
+  // Card do gasto (IA): grava só pelo "Gastei".
+  useCarteiras: () => ({ data: [{ id: 'c1', nome: 'Banco Teste', tipo: 'banco', arquivada: false }], isLoading: false }),
+  usePainelSaldo: () => ({ data: { carteiraPadraoId: 'c1' } }),
+  useGastei: () => ({ mutate: gasteiMutate, isPending: false }),
 }));
 
 // Relógio fixo (sábado 17/10/2026 10:00): depois das 20h o resumo repete o treino pendente e o teste dependia da hora.
@@ -220,5 +225,85 @@ describe('AgentPanel: fechar e camadas (bug do X inalcançável no iPhone)', () 
     expect(document.body.style.position).toBe('');
     expect(document.activeElement).toBe(gatilho);
     gatilho.remove();
+  });
+});
+
+describe('AgentPanel: gasto por linguagem natural (IA F1, LLM mockado)', () => {
+  const fetchMock = vi.fn();
+  beforeAll(() => vi.stubGlobal('fetch', fetchMock));
+  afterAll(() => vi.unstubAllGlobals());
+  beforeEach(() => {
+    fetchMock.mockReset();
+    mutation.mutateAsync.mockResolvedValue(undefined);
+  });
+
+  const hoje = () =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const respostaIa = (corpo: unknown) => Promise.resolve(new Response(JSON.stringify(corpo), { status: 200 }));
+
+  const enviar = (texto: string) => {
+    renderPanel('financas');
+    const input = screen.getByPlaceholderText('Pergunte algo ao agente...');
+    fireEvent.change(input, { target: { value: texto } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+  };
+  const agentes = () => mutation.mutateAsync.mock.calls.map((c) => c[0]).filter((m) => m.role === 'agent');
+
+  it('"gastei 45 no mercado" → card R$ 45,00 / Mercado / Hoje; nada gravado antes do Confirmar; Cancelar não grava', async () => {
+    fetchMock.mockImplementation(() =>
+      respostaIa({ fallback: false, proposta: { valor: 45, categoria: 'Mercado', descricao: 'Mercado', data: hoje(), carteira_id: null } }),
+    );
+    enviar('gastei 45 no mercado');
+    const card = await screen.findByTestId('card-gasto-ia');
+    expect(fetchMock).toHaveBeenCalledWith('/api/ia/chat', expect.objectContaining({ method: 'POST', body: JSON.stringify({ mensagem: 'gastei 45 no mercado' }) }));
+    expect(card.textContent).toMatch(/R\$\s*45,00/);
+    expect(screen.getByTestId('ia-categoria').textContent).toBe('Mercado');
+    expect(screen.getByTestId('ia-data').textContent).toBe('Hoje');
+    // Só a mensagem da usuária foi salva no chat; nenhuma transação, nenhuma resposta das regras.
+    expect(mutation.mutateAsync.mock.calls.map((c) => c[0].role)).toEqual(['user']);
+    expect(gasteiMutate).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByTestId('card-gasto-ia')).toBeNull();
+    expect(gasteiMutate).not.toHaveBeenCalled();
+    expect(agentes()).toEqual([{ role: 'agent', conteudo: 'Tudo bem, não salvei esse gasto.' }]);
+  });
+
+  it('Confirmar grava uma vez pelo "Gastei" e fecha o card', async () => {
+    fetchMock.mockImplementation(() =>
+      respostaIa({ fallback: false, proposta: { valor: 45, categoria: 'Mercado', descricao: 'Mercado', data: hoje(), carteira_id: null } }),
+    );
+    enviar('gastei 45 no mercado');
+    await screen.findByTestId('card-gasto-ia');
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    expect(gasteiMutate).toHaveBeenCalledTimes(1);
+    expect(gasteiMutate.mock.calls[0]![0]).toEqual({ valor: 45, categoria: 'Mercado', descricao: 'Mercado', carteira_id: 'c1', data: hoje() });
+    gasteiMutate.mock.calls[0]![1].onSuccess();
+    await waitFor(() => expect(screen.queryByTestId('card-gasto-ia')).toBeNull());
+    expect(agentes()[0].conteudo).toMatch(/Gasto salvo: R\$\s*45,00 em Mercado/);
+  });
+
+  it.each([
+    ['rota respondeu fallback', () => respostaIa({ fallback: true })],
+    ['LLM/rota caída (rede)', () => Promise.reject(new TypeError('fetch failed'))],
+    ['rota com erro 500', () => Promise.resolve(new Response('x', { status: 500 }))],
+  ])('fallback (%s): cai em processarMensagem, sem card e sem erro na tela', async (_nome, resposta) => {
+    fetchMock.mockImplementation(resposta);
+    enviar('gastei 45 no mercado');
+    await waitFor(() => expect(agentes()).toHaveLength(1));
+    // Resposta do motor de regras, igual a antes da IA.
+    expect(agentes()[0]).toMatchObject({
+      conteudo: 'Sem movimentações financeiras registradas este mês.',
+      acoes: [{ label: 'Ver Finanças', acao: 'NAVEGAR', payload: { rota: '/financas' } }],
+    });
+    expect(screen.queryByTestId('card-gasto-ia')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(gasteiMutate).not.toHaveBeenCalled();
+  });
+
+  it('navegação e atalhos seguem nas regras, sem chamar a IA', async () => {
+    enviar('abrir minhas notas');
+    await waitFor(() => expect(agentes()).toHaveLength(1));
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
