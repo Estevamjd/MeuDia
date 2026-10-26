@@ -17,6 +17,9 @@ const appEnv = {
 
 const iPhone = devices['iPhone 13'];
 
+/** Chave SINTÉTICA só no `next build`: o verificar-bundle-ia falha se ela (ou o nome da env) aparecer em .next/static. */
+const CHAVE_SINTETICA_BUILD = 'gemini-chave-sintetica-bundle-e2e';
+
 export default defineConfig({
   testDir: './e2e',
   testMatch: /(modo-runtime|novo-usuario|onboarding-loop|contas-saldo|excluir-metas|assistente|abas|config)\.spec\.ts$/,
@@ -56,7 +59,11 @@ export default defineConfig({
     {
       // Sempre rebuilda: um .next antigo pode ter a URL/chave do Supabase real embutida no bundle.
       // Build sem APP_MODE e start com APP_MODE=financas: prova que o modo é lido em runtime (e2e/modo-runtime.spec.ts).
-      command: `env -u APP_MODE pnpm exec next build && pnpm exec next start -p ${APP_PORT}`,
+      // A chave sintética entra só no build e na varredura do bundle; o `next start` sobe sem ela (IA em fallback).
+      command:
+        `env -u APP_MODE GEMINI_API_KEY=${CHAVE_SINTETICA_BUILD} pnpm exec next build` +
+        ` && GEMINI_API_KEY=${CHAVE_SINTETICA_BUILD} node scripts/verificar-bundle-ia.mjs` +
+        ` && pnpm exec next start -p ${APP_PORT}`,
       url: `http://localhost:${APP_PORT}/login`,
       env: appEnv,
       reuseExistingServer: false,
