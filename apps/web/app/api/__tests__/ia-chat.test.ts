@@ -16,12 +16,16 @@ const CARTEIRA_A = { id: '11111111-1111-4111-8111-111111111111', nome: 'Banco Te
 
 /**
  * Cliente falso do supabase-js: registra tudo o que a rota pede. Escrita (insert/update/delete/upsert/rpc)
- * fica registrada para provar que a rota nunca grava.
+ * fica registrada; inserts no chat acumulam na contagem real do mock.
  */
-function clienteFalso({ usuario = { id: A } as { id: string } | null, mensagensHoje = 1, erroContagem = false } = {}) {
+function clienteFalso({ usuario = { id: A } as { id: string } | null, mensagensHoje = 0, erroContagem = false, erroInsert = false } = {}) {
   const chamadas: { tabela: string; metodo: string; args: unknown[] }[] = [];
   const escrita = (tabela: string, metodo: string) => (...args: unknown[]) => {
     chamadas.push({ tabela, metodo, args });
+    if (tabela === 'chat_agente' && metodo === 'insert') {
+      if (erroInsert) return Promise.resolve({ error: { message: 'insert negado' } });
+      mensagensHoje++;
+    }
     return Promise.resolve({ data: null, error: null });
   };
   const from = vi.fn((tabela: string) => {
@@ -84,7 +88,7 @@ describe('POST /api/ia/chat', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('"gastei 45 no mercado" → card R$45,00 / Mercado / hoje, sem gravar nada', async () => {
+  it('"gastei 45 no mercado" → card R$45,00 / Mercado / hoje, gravando só a mensagem no chat', async () => {
     const { client, chamadas } = clienteFalso();
     vi.mocked(createServerSupabaseClient).mockReturnValue(client as never);
     fetchMock.mockResolvedValue(respostaGemini({ valor: 45, categoria: 'Mercado', descricao: 'Mercado' }));
@@ -93,10 +97,13 @@ describe('POST /api/ia/chat', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       fallback: false,
+      gravada: true,
       proposta: { valor: 45, categoria: 'Mercado', descricao: 'Mercado', data: hojeSPISO(), carteira_id: null },
     });
-    // Nada entra em `transacoes` (nem em tabela nenhuma): só leituras.
-    expect(chamadas.filter((c) => ['insert', 'update', 'delete', 'upsert', 'rpc'].includes(c.metodo))).toEqual([]);
+    // Só a mensagem entra no chat; nada em transacoes.
+    expect(chamadas.filter((c) => ['insert', 'update', 'delete', 'upsert', 'rpc'].includes(c.metodo))).toEqual([
+      { tabela: 'chat_agente', metodo: 'insert', args: [{ user_id: A, role: 'user', conteudo: 'gastei 45 no mercado' }] },
+    ]);
     expect(chamadas.some((c) => c.tabela === 'transacoes')).toBe(false);
   });
 
@@ -149,7 +156,7 @@ describe('POST /api/ia/chat', () => {
     vi.stubEnv('GEMINI_API_KEY', '');
     const { client } = clienteFalso();
     vi.mocked(createServerSupabaseClient).mockReturnValue(client as never);
-    expect(await (await pedir('gastei 45 no mercado')).json()).toEqual({ fallback: true });
+    expect(await (await pedir('gastei 45 no mercado')).json()).toEqual({ fallback: true, gravada: true });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -163,20 +170,22 @@ describe('POST /api/ia/chat', () => {
     ['valor negativo', () => fetchMock.mockResolvedValue(respostaGemini({ valor: -45, categoria: 'Mercado' }))],
     ['categoria inventada', () => fetchMock.mockResolvedValue(respostaGemini({ valor: 45, categoria: 'Cassino' }))],
     ['data inválida', () => fetchMock.mockResolvedValue(respostaGemini({ valor: 45, categoria: 'Mercado', data: 'ontem' }))],
-  ])('LLM com problema (%s) → fallback 200, sem gravar', async (_nome, preparar) => {
+  ])('LLM com problema (%s) → fallback 200, preservando só a mensagem no chat', async (_nome, preparar) => {
     preparar();
     const { client, chamadas } = clienteFalso();
     vi.mocked(createServerSupabaseClient).mockReturnValue(client as never);
     const res = await pedir('gastei 45 no mercado');
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ fallback: true });
-    expect(chamadas.filter((c) => ['insert', 'update', 'delete', 'upsert', 'rpc'].includes(c.metodo))).toEqual([]);
+    expect(await res.json()).toEqual({ fallback: true, gravada: true });
+    expect(chamadas.filter((c) => ['insert', 'update', 'delete', 'upsert', 'rpc'].includes(c.metodo))).toEqual([
+      { tabela: 'chat_agente', metodo: 'insert', args: [{ user_id: A, role: 'user', conteudo: 'gastei 45 no mercado' }] },
+    ]);
   });
 
   it('limite diário: conta as mensagens do usuário hoje (BRT) em chat_agente; acima de 50 → fallback sem chamar o modelo', async () => {
     const { client, chamadas } = clienteFalso({ mensagensHoje: 51 });
     vi.mocked(createServerSupabaseClient).mockReturnValue(client as never);
-    expect(await (await pedir('gastei 45 no mercado')).json()).toEqual({ fallback: true });
+    expect(await (await pedir('gastei 45 no mercado')).json()).toEqual({ fallback: true, gravada: true });
     expect(fetchMock).not.toHaveBeenCalled();
     const contagem = chamadas.filter((c) => c.tabela === 'chat_agente');
     expect(contagem).toContainEqual({ tabela: 'chat_agente', metodo: 'select', args: ['id', { count: 'exact', head: true }] });
@@ -190,18 +199,38 @@ describe('POST /api/ia/chat', () => {
 
   it('exatamente 50 ainda passa; IA_LIMITE_DIARIO muda o limite', async () => {
     fetchMock.mockResolvedValue(respostaGemini({ valor: 45, categoria: 'Mercado' }));
-    vi.mocked(createServerSupabaseClient).mockReturnValue(clienteFalso({ mensagensHoje: 50 }).client as never);
+    vi.mocked(createServerSupabaseClient).mockReturnValue(clienteFalso({ mensagensHoje: 49 }).client as never);
     expect((await (await pedir('gastei 45 no mercado')).json()).fallback).toBe(false);
 
     vi.stubEnv('IA_LIMITE_DIARIO', '3');
     vi.mocked(createServerSupabaseClient).mockReturnValue(clienteFalso({ mensagensHoje: 4 }).client as never);
-    expect(await (await pedir('gastei 45 no mercado')).json()).toEqual({ fallback: true });
+    expect(await (await pedir('gastei 45 no mercado')).json()).toEqual({ fallback: true, gravada: true });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('60 POSTs diretos consomem cota: só 50 chegam ao Gemini', async () => {
+    const { client, chamadas } = clienteFalso();
+    vi.mocked(createServerSupabaseClient).mockReturnValue(client as never);
+    fetchMock.mockImplementation(() => Promise.resolve(respostaGemini({ valor: 45, categoria: 'Mercado' })));
+    const resultados = [];
+    for (let i = 0; i < 60; i++) resultados.push(await (await pedir('gastei 45 no mercado')).json());
+    expect(fetchMock).toHaveBeenCalledTimes(50);
+    expect(resultados.filter((r) => !r.fallback)).toHaveLength(50);
+    expect(chamadas.filter((c) => c.metodo === 'insert')).toHaveLength(60);
+    expect(chamadas[0]).toMatchObject({ tabela: 'chat_agente', metodo: 'insert' });
+  });
+
+  it('erro no insert → fallback sem contagem nem Gemini', async () => {
+    const { client, chamadas } = clienteFalso({ erroInsert: true });
+    vi.mocked(createServerSupabaseClient).mockReturnValue(client as never);
+    expect(await (await pedir('gastei 45 no mercado')).json()).toEqual({ fallback: true, gravada: false });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(chamadas.map((c) => c.metodo)).toEqual(['insert']);
   });
 
   it('erro na contagem → fallback (não gasta cota sem saber)', async () => {
     vi.mocked(createServerSupabaseClient).mockReturnValue(clienteFalso({ erroContagem: true }).client as never);
-    expect(await (await pedir('gastei 45 no mercado')).json()).toEqual({ fallback: true });
+    expect(await (await pedir('gastei 45 no mercado')).json()).toEqual({ fallback: true, gravada: true });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

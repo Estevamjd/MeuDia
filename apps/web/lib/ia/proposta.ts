@@ -13,7 +13,7 @@ export interface PropostaGasto {
 }
 
 /** Resposta de `POST /api/ia/chat`: ou um card validado, ou `fallback` (o cliente usa `processarMensagem`). */
-export type RespostaIaChat = { fallback: true } | { fallback: false; proposta: PropostaGasto };
+export type RespostaIaChat = { fallback: true; gravada: boolean } | { fallback: false; gravada: true; proposta: PropostaGasto };
 
 export interface CarteiraIa {
   id: string;

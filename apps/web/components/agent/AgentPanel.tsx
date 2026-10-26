@@ -68,7 +68,7 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
 
   // Agent hooks
   const { data: notificacoes, isLoading: loadingNotif } = useNotificacoes();
-  const { data: mensagens, isLoading: loadingChat } = useMensagensChat();
+  const { data: mensagens, isLoading: loadingChat, refetch: refetchChat } = useMensagensChat();
   const { data: countNaoLidas } = useContarNaoLidas();
   const enviarMensagem = useEnviarMensagem();
   const marcarLida = useMarcarNotificacaoLida();
@@ -203,11 +203,11 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
   // Handler de enviar mensagem no chat (definido antes de handleAcao pois COMANDO depende dele)
   const handleEnviarChat = useCallback(
     async (texto: string) => {
-      // Salvar mensagem do usuário
-      await enviarMensagem.mutateAsync({
-        role: 'user',
-        conteudo: texto,
-      });
+      const consultarIA = deveConsultarIA(texto);
+      // No caminho IA, aguardamos a confirmação explícita de gravação da rota.
+      if (!consultarIA) {
+        await enviarMensagem.mutateAsync({ role: 'user', conteudo: texto });
+      }
 
       // Montar histórico recente (últimas 10 mensagens)
       const historico = (mensagens ?? []).slice(-10).map((m) => ({
@@ -217,13 +217,18 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
       // Adicionar a mensagem atual que acabou de ser enviada
       historico.push({ role: 'user', conteudo: texto });
 
-      // Gasto em linguagem natural: a IA (servidor) só devolve o card; nada é gravado antes do Confirmar.
+      // A rota grava o chat; o gasto só é gravado no Confirmar.
       // Sem card (fallback, cota, erro, timeout), segue com as regras, sem erro na tela.
-      if (deveConsultarIA(texto)) {
+      if (consultarIA) {
         setConsultandoIA(true);
         const dados = await pedirPropostaIA(texto).finally(() => setConsultandoIA(false));
-        if (dados) {
-          setProposta({ id: Date.now(), dados });
+        if (dados?.gravada !== true) {
+          // Num timeout, o servidor pode ainda estar gravando: uma duplicata é preferível a perder a mensagem.
+          await enviarMensagem.mutateAsync({ role: 'user', conteudo: texto });
+        }
+        await refetchChat();
+        if (dados?.proposta) {
+          setProposta({ id: Date.now(), dados: dados.proposta });
           return;
         }
       }
@@ -238,7 +243,7 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
         acoes: resposta.acoes,
       });
     },
-    [enviarMensagem, contexto, mensagens],
+    [enviarMensagem, contexto, mensagens, refetchChat],
   );
 
   // Handler de ações (NAVEGAR + COMANDO + CRIAR_COMPROMISSO)

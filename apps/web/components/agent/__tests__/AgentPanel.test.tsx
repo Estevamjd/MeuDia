@@ -25,11 +25,12 @@ const notif = (id: string, modulo: NotificacaoAgente['modulo'], rota: string): N
 });
 
 const NOTIFICACOES = [notif('n1', 'financas', '/financas/contas'), notif('n2', 'treino', '/treinos')];
+const refetchChat = vi.fn().mockResolvedValue({});
 const mutation = { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false };
 
 vi.mock('../../../hooks/useAgente', () => ({
   useNotificacoes: () => ({ data: NOTIFICACOES, isLoading: false }),
-  useMensagensChat: () => ({ data: [], isLoading: false }),
+  useMensagensChat: () => ({ data: [], isLoading: false, refetch: refetchChat }),
   useEnviarMensagem: () => mutation,
   useMarcarNotificacaoLida: () => ({ ...mutation, mutate: marcarLida }),
   useMarcarTodasLidas: () => ({ ...mutation, mutate: marcarTodasLidas }),
@@ -251,7 +252,7 @@ describe('AgentPanel: gasto por linguagem natural (IA F1, LLM mockado)', () => {
 
   it('"gastei 45 no mercado" → card R$ 45,00 / Mercado / Hoje; nada gravado antes do Confirmar; Cancelar não grava', async () => {
     fetchMock.mockImplementation(() =>
-      respostaIa({ fallback: false, proposta: { valor: 45, categoria: 'Mercado', descricao: 'Mercado', data: hoje(), carteira_id: null } }),
+      respostaIa({ fallback: false, gravada: true, proposta: { valor: 45, categoria: 'Mercado', descricao: 'Mercado', data: hoje(), carteira_id: null } }),
     );
     enviar('gastei 45 no mercado');
     const card = await screen.findByTestId('card-gasto-ia');
@@ -259,8 +260,9 @@ describe('AgentPanel: gasto por linguagem natural (IA F1, LLM mockado)', () => {
     expect(card.textContent).toMatch(/R\$\s*45,00/);
     expect(screen.getByTestId('ia-categoria').textContent).toBe('Mercado');
     expect(screen.getByTestId('ia-data').textContent).toBe('Hoje');
-    // Só a mensagem da usuária foi salva no chat; nenhuma transação, nenhuma resposta das regras.
-    expect(mutation.mutateAsync.mock.calls.map((c) => c[0].role)).toEqual(['user']);
+    // A rota grava a mensagem; o navegador só atualiza o histórico.
+    expect(mutation.mutateAsync.mock.calls.map((c) => c[0].role)).toEqual([]);
+    expect(refetchChat).toHaveBeenCalledOnce();
     expect(gasteiMutate).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
@@ -271,7 +273,7 @@ describe('AgentPanel: gasto por linguagem natural (IA F1, LLM mockado)', () => {
 
   it('Confirmar grava uma vez pelo "Gastei" e fecha o card', async () => {
     fetchMock.mockImplementation(() =>
-      respostaIa({ fallback: false, proposta: { valor: 45, categoria: 'Mercado', descricao: 'Mercado', data: hoje(), carteira_id: null } }),
+      respostaIa({ fallback: false, gravada: true, proposta: { valor: 45, categoria: 'Mercado', descricao: 'Mercado', data: hoje(), carteira_id: null } }),
     );
     enviar('gastei 45 no mercado');
     await screen.findByTestId('card-gasto-ia');
@@ -284,13 +286,17 @@ describe('AgentPanel: gasto por linguagem natural (IA F1, LLM mockado)', () => {
   });
 
   it.each([
-    ['rota respondeu fallback', () => respostaIa({ fallback: true })],
-    ['LLM/rota caída (rede)', () => Promise.reject(new TypeError('fetch failed'))],
-    ['rota com erro 500', () => Promise.resolve(new Response('x', { status: 500 }))],
-  ])('fallback (%s): cai em processarMensagem, sem card e sem erro na tela', async (_nome, resposta) => {
+    ['rota respondeu fallback', () => respostaIa({ fallback: true, gravada: true }), ['agent']],
+    ['401', () => Promise.resolve(new Response('x', { status: 401 })), ['user', 'agent']],
+    ['400', () => Promise.resolve(new Response('x', { status: 400 })), ['user', 'agent']],
+    ['timeout', () => Promise.reject(new DOMException('timeout', 'TimeoutError')), ['user', 'agent']],
+    ['LLM/rota caída (rede)', () => Promise.reject(new TypeError('fetch failed')), ['user', 'agent']],
+    ['rota com erro 500', () => Promise.resolve(new Response('x', { status: 500 })), ['user', 'agent']],
+  ])('fallback (%s): cai em processarMensagem, sem card e sem erro na tela', async (_nome, resposta, ordem) => {
     fetchMock.mockImplementation(resposta);
     enviar('gastei 45 no mercado');
     await waitFor(() => expect(agentes()).toHaveLength(1));
+    expect(mutation.mutateAsync.mock.calls.map((c) => c[0].role)).toEqual(ordem);
     // Resposta do motor de regras, igual a antes da IA.
     expect(agentes()[0]).toMatchObject({
       conteudo: 'Sem movimentações financeiras registradas este mês.',
@@ -301,9 +307,10 @@ describe('AgentPanel: gasto por linguagem natural (IA F1, LLM mockado)', () => {
     expect(gasteiMutate).not.toHaveBeenCalled();
   });
 
-  it('navegação e atalhos seguem nas regras, sem chamar a IA', async () => {
-    enviar('abrir minhas notas');
+  it.each(['abrir minhas notas', 'como estão minhas finanças?', 'quanto gastei este mês?'])('atalho %s segue nas regras, sem chamar a IA', async (texto) => {
+    enviar(texto);
     await waitFor(() => expect(agentes()).toHaveLength(1));
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(mutation.mutateAsync.mock.calls[0]?.[0]).toEqual({ role: 'user', conteudo: texto });
   });
 });

@@ -16,7 +16,10 @@ export function inicioDoDiaSP(now = new Date()): string {
 
 /**
  * Conta as mensagens do próprio usuário hoje (BRT) em `chat_agente`, sem migração.
- * O cliente grava a mensagem antes de chamar a rota, então a atual entra na conta.
+ * A rota grava a mensagem antes de contar, então a atual entra na conta.
+ * Limite conhecido: conta mensagens existentes no dia; limparChat pode zerar a cota,
+ * pois users_own_data FOR ALL permite DELETE. Fechar exige contador sem DELETE
+ * (tabela própria ou RPC SECURITY DEFINER), migração que depende do OK do Estevam.
  * Erro na contagem conta como "estourou": sem saber, não gasta cota.
  */
 export async function passouDoLimite(client: SupabaseClient, userId: string, now = new Date()): Promise<boolean> {
