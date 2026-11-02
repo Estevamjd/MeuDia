@@ -5,6 +5,25 @@ import 'server-only';
  * nunca tem `NEXT_PUBLIC_` e nunca é logada. Qualquer falha devolve null (a rota cai no fallback).
  */
 
+/**
+ * Log de fallback com motivo curto e estável. Nunca recebe chave, URL, headers, mensagem do usuário
+ * nem texto da resposta: só o motivo e, no HTTP, o status numérico e o `error.status` do Google.
+ */
+export function logFallback(motivo: string, extra = ''): void {
+  console.warn(`[ia/chat] fallback motivo=${motivo}${extra ? ` ${extra}` : ''}`);
+}
+
+/** Só códigos no formato do Google (ex.: INVALID_ARGUMENT, RESOURCE_EXHAUSTED); o resto é descartado. */
+async function codigoErroGoogle(res: Response): Promise<string | null> {
+  try {
+    const json = (await res.json()) as { error?: { status?: unknown } } | null;
+    const status = json?.error?.status;
+    return typeof status === 'string' && /^[A-Z_]{1,40}$/.test(status) ? status : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Padrão do STACK-DECISION §1; troca sem deploy pela env opcional `GEMINI_MODEL`. */
 export const MODELO_PADRAO = 'gemini-3.1-flash-lite';
 const TIMEOUT_MS = 8000;
@@ -83,13 +102,24 @@ export async function chamarProporGasto(entrada: EntradaGemini, chave: string): 
         cache: 'no-store',
       },
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const codigo = await codigoErroGoogle(res);
+      logFallback('gemini_http', `status=${res.status}${codigo ? ` erro=${codigo}` : ''}`);
+      return null;
+    }
     const json = (await res.json()) as {
       candidates?: { content?: { parts?: { functionCall?: { name?: string; args?: unknown } }[] } }[];
     };
     const chamada = json.candidates?.[0]?.content?.parts?.find((p) => p.functionCall?.name === PROPOR_GASTO.name);
-    return chamada?.functionCall?.args ?? null;
-  } catch {
+    if (!chamada?.functionCall?.args) {
+      logFallback('gemini_sem_funcao');
+      return null;
+    }
+    return chamada.functionCall.args;
+  } catch (e) {
+    // Só o nome do erro decide o motivo; a mensagem pode carregar a requisição.
+    const nome = e instanceof Error ? e.name : '';
+    logFallback(nome === 'TimeoutError' || nome === 'AbortError' ? 'gemini_timeout' : nome === 'TypeError' ? 'gemini_rede' : 'excecao');
     return null;
   }
 }

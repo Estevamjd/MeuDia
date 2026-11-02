@@ -242,6 +242,88 @@ describe('POST /api/ia/chat', () => {
   });
 });
 
+describe('POST /api/ia/chat: log do motivo do fallback, sem segredo nem texto', () => {
+  const MENSAGEM = 'gastei 45 no mercado secreto';
+  let warn: ReturnType<typeof vi.spyOn>;
+  let info: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    info = vi.spyOn(console, 'info').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    warn.mockRestore();
+    info.mockRestore();
+  });
+  const logs = () => [...warn.mock.calls, ...info.mock.calls].map((c) => c.map(String).join(' '));
+  const semSegredo = () => {
+    for (const l of logs()) {
+      expect(l).not.toContain(CHAVE);
+      expect(l).not.toContain('secreto');
+      expect(l).not.toContain('generativelanguage');
+      expect(l).not.toContain('detalhe do google');
+    }
+  };
+  const usar = (opts?: Parameters<typeof clienteFalso>[0]) =>
+    vi.mocked(createServerSupabaseClient).mockReturnValue(clienteFalso(opts).client as never);
+  /** Erro no formato do Google, com mensagem que ecoa a chave e o texto (não pode ir para o log). */
+  const erroGoogle = (status: number, codigo: string) =>
+    new Response(JSON.stringify({ error: { code: status, message: `detalhe do google ${CHAVE} ${MENSAGEM}`, status: codigo } }), { status });
+
+  it('sem chave → motivo=sem_chave', async () => {
+    vi.stubEnv('GEMINI_API_KEY', '');
+    usar();
+    await pedir(MENSAGEM);
+    expect(warn).toHaveBeenCalledWith('[ia/chat] fallback motivo=sem_chave');
+    expect(info).not.toHaveBeenCalled();
+    semSegredo();
+  });
+
+  it.each([
+    [400, 'INVALID_ARGUMENT'],
+    [429, 'RESOURCE_EXHAUSTED'],
+  ])('HTTP %i do Gemini → só status e error.status', async (status, codigo) => {
+    usar();
+    fetchMock.mockResolvedValue(erroGoogle(status, codigo));
+    await pedir(MENSAGEM);
+    expect(warn.mock.calls).toEqual([[`[ia/chat] fallback motivo=gemini_http status=${status} erro=${codigo}`]]);
+    semSegredo();
+  });
+
+  it('HTTP sem JSON → só o status; error.status fora do formato é descartado', async () => {
+    usar();
+    fetchMock.mockResolvedValueOnce(new Response(`<html>${CHAVE}</html>`, { status: 500 }));
+    await pedir(MENSAGEM);
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ error: { status: `x ${CHAVE}` } }), { status: 403 }));
+    await pedir(MENSAGEM);
+    expect(warn.mock.calls).toEqual([['[ia/chat] fallback motivo=gemini_http status=500'], ['[ia/chat] fallback motivo=gemini_http status=403']]);
+    semSegredo();
+  });
+
+  it.each([
+    ['limite', () => usar({ mensagensHoje: 51 }), 'limite'],
+    ['erro ao gravar', () => usar({ erroInsert: true }), 'erro_gravar'],
+    ['timeout', () => { usar(); fetchMock.mockRejectedValue(new DOMException(`timeout ${CHAVE}`, 'TimeoutError')); }, 'gemini_timeout'],
+    ['rede', () => { usar(); fetchMock.mockRejectedValue(new TypeError(`fetch failed ${CHAVE}`)); }, 'gemini_rede'],
+    ['JSON quebrado', () => { usar(); fetchMock.mockResolvedValue(new Response(`não é json ${CHAVE}`, { status: 200 })); }, 'excecao'],
+    ['sem função', () => { usar(); fetchMock.mockResolvedValue(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: MENSAGEM }] } }] }))); }, 'gemini_sem_funcao'],
+    ['proposta inválida', () => { usar(); fetchMock.mockResolvedValue(respostaGemini({ valor: -45, categoria: 'Mercado' })); }, 'proposta_invalida'],
+  ])('%s → um motivo só', async (_nome, preparar, motivo) => {
+    preparar();
+    expect((await (await pedir(MENSAGEM)).json()).fallback).toBe(true);
+    expect(warn.mock.calls).toEqual([[`[ia/chat] fallback motivo=${motivo}`]]);
+    semSegredo();
+  });
+
+  it('sucesso → [ia/chat] ok, sem warn', async () => {
+    usar();
+    fetchMock.mockResolvedValue(respostaGemini({ valor: 45, categoria: 'Mercado', descricao: 'secreto' }));
+    expect((await (await pedir(MENSAGEM)).json()).fallback).toBe(false);
+    expect(info.mock.calls).toEqual([['[ia/chat] ok']]);
+    expect(warn).not.toHaveBeenCalled();
+    semSegredo();
+  });
+});
+
 describe('rotas e módulos de IA: sem service-role, chave só no servidor', () => {
   const raiz = path.resolve(__dirname, '../../..');
   const arquivos = (dir: string): string[] =>
