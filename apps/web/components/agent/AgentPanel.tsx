@@ -29,6 +29,7 @@ import { useAppMode } from '../AppModeProvider';
 import {
   abaInicialAgente,
   abasAgente,
+  adaptarRespostaAoModo,
   filtrarMensagens,
   filtrarNotificacoes,
   isAcaoPermitida,
@@ -234,7 +235,7 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
       }
 
       // Processar e gerar resposta do agente
-      const resposta = processarMensagem(texto, contexto, historico);
+      const resposta = adaptarRespostaAoModo(texto, processarMensagem(texto, contexto, historico), mode);
 
       // Salvar resposta do agente
       await enviarMensagem.mutateAsync({
@@ -243,7 +244,7 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
         acoes: resposta.acoes,
       });
     },
-    [enviarMensagem, contexto, mensagens, refetchChat],
+    [enviarMensagem, contexto, mensagens, refetchChat, mode],
   );
 
   // Handler de ações (NAVEGAR + COMANDO + CRIAR_COMPROMISSO)

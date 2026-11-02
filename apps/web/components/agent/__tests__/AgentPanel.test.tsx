@@ -307,6 +307,19 @@ describe('AgentPanel: gasto por linguagem natural (IA F1, LLM mockado)', () => {
     expect(gasteiMutate).not.toHaveBeenCalled();
   });
 
+  it.each(['marcar reunião dia 15 às 10h', 'Adicione uma tarefa: comprar pão amanhã às 9h'])(
+    'modo Finanças: "%s" responde que a agenda não está disponível, sem citar "Criar Agora" nem chamar a IA',
+    async (texto) => {
+      enviar(texto);
+      await waitFor(() => expect(agentes()).toHaveLength(1));
+      expect(fetchMock).not.toHaveBeenCalled();
+      const [resposta] = agentes();
+      expect(resposta.conteudo).toMatch(/agenda .*não está disponível no modo Finanças/);
+      expect(resposta.conteudo).not.toContain('Criar Agora');
+      expect(resposta.acoes.some((a: { acao: string }) => a.acao === 'CRIAR_COMPROMISSO')).toBe(false);
+    },
+  );
+
   it.each(['abrir minhas notas', 'como estão minhas finanças?', 'quanto gastei este mês?'])('atalho %s segue nas regras, sem chamar a IA', async (texto) => {
     enviar(texto);
     await waitFor(() => expect(agentes()).toHaveLength(1));
