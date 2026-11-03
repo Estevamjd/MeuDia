@@ -5,6 +5,7 @@ import { treinoService } from '@meudia/api';
 import type { TreinoInsert, ExercicioInsert, SerieRealizadaInsert } from '@meudia/shared';
 import { useAuth } from './useAuth';
 import { withOfflineSupport } from '../lib/offline-mutation';
+import { useAppMode } from '../components/AppModeProvider';
 
 export function useTreinos() {
   const { user } = useAuth();
@@ -134,13 +135,15 @@ export function useReordenarExercicios() {
 
 // === Sessões ===
 
+/** No modo Finanças não há treinos: não consulta `sessoes_treino` (o AgentPanel do layout monta em toda página). */
 export function useSessoesSemana() {
   const { user } = useAuth();
+  const mode = useAppMode();
 
   return useQuery({
     queryKey: ['sessoes-semana', user?.id],
     queryFn: () => treinoService.obterSessoesSemana(user!.id),
-    enabled: !!user?.id,
+    enabled: !!user?.id && mode !== 'financas',
   });
 }
 
