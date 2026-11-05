@@ -44,6 +44,6 @@ export const TACO_CITACAO_CURTA = 'Valores de referência: TACO 4ª ed. (NEPA/UN
 export const TACO_CITACAO =
   'UNICAMP/NEPA. Tabela Brasileira de Composição de Alimentos – TACO. 4. ed. rev. e ampl. Campinas: NEPA-UNICAMP, 2011.';
 
-/** Aviso do cadastro (design-system B §5, texto do ANEXO-ONBOARDING §5.6). */
+/** Aviso do cadastro (design-system B §5, ANEXO-ONBOARDING §5.6) sem "O app ajusta pela sua tendência de peso": o ajuste não existe (decisão do Chief, 05/11). */
 export const AVISO_ESTIMATIVA_SAUDE =
-  'Estimativa baseada em médias (fórmula Mifflin-St Jeor). Seu corpo pode gastar mais ou menos. O app ajusta pela sua tendência de peso. Não é orientação médica.';
+  'Estimativa baseada em médias (fórmula Mifflin-St Jeor). Seu corpo pode gastar mais ou menos. Não é orientação médica.';

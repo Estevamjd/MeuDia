@@ -142,7 +142,13 @@ describe('OnboardingSaude (3 telas)', () => {
     expect(screen.getByText(/gasto estimado 2\.820 kcal \+ 10% para ganho/)).toBeTruthy();
     expect(screen.getByText('126')).toBeTruthy();
     expect(screen.getAllByText('calculada')).toHaveLength(2);
-    expect(screen.getByText(/Estimativa baseada em médias \(fórmula Mifflin-St Jeor\)/)).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Estimativa baseada em médias (fórmula Mifflin-St Jeor). Seu corpo pode gastar mais ou menos. Não é orientação médica.',
+      ),
+    ).toBeTruthy();
+    // O app não ajusta a meta pela tendência de peso; o aviso não pode prometer isso.
+    expect(screen.queryByText(/ajusta|tendência/i)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Salvar e começar' }));
     expect(onConcluir).toHaveBeenCalledWith(
       { idade: 28, sexo: 'masculino', alturaCm: 175, pesoKg: 70, nivel: 'moderado', objetivo: 'ganhar' },
