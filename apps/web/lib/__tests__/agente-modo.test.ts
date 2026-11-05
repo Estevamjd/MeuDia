@@ -27,8 +27,8 @@ describe('agente-modo', () => {
     expect(abaInicialAgente('padrao')).toBe('resumo');
   });
 
-  it('financas: remove navegação para módulos ocultos e criar compromisso', () => {
-    expect(filtrarAcoes(ACOES, 'financas').map((a) => a.label)).toEqual(['Finanças', 'Contas', 'Pergunta']);
+  it('financas: remove navegação para módulos ocultos e criar compromisso; Treinos fica (aparece para todos)', () => {
+    expect(filtrarAcoes(ACOES, 'financas').map((a) => a.label)).toEqual(['Finanças', 'Contas', 'Treinos', 'Pergunta']);
     expect(isAcaoPermitida({ acao: 'NAVEGAR' }, 'financas')).toBe(false);
     expect(filtrarAcoes(ACOES, 'padrao')).toEqual(ACOES);
   });
@@ -41,7 +41,7 @@ describe('agente-modo', () => {
 
   it('mensagens do chat perdem ações ocultas só no modo financas', () => {
     const msg = { id: 'm', role: 'agent', conteudo: 'oi', acoes: ACOES } as MensagemChat;
-    expect(filtrarMensagens([msg], 'financas')[0]!.acoes).toHaveLength(3);
+    expect(filtrarMensagens([msg], 'financas')[0]!.acoes).toHaveLength(4);
     expect(filtrarMensagens([msg], 'padrao')[0]!.acoes).toHaveLength(5);
   });
 
@@ -96,8 +96,13 @@ describe('adaptarRespostaAoModo (motor de regras real)', () => {
     },
   );
 
+  it.each(['cria um treino de peito', 'qual meu treino de hoje'])('financas: "%s" responde como no modo padrão (Treinos aparece para todos)', (texto) => {
+    const r = responder(texto, 'financas');
+    expect(r.mensagem).not.toMatch(/não está disponível|não estão disponíveis/);
+    expect(r.mensagem).toBe(processarMensagem(texto, contexto).mensagem);
+  });
+
   it.each([
-    ['cria um treino de peito', /Treinos não estão disponíveis/],
     ['criar hábito de ler', /Hábitos não estão disponíveis/],
     ['abrir minhas notas', /Notas não estão disponíveis/],
   ])('financas: "%s" avisa o módulo indisponível', (texto, esperado) => {

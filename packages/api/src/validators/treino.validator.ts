@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { lerFaixaRepeticoes } from '@meudia/shared';
 
 export const treinoInsertSchema = z.object({
   nome: z.string().min(1, 'Nome do treino é obrigatório').max(100),
@@ -12,7 +13,8 @@ export const exercicioInsertSchema = z.object({
   treino_id: z.string().uuid(),
   nome: z.string().min(1, 'Nome do exercício é obrigatório').max(100),
   series: z.number().min(1).default(3),
-  repeticoes: z.string().min(1).max(50).default('10-12'),
+  // "8-12", "10" ou "" (série sem repetição, ex.: prancha). Vira repeticoes_min/max no repositório.
+  repeticoes: z.string().max(20).refine((t) => lerFaixaRepeticoes(t) !== null, 'Use um número (10) ou uma faixa (8-12)').default('10-12'),
   carga: z.number().min(0).nullable().optional(),
   tempo_descanso: z.number().min(0).default(60),
   observacao: z.string().max(500).nullable().optional(),

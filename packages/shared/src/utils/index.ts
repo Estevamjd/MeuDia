@@ -7,3 +7,5 @@ export * from './saldo';
 export * from './metas';
 export * from './gastos';
 export * from './renda-principal';
+export * from './repeticoes';
+export * from './treino';

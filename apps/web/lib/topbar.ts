@@ -12,7 +12,8 @@ export const TOPBAR_TABS: readonly TopbarTab[] = [
   { label: '📝 Notas', href: '/notas', color: 'green' },
 ];
 
-/** Abas do desktop visíveis no modo (FE-01): em Finanças nenhuma; a navegação fica na Sidebar. */
+/** Abas do desktop visíveis no modo (FE-01): em Finanças nenhuma; a navegação (inclusive Treinos) fica na Sidebar. */
 export function tabsTopbar(mode: AppMode): TopbarTab[] {
+  if (mode === 'financas') return [];
   return filtrarPorModo(TOPBAR_TABS, mode);
 }

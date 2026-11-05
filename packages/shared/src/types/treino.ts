@@ -27,7 +27,11 @@ export interface Exercicio {
   treino_id: UUID;
   nome: string;
   series: number;
+  /** Faixa em texto ("8–12", "10" ou "" quando a série não conta repetição). Vem de `repeticoes_min`/`max`. */
   repeticoes: string;
+  /** 008: faixa de repetições. Os dois NULL = série sem repetição (ex.: prancha). */
+  repeticoes_min: number | null;
+  repeticoes_max: number | null;
   carga: number | null;
   tempo_descanso: number;
   observacao: string | null;
@@ -38,6 +42,7 @@ export interface ExercicioInsert {
   treino_id: UUID;
   nome: string;
   series?: number;
+  /** Texto da faixa ("8-12", "8–12", "10" ou "" para sem repetição); o repositório grava min/max. */
   repeticoes?: string;
   carga?: number | null;
   tempo_descanso?: number;

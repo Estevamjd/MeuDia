@@ -23,6 +23,8 @@ const config: Config = {
         red: '#f87171',
         text: '#eeeef8',
         muted: '#65657a',
+        // Saúde e Treino (Caderno B): texto secundário legível; `muted` só em elementos não textuais.
+        'muted-text': '#a3a3b8',
       },
       fontFamily: {
         syne: ['var(--font-syne)', 'Syne', 'sans-serif'],

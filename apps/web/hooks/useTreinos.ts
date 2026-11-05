@@ -135,15 +135,56 @@ export function useReordenarExercicios() {
 
 // === Sessões ===
 
-/** No modo Finanças não há treinos: não consulta `sessoes_treino` (o AgentPanel do layout monta em toda página). */
-export function useSessoesSemana() {
+/**
+ * No modo Finanças o AgentPanel do layout monta em toda página: por padrão não consulta `sessoes_treino` lá (C-1).
+ * A tela /treinos (visível para todos desde 04/11/2026) pede `{ noModoFinancas: true }`.
+ */
+export function useSessoesSemana({ noModoFinancas = false }: { noModoFinancas?: boolean } = {}) {
   const { user } = useAuth();
   const mode = useAppMode();
 
   return useQuery({
     queryKey: ['sessoes-semana', user?.id],
     queryFn: () => treinoService.obterSessoesSemana(user!.id),
-    enabled: !!user?.id && mode !== 'financas',
+    enabled: !!user?.id && (mode !== 'financas' || noModoFinancas),
+  });
+}
+
+/** Coluna ANTERIOR: última vez de cada exercício, sem a sessão em andamento. */
+export function useSeriesAnteriores(exercicioIds: string[], sessaoAtualId: string | null) {
+  const { user } = useAuth();
+  const ids = [...exercicioIds].sort();
+
+  return useQuery({
+    queryKey: ['series-anteriores', user?.id, ids.join(','), sessaoAtualId],
+    queryFn: () => treinoService.obterSeriesAnteriores(user!.id, ids, sessaoAtualId),
+    enabled: !!user?.id && ids.length > 0,
+  });
+}
+
+/** Lembrete de treino: false por padrão; `null` = a coluna ainda não existe no banco (008 não aplicada). */
+export function useLembreteTreino() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['lembrete-treino', user?.id],
+    queryFn: () => treinoService.obterLembreteTreino(user!.id),
+    enabled: !!user?.id,
+  });
+}
+
+export function useSalvarLembreteTreino() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ligado: boolean) => {
+      if (!user?.id) throw new Error('Não autenticado');
+      return treinoService.salvarLembreteTreino(user.id, ligado);
+    },
+    onSuccess: (ligado) => {
+      queryClient.setQueryData(['lembrete-treino', user?.id], ligado);
+    },
   });
 }
 
@@ -187,6 +228,7 @@ export function useFinalizarSessao() {
       treinoService.finalizarSessao(sessaoId, duracao),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['sessoes-semana'] });
+      void queryClient.invalidateQueries({ queryKey: ['series-anteriores'] });
       void queryClient.invalidateQueries({ queryKey: ['score'] });
     },
   });

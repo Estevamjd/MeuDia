@@ -17,6 +17,9 @@ export {
   useFinalizarSessao,
   useRegistrarSerie,
   useAtualizarSerie,
+  useSeriesAnteriores,
+  useLembreteTreino,
+  useSalvarLembreteTreino,
 } from './useTreinos';
 export {
   useHabitos,

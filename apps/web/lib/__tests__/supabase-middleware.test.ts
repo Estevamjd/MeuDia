@@ -8,8 +8,8 @@ afterEach(() => vi.unstubAllEnvs());
 it.each([
   ['/financas', null, '/login'],
   ['/login', { id: 'u' }, '/financas'],
-  ['/treinos/sessao?mes=10', { id: 'u' }, '/financas'],
-  ['/treinos?mes=10', { id: 'u' }, '/financas'],
+  ['/habitos/hoje?mes=10', { id: 'u' }, '/financas'],
+  ['/dieta?mes=10', { id: 'u' }, '/financas'],
 ] as const)('preserva cookies no redirect de %s', async (origem, user, destino) => {
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.invalid');
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'fixture');
@@ -25,7 +25,7 @@ it.each([
   expect(response.cookies.get('session')).toMatchObject({ value: 'renovada', httpOnly: true, path: '/', sameSite: 'lax' });
 });
 
-it.each(['/treinos', '/treinos/sessao?mes=10'])('bloqueia %s mesmo sem Supabase configurado', async path => {
+it.each(['/habitos', '/dieta/hoje?mes=10'])('bloqueia %s mesmo sem Supabase configurado', async path => {
   vi.stubEnv('APP_MODE', 'financas');
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', '');
@@ -45,6 +45,18 @@ it.each([null, { id: 'u' }])('/auth/callback é público e não redireciona (use
 });
 
 it.each(['/privacidade', '/termos'])('%s segue acessível para usuário logado', async path => {
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.invalid');
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'fixture');
+  vi.stubEnv('APP_MODE', 'financas');
+  vi.mocked(createServerClient).mockImplementation(() => ({
+    auth: { getUser: async () => ({ data: { user: { id: 'u' } } }) },
+  }) as never);
+  const response = await updateSession(new NextRequest(`https://example.invalid${path}`));
+  expect(response.headers.get('location')).toBeNull();
+});
+
+// Saúde e Treino aparece para todos (decisão do Estevam, 04/11/2026): /treinos não redireciona no modo Finanças.
+it.each(['/treinos', '/treinos?dia=1'])('modo Finanças: %s segue aberto para usuário logado', async path => {
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.invalid');
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'fixture');
   vi.stubEnv('APP_MODE', 'financas');

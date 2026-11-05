@@ -5,7 +5,8 @@ import { GET as getManifestJson } from '../../app/manifest.json/route';
 
 afterEach(() => vi.unstubAllEnvs());
 
-const OCULTOS_NO_FINANCAS = ['/inicio', '/agenda', '/habitos', '/treinos', '/dieta', '/compras', '/medicamentos', '/notas', '/veiculo'];
+// /treinos saiu: Saúde e Treino aparece para todos (decisão do Estevam, 04/11/2026).
+const OCULTOS_NO_FINANCAS = ['/inicio', '/agenda', '/habitos', '/dieta', '/compras', '/medicamentos', '/notas', '/veiculo'];
 
 describe('buildManifest', () => {
   it('modo padrão: igual ao antigo public/manifest.json', () => {
@@ -16,10 +17,10 @@ describe('buildManifest', () => {
     expect(m.icons).toHaveLength(4);
   });
 
-  it('modo finanças: só atalhos de finanças e start_url /financas', () => {
+  it('modo finanças: atalhos de Treinos e Finanças e start_url /financas', () => {
     const m = buildManifest('financas');
     expect(m.start_url).toBe('/financas');
-    expect(m.shortcuts.map((s) => s.url)).toEqual(['/financas']);
+    expect(m.shortcuts.map((s) => s.url)).toEqual(['/treinos', '/financas']);
     expect(m.categories).toEqual(['finance']);
   });
 });
@@ -35,7 +36,7 @@ describe.each([
     const m = await res.json();
     expect(m.start_url).toBe('/financas');
     for (const atalho of m.shortcuts) expect(OCULTOS_NO_FINANCAS).not.toContain(atalho.url);
-    expect(m.shortcuts.map((s: { url: string }) => s.url)).not.toContain('/treinos');
+    expect(m.shortcuts.map((s: { url: string }) => s.url)).toContain('/treinos');
   });
 
   it('sem APP_MODE: manifest padrão (inclui /treinos)', async () => {

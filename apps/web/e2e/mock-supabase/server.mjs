@@ -58,6 +58,10 @@ const DEFAULTS = {
   assinaturas: () => ({ icone: null, cor: null, ativo: true, created_at: nowIso() }),
   chat_agente: () => ({ intencao: null, acoes: null, created_at: nowIso() }),
   notificacoes_agente: () => ({ lida: false, created_at: nowIso() }),
+  // Treino (000_baseline + 008): inicio DEFAULT now(), concluida/notif_treino DEFAULT false.
+  sessoes_treino: () => ({ inicio: nowIso(), fim: null, duracao_minutos: null, concluida: false, observacao: null, created_at: nowIso() }),
+  series_realizadas: () => ({ concluida: false, observacao: null, created_at: nowIso() }),
+  preferencias_agente: () => ({ notif_treino: false, notif_refeicao: false, notif_suplemento: false, agenda_saude: 'nao', created_at: nowIso() }),
 };
 const COM_UPDATED_AT = new Set(['contas_pagar', 'rendas', 'orcamento_categorias', 'carteiras', 'transferencias', 'metas']);
 
