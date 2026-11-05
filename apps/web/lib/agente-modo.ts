@@ -2,7 +2,7 @@ import type { AcaoRapida, MensagemChat, NotificacaoAgente, RespostaAgente, TipoI
 import { classificarIntencao } from '@meudia/ai';
 import { isRotaVisivel, type AppMode } from './app-mode';
 
-/** Conteúdo do AgentPanel filtrado pelo APP_MODE (modo Finanças: só finanças). */
+/** Conteúdo do AgentPanel filtrado pelo APP_MODE (modo Finanças: finanças; a rota /treinos também é visível). */
 
 export type AbaAgente = 'resumo' | 'treino' | 'alertas';
 
@@ -52,14 +52,12 @@ export function filtrarNotificacoes(notificacoes: readonly NotificacaoAgente[], 
     .map((n) => ({ ...n, acoes: filtrarAcoes(n.acoes, mode) }));
 }
 
-type ModuloOculto = 'agenda' | 'treinos' | 'habitos' | 'notas';
+// Treinos saiu desta lista: o módulo aparece no modo Finanças (decisão do Estevam, 04/11/2026; C6 do PLANO-F1).
+type ModuloOculto = 'agenda' | 'habitos' | 'notas';
 
 const MODULO_POR_INTENCAO: Partial<Record<TipoIntencao, ModuloOculto>> = {
   CRIAR_COMPROMISSO: 'agenda',
   CONSULTA_AGENDA: 'agenda',
-  CRIAR_TREINO: 'treinos',
-  CONSULTA_TREINO: 'treinos',
-  AGENDAR_TREINO: 'treinos',
   CRIAR_HABITO: 'habitos',
   CONSULTA_HABITOS: 'habitos',
   CONSULTA_NOTAS: 'notas',
@@ -67,7 +65,6 @@ const MODULO_POR_INTENCAO: Partial<Record<TipoIntencao, ModuloOculto>> = {
 
 const NOME_MODULO: Record<ModuloOculto, string> = {
   agenda: 'A agenda (compromissos e tarefas) não está disponível',
-  treinos: 'Treinos não estão disponíveis',
   habitos: 'Hábitos não estão disponíveis',
   notas: 'Notas não estão disponíveis',
 };
@@ -81,7 +78,7 @@ function moduloDaAcao(acao: AcaoRapida): ModuloOculto | null {
   if (acao.acao === 'CRIAR_COMPROMISSO') return 'agenda';
   const rota = acao.acao === 'NAVEGAR' ? acao.payload?.rota : undefined;
   if (typeof rota !== 'string') return null;
-  const modulo = (['agenda', 'treinos', 'habitos', 'notas'] as const).find((m) => rota === `/${m}` || rota.startsWith(`/${m}/`) || rota.startsWith(`/${m}?`));
+  const modulo = (['agenda', 'habitos', 'notas'] as const).find((m) => rota === `/${m}` || rota.startsWith(`/${m}/`) || rota.startsWith(`/${m}?`));
   return modulo ?? null;
 }
 
@@ -95,7 +92,7 @@ function moduloRemovido(acoes: readonly AcaoRapida[] | null | undefined, mode: A
 }
 
 /**
- * Modo Finanças: o motor de regras (pacote ai) não conhece o modo. Se o texto pede agenda/tarefa, treino,
+ * Modo Finanças: o motor de regras (pacote ai) não conhece o modo. Se o texto pede agenda/tarefa,
  * hábito ou notas, ou se a resposta oferecia ação desses módulos, a resposta diz que o módulo não está
  * disponível, em vez de citar um botão ("Criar Agora", "Abrir Agenda") que o filtro tirou.
  */

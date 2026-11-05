@@ -13,7 +13,11 @@
   --accent3:  #6affda;
   --text:     #eeeef8;
   --muted:    #65657a;
+  /* Texto secundário (rótulos, legendas, "sem valor"): 8,06:1 no --bg. --muted fica só para bordas e trilhos. */
+  --muted-text: #a3a3b8;
   --green:    #4ade80;
+  /* Excedente da barra de calorias acima de 100% (não é texto). */
+  --green-dark: #22a35a;
   --yellow:   #fbbf24;
   --red:      #f87171;
   --orange:   #ff9f4a;

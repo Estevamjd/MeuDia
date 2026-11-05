@@ -17,6 +17,9 @@ export {
   useFinalizarSessao,
   useRegistrarSerie,
   useAtualizarSerie,
+  useSeriesAnteriores,
+  useLembreteTreino,
+  useSalvarLembreteTreino,
 } from './useTreinos';
 export {
   useHabitos,
@@ -156,3 +159,4 @@ export {
 
 export { useVinculosTransacoes } from './useFinancas';
 export { useMetas, useCriarMeta, useAtualizarMeta, useGuardarNaMeta, useExcluirMeta, useSobraDoMesCorrente } from './useMetas';
+export { usePesoRecente, useRegistrarPesoDoDia, usePerfilSaude, hojeLocal } from './useSaude';

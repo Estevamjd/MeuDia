@@ -1,6 +1,7 @@
-import { AppError } from '@meudia/shared';
+import { AppError, seriesAnteriores } from '@meudia/shared';
+import type { SerieRealizada } from '@meudia/shared';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
-import { treinoRepository, exercicioRepository, sessaoRepository } from '../repositories';
+import { treinoRepository, exercicioRepository, sessaoRepository, preferenciasAgenteRepository } from '../repositories';
 import { treinoInsertSchema, exercicioInsertSchema, serieRealizadaSchema, sessaoInsertSchema } from '../validators';
 
 export async function listarTreinos(userId: string) {
@@ -87,4 +88,29 @@ export async function atualizarSerie(serieId: string, data: unknown) {
  */
 export async function obterHistoricoExercicio(exercicioId: string, limit = 20) {
   return sessaoRepository.findSeriesByExercicioId(exercicioId, limit);
+}
+
+/**
+ * Coluna ANTERIOR: séries da última vez em que cada exercício foi feito (sem a sessão em andamento).
+ * Exercício novo fica fora do resultado e a tela mostra "—".
+ */
+export async function obterSeriesAnteriores(
+  userId: string,
+  exercicioIds: string[],
+  sessaoAtualId?: string | null,
+): Promise<Record<string, SerieRealizada[]>> {
+  if (!userId) throw new AppError('userId é obrigatório', 'VALIDATION_ERROR');
+  const { sessoes, series } = await sessaoRepository.findSeriesRecentes(userId, exercicioIds, { excluirSessaoId: sessaoAtualId });
+  return Object.fromEntries(seriesAnteriores(sessoes, series));
+}
+
+/** Lembrete de treino: false por padrão; null = indisponível até a 008 ser aplicada. */
+export async function obterLembreteTreino(userId: string): Promise<boolean | null> {
+  if (!userId) throw new AppError('userId é obrigatório', 'VALIDATION_ERROR');
+  return preferenciasAgenteRepository.findLembreteTreino(userId);
+}
+
+export async function salvarLembreteTreino(userId: string, ligado: boolean): Promise<boolean> {
+  if (!userId) throw new AppError('userId é obrigatório', 'VALIDATION_ERROR');
+  return preferenciasAgenteRepository.salvarLembreteTreino(userId, ligado);
 }

@@ -59,11 +59,11 @@ describe('Drawer do Topbar (modo finanças)', () => {
     expect(dialog.contains(document.activeElement)).toBe(true);
   });
 
-  it('só itens de finanças + Configurações e Sair', () => {
+  it('itens de finanças + Saúde e Treinos (aparece para todos desde 04/11/2026) + Configurações e Sair', () => {
     renderTopbar('financas');
     abrir();
     const links = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
-    expect(links).toEqual(['/financas', '/financas/carteiras', '/financas/contas', '/financas/orcamento', '/financas/metas', '/assinaturas', '/configuracoes']);
+    expect(links).toEqual(['/financas', '/financas/carteiras', '/financas/contas', '/financas/orcamento', '/financas/metas', '/assinaturas', '/saude', '/treinos', '/configuracoes']);
     expect(screen.getByRole('button', { name: 'Sair' })).toBeTruthy();
   });
 

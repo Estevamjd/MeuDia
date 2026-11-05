@@ -58,6 +58,13 @@ const DEFAULTS = {
   assinaturas: () => ({ icone: null, cor: null, ativo: true, created_at: nowIso() }),
   chat_agente: () => ({ intencao: null, acoes: null, created_at: nowIso() }),
   notificacoes_agente: () => ({ lida: false, created_at: nowIso() }),
+  // Treino (000_baseline + 008): inicio DEFAULT now(), concluida/notif_treino DEFAULT false.
+  sessoes_treino: () => ({ inicio: nowIso(), fim: null, duracao_minutos: null, concluida: false, observacao: null, created_at: nowIso() }),
+  series_realizadas: () => ({ concluida: false, observacao: null, created_at: nowIso() }),
+  // Saúde (000_baseline): refeicoes.items JSONB DEFAULT '[]', totais DEFAULT 0; registros_peso.data DEFAULT CURRENT_DATE.
+  refeicoes: () => ({ data: hojeSP(), items: [], total_calorias: 0, total_proteina: 0, total_carbo: 0, total_gordura: 0 }),
+  registros_peso: () => ({ data: hojeSP(), observacao: null }),
+  preferencias_agente: () => ({ notif_treino: false, notif_refeicao: false, notif_suplemento: false, agenda_saude: 'nao', created_at: nowIso() }),
 };
 const COM_UPDATED_AT = new Set(['contas_pagar', 'rendas', 'orcamento_categorias', 'carteiras', 'transferencias', 'metas']);
 
@@ -70,6 +77,7 @@ const UNIQUES = {
   push_subscriptions: [['user_id', 'endpoint']],
   lembretes_enviados: [['conta_id', 'competencia', 'etapa', 'canal']],
   registros_agua: [['user_id', 'data']],
+  registros_peso: [['user_id', 'data']],
   scores_diarios: [['user_id', 'data']],
   preferencias_agente: [['user_id']],
   registros_habito: [['habito_id', 'data']],
@@ -108,6 +116,15 @@ function checkRow(table, r) {
     notNull('user_id', 'descricao', 'valor');
     if (!(Number(r.valor) > 0)) fail('valor > 0');
     if (r.dia_recebimento != null && (r.dia_recebimento < 1 || r.dia_recebimento > 31)) fail('dia_recebimento');
+  }
+  if (table === 'refeicoes') {
+    notNull('user_id', 'tipo', 'data', 'items');
+    if (!['cafe', 'lanche_manha', 'almoco', 'lanche_tarde', 'jantar', 'ceia'].includes(r.tipo)) fail('tipo');
+    if (!Number.isInteger(Number(r.total_calorias))) throw new PgError(400, '22P02', 'invalid input syntax for type integer');
+  }
+  if (table === 'registros_peso') {
+    notNull('user_id', 'peso', 'data');
+    if (!(Number(r.peso) > 0 && Number(r.peso) < 1000)) throw new PgError(400, '22003', 'numeric field overflow');
   }
   if (table === 'orcamento_categorias') {
     notNull('user_id', 'categoria', 'valor_planejado');

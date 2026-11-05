@@ -1,644 +1,359 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { format, getDay } from 'date-fns';
-import { Dumbbell, Plus, Timer as TimerIcon } from 'lucide-react';
-import { DIAS_SEMANA_CURTO } from '@meudia/shared';
-import type { Exercicio, SessaoTreino, Treino } from '@meudia/shared';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { getDay } from 'date-fns';
+import { AlertCircle } from 'lucide-react';
+import { DIAS_SEMANA } from '@meudia/shared';
+import type { Exercicio } from '@meudia/shared';
 import { calcularDescansoSugerido } from '@meudia/ai';
-import type { ContextoUsuario } from '@meudia/shared';
 
 import {
   useTreinos,
   useSessoesSemana,
   useIniciarSessao,
   useFinalizarSessao,
+  useCriarTreino,
   useAdicionarExercicio,
   useAtualizarExercicio,
   useExcluirExercicio,
   useRegistrarSerie,
   useAtualizarSerie,
   useSeriesDaSessao,
-  useScoreHoje,
-  useStreak,
-  useProfile,
-  useHabitos,
-  useRegistrosHoje,
-  useResumoMensal,
+  useSeriesAnteriores,
+  useLembreteTreino,
+  useSalvarLembreteTreino,
 } from '../../../hooks';
-import { useAuth } from '../../../hooks/useAuth';
-
-import { Card } from '../../../components/ui/Card';
-import { Button } from '../../../components/ui/Button';
-import { StatCard } from '../../../components/ui/StatCard';
-import { WeekProgress } from '../../../components/ui/WeekProgress';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { SkeletonList } from '../../../components/ui/Skeleton';
+import { Modal } from '../../../components/ui/Modal';
+import { Input } from '../../../components/ui/Input';
+import { Button } from '../../../components/ui/Button';
 import { useToast } from '../../../components/ui/Toast';
-import { AgentBanner, TimerDescanso } from '../../../components/agent';
+import { TimerDescanso } from '../../../components/agent';
+import { AddExercicioModal, type ExercicioFormData } from '../../../components/modules/AddExercicioModal';
+import { SeletorDias, type DiaSeletor } from '../../../components/treinos/SeletorDias';
+import { ExercicioCaderno, type MarcarSerie } from '../../../components/treinos/ExercicioCaderno';
+import { Cabecalho, LinkAcao, Subabas, TelaCaderno, VazioCaderno, classeBotaoCheio } from '../../../components/caderno';
+import { LembreteTreino } from '../../../components/treinos/LembreteTreino';
 
-import { ExercicioCard } from '../../../components/modules/ExercicioCard';
-import {
-  AddExercicioModal,
-  type ExercicioFormData,
-} from '../../../components/modules/AddExercicioModal';
+// Segunda primeiro (S T Q Q S S D); valores de `treinos.dia_semana` (0 = domingo).
+const ORDEM_SEMANA = [1, 2, 3, 4, 5, 6, 0] as const;
+const LETRAS: Record<number, string> = { 0: 'D', 1: 'S', 2: 'T', 3: 'Q', 4: 'Q', 5: 'S', 6: 'S' };
 
-// --- Helpers ---
-
-type DayStatus = 'done' | 'today' | 'pending' | 'rest' | 'missed';
-
-/** Map JS getDay (0=Sun) to our Monday-based index (0=Mon..6=Sun) */
-function jsToMondayIndex(jsDay: number): number {
-  return jsDay === 0 ? 6 : jsDay - 1;
+interface Descanso {
+  aberto: boolean;
+  segundos: number;
+  serie: number;
+  total: number;
+  proxima?: { carga: number | null; reps: string };
 }
-
-function buildWeekDayStatuses(
-  treinos: Treino[],
-  sessoes: SessaoTreino[],
-  today: Date,
-): DayStatus[] {
-  const todayJsDay = getDay(today);
-  const todayMonIdx = jsToMondayIndex(todayJsDay);
-
-  // Map dia_semana (0=Dom) -> treino exists
-  const treinoPorDia = new Map<number, boolean>();
-  treinos.forEach((t) => {
-    if (t.tipo !== 'descanso') treinoPorDia.set(t.dia_semana, true);
-  });
-
-  // Map dia_semana -> sessao concluida
-  const sessaoPorDia = new Map<number, boolean>();
-  sessoes.forEach((s) => {
-    if (s.concluido) {
-      const d = getDay(new Date(s.data + 'T12:00:00'));
-      sessaoPorDia.set(d, true);
-    }
-  });
-
-  // Build 7 statuses from Monday(0) to Sunday(6)
-  const monToSunJsDays = [1, 2, 3, 4, 5, 6, 0]; // Mon=1..Sun=0
-
-  return monToSunJsDays.map((jsDay, monIdx) => {
-    const hasTreino = treinoPorDia.get(jsDay);
-    const done = sessaoPorDia.get(jsDay);
-
-    if (monIdx === todayMonIdx) return done ? 'done' : 'today';
-    if (!hasTreino) return 'rest';
-    if (done) return 'done';
-    if (monIdx < todayMonIdx) return 'missed';
-    return 'pending';
-  });
-}
-
-// --- Component ---
 
 export default function TreinosPage() {
   const toast = useToast();
-  const today = useMemo(() => new Date(), []);
-  const todayJsDay = getDay(today); // 0=Sun..6=Sat
+  const hoje = useMemo(() => getDay(new Date()), []);
+  const [dia, setDia] = useState<number>(hoje);
+  const [abertos, setAbertos] = useState<Record<string, boolean>>({});
+  const [criandoTreino, setCriandoTreino] = useState(false);
+  const [nomeTreino, setNomeTreino] = useState('');
+  const [adicionando, setAdicionando] = useState(false);
+  const [editando, setEditando] = useState<Exercicio | null>(null);
+  const [excluindo, setExcluindo] = useState<Exercicio | null>(null);
+  const [descanso, setDescanso] = useState<Descanso>({ aberto: false, segundos: 60, serie: 1, total: 1 });
 
-  // Tabs use Monday-based index (0=Mon..6=Sun)
-  const [selectedTab, setSelectedTab] = useState(() => jsToMondayIndex(todayJsDay));
-
-  // Session state
-  const [activeSessaoId, setActiveSessaoId] = useState<string | null>(null);
-  const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
-
-  // Rest timer (TimerDescanso)
-  const [restTimer, setRestTimer] = useState<{
-    show: boolean;
-    seconds: number;
-    serieAtual: number;
-    totalSeries: number;
-    proximaSerie?: { carga: number | null; reps: string };
-  }>({
-    show: false,
-    seconds: 60,
-    serieAtual: 1,
-    totalSeries: 1,
-  });
-
-  // Modals
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingExercicio, setEditingExercicio] = useState<Exercicio | null>(null);
-  const [deletingExercicio, setDeletingExercicio] = useState<Exercicio | null>(null);
-  const [dismissedAI, setDismissedAI] = useState(false);
-
-  // --- Data hooks ---
-  const { user } = useAuth();
-  const { data: profile } = useProfile();
-  const { data: treinos, isLoading: loadingTreinos } = useTreinos();
-  const { data: sessoes, isLoading: loadingSessoes } = useSessoesSemana();
-  const { data: scoreHoje } = useScoreHoje();
-  const { data: streak } = useStreak();
-  const { data: seriesDaSessao } = useSeriesDaSessao(activeSessaoId ?? undefined);
-  const { data: habitos } = useHabitos();
-  const { data: registrosHoje } = useRegistrosHoje();
-  const { data: resumoMensal } = useResumoMensal(today.getFullYear(), today.getMonth() + 1);
-
-  // --- Mutations ---
+  const treinosQ = useTreinos();
+  const sessoesQ = useSessoesSemana({ noModoFinancas: true });
+  const lembreteQ = useLembreteTreino();
+  const salvarLembrete = useSalvarLembreteTreino();
   const iniciarSessao = useIniciarSessao();
   const finalizarSessao = useFinalizarSessao();
+  const criarTreino = useCriarTreino();
   const adicionarExercicio = useAdicionarExercicio();
   const atualizarExercicio = useAtualizarExercicio();
   const excluirExercicio = useExcluirExercicio();
   const registrarSerie = useRegistrarSerie();
   const atualizarSerie = useAtualizarSerie();
 
-  // --- Derived data ---
+  const treinos = useMemo(() => treinosQ.data ?? [], [treinosQ.data]);
+  const treinosDoDia = treinos.filter((t) => t.dia_semana === dia);
+  const treino = treinosDoDia.find((t) => t.tipo !== 'descanso') ?? null;
+  const descansoDoDia = !treino ? treinosDoDia.find((t) => t.tipo === 'descanso') ?? null : null;
+  const exercicios = useMemo(() => treino?.exercicios ?? [], [treino]);
 
-  // Convert tab index (Mon-based) to JS day for data lookup
-  const monToSunJsDays = [1, 2, 3, 4, 5, 6, 0];
-  const selectedJsDay = monToSunJsDays[selectedTab];
+  const sessaoAtiva = (sessoesQ.data ?? []).find((s) => !s.concluido && (!treino || s.treino_id === treino.id)) ?? null;
+  const seriesQ = useSeriesDaSessao(sessaoAtiva?.id);
+  const anterioresQ = useSeriesAnteriores(exercicios.map((e) => e.id), sessaoAtiva?.id ?? null);
 
-  const treinosDoDia = useMemo(
-    () => (treinos ?? []).filter((t) => t.dia_semana === selectedJsDay),
-    [treinos, selectedJsDay],
-  );
-
-  const treinoAtivo = treinosDoDia[0]; // Primary treino for the day
-  const exercicios = useMemo(() => treinoAtivo?.exercicios ?? [], [treinoAtivo]);
-  const isDiaDescanso =
-    treinosDoDia.length === 0 ||
-    treinosDoDia.every((t) => t.tipo === 'descanso');
-
-  // Detect active session from this week's sessions
-  useEffect(() => {
-    if (!sessoes) return;
-    const ativa = sessoes.find((s) => !s.concluido);
-    if (ativa) {
-      setActiveSessaoId(ativa.id);
-      setSessionStartTime(new Date(ativa.created_at).getTime());
-    }
-  }, [sessoes]);
-
-  // Week progress
-  const weekStatuses = useMemo(
-    () => buildWeekDayStatuses(treinos ?? [], sessoes ?? [], today),
-    [treinos, sessoes, today],
-  );
-
-  // Stats
-  const treinosNaSemana = useMemo(
-    () => (sessoes ?? []).filter((s) => s.concluido).length,
-    [sessoes],
-  );
-
-  const duracaoMedia = useMemo(() => {
-    const concluidas = (sessoes ?? []).filter((s) => s.concluido && s.duracao_minutos);
-    if (concluidas.length === 0) return 0;
-    const total = concluidas.reduce((acc, s) => acc + (s.duracao_minutos ?? 0), 0);
-    return Math.round(total / concluidas.length);
-  }, [sessoes]);
-
-  // Contexto do agente IA
-  const contextoAgente: ContextoUsuario = useMemo(() => {
-    const diaSemana = todayJsDay as 0 | 1 | 2 | 3 | 4 | 5 | 6;
-    const hojeStr = format(today, 'yyyy-MM-dd');
-    const treinoHojeConcluido = sessoes?.some(
-      (s) => s.treino_id === treinoAtivo?.id && s.data === hojeStr && s.concluido,
-    ) ?? false;
-
-    const habitosAtivos = habitos?.filter(
-      (h) => h.ativo && (h.frequencia === 'diario' || h.dias_semana.includes(diaSemana)),
-    ) ?? [];
-    const registrosMap = new Map<string, boolean>();
-    registrosHoje?.forEach((r) => {
-      if (r.concluido) registrosMap.set(r.habito_id, true);
-    });
-    const habitosConcluidos = habitosAtivos.filter((h) => registrosMap.has(h.id)).length;
-
+  const dias: DiaSeletor[] = ORDEM_SEMANA.map((d) => {
+    const doDia = treinos.filter((t) => t.dia_semana === d);
+    const musculacao = doDia.find((t) => t.tipo !== 'descanso');
     return {
-      userId: user?.id ?? '',
-      nome: profile?.nome ?? user?.email?.split('@')[0] ?? 'Usuário',
-      objetivo: profile?.objetivo ?? null,
-      horaAtual: today.getHours(),
-      diaSemana,
-      treinoHoje: treinoAtivo
-        ? {
-            nome: treinoAtivo.nome,
-            exercicios: treinoAtivo.exercicios?.length ?? 0,
-            concluido: treinoHojeConcluido,
-          }
-        : null,
-      sessoesSemana: treinosNaSemana,
-      metaTreinosSemana: 5,
-      habitosTotal: habitosAtivos.length,
-      habitosConcluidos,
-      habitosPendentes: habitosAtivos.filter((h) => !registrosMap.has(h.id)).map((h) => h.nome),
-      percentualHabitos: habitosAtivos.length > 0 ? Math.round((habitosConcluidos / habitosAtivos.length) * 100) : 0,
-      compromissosHoje: 0,
-      proximoCompromisso: null,
-      saldoMes: resumoMensal?.saldo ?? 0,
-      despesasMes: resumoMensal?.totalDespesas ?? 0,
-      receitasMes: resumoMensal?.totalReceitas ?? 0,
-      streakAtual: streak ?? 0,
-      scoreHoje: typeof scoreHoje === 'number' ? scoreHoje : ((scoreHoje as { total?: number })?.total ?? 0),
+      diaSemana: d,
+      letra: LETRAS[d] ?? '',
+      nome: DIAS_SEMANA[d] ?? '',
+      descanso: !musculacao && doDia.some((t) => t.tipo === 'descanso'),
+      treino: musculacao?.nome ?? null,
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [treinos, sessoes, habitos, registrosHoje, resumoMensal, profile, user, streak, scoreHoje]);
+  });
 
-  // --- Elapsed timer for active session ---
-  const [elapsed, setElapsed] = useState(0);
-  const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Primeiro exercício aberto por padrão; a pessoa abre e fecha os outros.
+  const estaAberto = (e: Exercicio, i: number) => abertos[e.id] ?? i === 0;
 
-  useEffect(() => {
-    if (!sessionStartTime) {
-      setElapsed(0);
-      return;
-    }
-
-    const tick = () => {
-      setElapsed(Math.floor((Date.now() - sessionStartTime) / 1000));
-    };
-    tick();
-    elapsedRef.current = setInterval(tick, 1000);
-    return () => {
-      if (elapsedRef.current) clearInterval(elapsedRef.current);
-    };
-  }, [sessionStartTime]);
-
-  const formatElapsed = (secs: number) => {
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
-
-  // --- Actions ---
-
-  const handleIniciarTreino = useCallback(async () => {
-    if (!treinoAtivo) {
-      toast.warning('Nenhum treino cadastrado para hoje.');
-      return;
-    }
-    try {
-      const sessao = await iniciarSessao.mutateAsync(treinoAtivo.id);
-      setActiveSessaoId(sessao.id);
-      setSessionStartTime(Date.now());
-      toast.success('Treino iniciado!');
-    } catch {
-      toast.error('Erro ao iniciar treino.');
-    }
-  }, [treinoAtivo, iniciarSessao, toast]);
-
-  const handleFinalizarTreino = useCallback(async () => {
-    if (!activeSessaoId || !sessionStartTime) return;
-    const duracaoMin = Math.round((Date.now() - sessionStartTime) / 60000);
-    try {
-      await finalizarSessao.mutateAsync({
-        sessaoId: activeSessaoId,
-        duracao: duracaoMin,
-      });
-      setActiveSessaoId(null);
-      setSessionStartTime(null);
-      toast.success(`Treino finalizado! Duracao: ${duracaoMin} min`);
-    } catch {
-      toast.error('Erro ao finalizar treino.');
-    }
-  }, [activeSessaoId, sessionStartTime, finalizarSessao, toast]);
-
-  const handleAddExercicio = useCallback(
-    async (data: ExercicioFormData) => {
-      if (!treinoAtivo) return;
+  const marcar = useCallback(
+    async (serie: MarcarSerie) => {
+      if (!treino) return;
       try {
-        await adicionarExercicio.mutateAsync({
-          treino_id: treinoAtivo.id,
-          nome: data.nome,
-          series: data.series,
-          repeticoes: data.repeticoes,
-          carga: data.carga,
-          tempo_descanso: data.tempo_descanso,
-          observacao: data.observacao,
-          ordem: exercicios.length,
-        });
-        setShowAddModal(false);
-        toast.success('Exercicio adicionado!');
-      } catch {
-        toast.error('Erro ao adicionar exercicio.');
-      }
-    },
-    [treinoAtivo, adicionarExercicio, exercicios.length, toast],
-  );
-
-  const handleEditExercicio = useCallback(
-    async (data: ExercicioFormData) => {
-      if (!editingExercicio) return;
-      try {
-        await atualizarExercicio.mutateAsync({
-          id: editingExercicio.id,
-          data: {
-            nome: data.nome,
-            series: data.series,
-            repeticoes: data.repeticoes,
-            carga: data.carga,
-            tempo_descanso: data.tempo_descanso,
-            observacao: data.observacao,
-          },
-        });
-        setEditingExercicio(null);
-        toast.success('Exercicio atualizado!');
-      } catch {
-        toast.error('Erro ao atualizar exercicio.');
-      }
-    },
-    [editingExercicio, atualizarExercicio, toast],
-  );
-
-  const handleDeleteExercicio = useCallback(async () => {
-    if (!deletingExercicio) return;
-    try {
-      await excluirExercicio.mutateAsync(deletingExercicio.id);
-      setDeletingExercicio(null);
-      toast.success('Exercicio excluido.');
-    } catch {
-      toast.error('Erro ao excluir exercicio.');
-    }
-  }, [deletingExercicio, excluirExercicio, toast]);
-
-  const handleSerieComplete = useCallback(
-    async (data: {
-      exercicio_id: string;
-      numero_serie: number;
-      carga_usada: number | null;
-      reps_feitas: number | null;
-      concluido: boolean;
-      id?: string;
-    }) => {
-      if (!activeSessaoId) return;
-
-      try {
-        if (data.id) {
-          // Update existing serie
+        let sessaoId = sessaoAtiva?.id;
+        if (!sessaoId) sessaoId = (await iniciarSessao.mutateAsync(treino.id)).id;
+        if (serie.id) {
           await atualizarSerie.mutateAsync({
-            id: data.id,
-            data: {
-              carga_usada: data.carga_usada,
-              reps_feitas: data.reps_feitas,
-              concluido: data.concluido,
-            },
+            id: serie.id,
+            data: { carga_usada: serie.carga_usada, reps_feitas: serie.reps_feitas, concluido: serie.concluido },
           });
         } else {
-          // Register new serie
           await registrarSerie.mutateAsync({
-            sessao_id: activeSessaoId,
-            exercicio_id: data.exercicio_id,
-            numero_serie: data.numero_serie,
-            carga_usada: data.carga_usada,
-            reps_feitas: data.reps_feitas,
-            concluido: data.concluido,
+            sessao_id: sessaoId,
+            exercicio_id: serie.exercicio_id,
+            numero_serie: serie.numero_serie,
+            carga_usada: serie.carga_usada,
+            reps_feitas: serie.reps_feitas,
+            concluido: serie.concluido,
           });
         }
-
-        // Start rest timer when serie is marked complete
-        if (data.concluido) {
-          const exercicio = exercicios.find((e) => e.id === data.exercicio_id);
-          const tempoDescanso = calcularDescansoSugerido(
-            exercicio?.tempo_descanso ?? null,
-            data.carga_usada,
-            data.numero_serie,
-            exercicio?.series ?? 1,
-          );
-          const proximaSerieNum = data.numero_serie + 1;
-          setRestTimer({
-            show: true,
-            seconds: tempoDescanso,
-            serieAtual: data.numero_serie,
-            totalSeries: exercicio?.series ?? 1,
-            proximaSerie: proximaSerieNum <= (exercicio?.series ?? 1)
-              ? { carga: exercicio?.carga ?? null, reps: String(exercicio?.repeticoes ?? '') }
-              : undefined,
+        if (serie.concluido) {
+          const ex = exercicios.find((e) => e.id === serie.exercicio_id);
+          const total = ex?.series ?? 1;
+          setDescanso({
+            aberto: true,
+            segundos: calcularDescansoSugerido(ex?.tempo_descanso ?? null, serie.carga_usada, serie.numero_serie, total),
+            serie: serie.numero_serie,
+            total,
+            proxima: serie.numero_serie < total ? { carga: serie.carga_usada, reps: ex?.repeticoes ?? '' } : undefined,
           });
         }
       } catch {
-        toast.error('Erro ao registrar serie.');
+        toast.error('Não deu para salvar a série. Tente de novo.');
       }
     },
-    [activeSessaoId, atualizarSerie, registrarSerie, exercicios, toast],
+    [treino, sessaoAtiva, iniciarSessao, atualizarSerie, registrarSerie, exercicios, toast],
   );
 
-  // --- Tab labels with muscle group ---
-  const tabLabels = useMemo(() => {
-    const monToSun = [1, 2, 3, 4, 5, 6, 0];
-    // DIAS_SEMANA_CURTO is indexed 0=Dom..6=Sab
-    return monToSun.map((jsDay, monIdx) => {
-      const label = DIAS_SEMANA_CURTO[jsDay];
-      const treino = (treinos ?? []).find((t) => t.dia_semana === jsDay);
-      return {
-        short: label,
-        treino: treino?.nome ?? null,
-        isToday: monIdx === jsToMondayIndex(todayJsDay),
-      };
-    });
-  }, [treinos, todayJsDay]);
+  const concluirTreino = async () => {
+    if (!sessaoAtiva) return;
+    const minutos = Math.max(1, Math.round((Date.now() - new Date(sessaoAtiva.created_at).getTime()) / 60000));
+    try {
+      await finalizarSessao.mutateAsync({ sessaoId: sessaoAtiva.id, duracao: minutos });
+      toast.success(`Treino salvo: ${minutos} min.`);
+    } catch {
+      toast.error('Não deu para concluir o treino. Tente de novo.');
+    }
+  };
 
-  const isLoading = loadingTreinos || loadingSessoes;
+  const salvarTreinoNovo = async () => {
+    const nome = nomeTreino.trim();
+    if (!nome) return;
+    try {
+      await criarTreino.mutateAsync({ nome, dia_semana: dia as 0 | 1 | 2 | 3 | 4 | 5 | 6, tipo: 'musculacao' });
+      setCriandoTreino(false);
+      setNomeTreino('');
+    } catch {
+      toast.error('Não deu para criar o treino. Tente de novo.');
+    }
+  };
 
-  // -------------------------------------------------------------------
-  // RENDER
-  // -------------------------------------------------------------------
+  const salvarExercicio = async (data: ExercicioFormData) => {
+    try {
+      if (editando) {
+        await atualizarExercicio.mutateAsync({ id: editando.id, data });
+        setEditando(null);
+      } else if (treino) {
+        await adicionarExercicio.mutateAsync({ ...data, treino_id: treino.id, ordem: exercicios.length });
+        setAdicionando(false);
+      }
+    } catch {
+      toast.error('Não deu para salvar o exercício. Tente de novo.');
+    }
+  };
+
+  const confirmarExclusao = async () => {
+    if (!excluindo) return;
+    try {
+      await excluirExercicio.mutateAsync(excluindo.id);
+      setExcluindo(null);
+    } catch {
+      toast.error('Não deu para excluir o exercício. Tente de novo.');
+    }
+  };
+
+  const nomeDia = DIAS_SEMANA[dia] ?? '';
+  const contexto = treino?.nome ?? descansoDoDia?.nome ?? nomeDia;
+
+  let conteudo: ReactNode;
+  if (treinosQ.isLoading) {
+    conteudo = (
+      <div className="px-5 py-[18px]" aria-busy="true" aria-label="Carregando treino">
+        <SkeletonList count={3} />
+      </div>
+    );
+  } else if (treinosQ.isError) {
+    conteudo = (
+      <EmptyState
+        icon={<AlertCircle size={36} aria-hidden="true" />}
+        title="Não deu para carregar o treino."
+        description="Confira a conexão e tente de novo."
+        actionLabel="Tentar de novo"
+        onAction={() => void treinosQ.refetch()}
+      />
+    );
+  } else if (descansoDoDia) {
+    conteudo = (
+      <section className="border-b border-white/[0.07] px-5 py-[18px]">
+        <p className="text-[10.5px] uppercase tracking-[1.6px] text-muted-text">{nomeDia}</p>
+        <h2 className="mt-1 font-syne text-[22px] font-bold text-text">{descansoDoDia.nome}</h2>
+        <p className="mt-1 text-[14.5px] text-muted-text">Sem musculação programada.</p>
+      </section>
+    );
+  } else if (!treino) {
+    conteudo = (
+      <VazioCaderno
+        rotulo={nomeDia}
+        titulo={`Nenhum treino na ${nomeDia.toLowerCase()}.`}
+        explicacao="Crie o treino do dia e depois adicione os exercícios."
+        acao="Criar treino"
+        onAcao={() => setCriandoTreino(true)}
+      />
+    );
+  } else if (exercicios.length === 0) {
+    conteudo = (
+      <VazioCaderno
+        rotulo={treino.nome}
+        titulo="Nenhum exercício neste treino."
+        explicacao="Adicione o primeiro com séries, repetições e carga."
+        acao="Adicionar exercício"
+        onAcao={() => setAdicionando(true)}
+      />
+    );
+  } else {
+    conteudo = (
+      <>
+        {exercicios.map((e, i) => (
+          <ExercicioCaderno
+            key={e.id}
+            exercicio={e}
+            posicao={i + 1}
+            total={exercicios.length}
+            anteriores={anterioresQ.data?.[e.id]}
+            feitas={(seriesQ.data ?? []).filter((s) => s.exercicio_id === e.id)}
+            aberto={estaAberto(e, i)}
+            onAlternar={() => setAbertos((a) => ({ ...a, [e.id]: !estaAberto(e, i) }))}
+            onMarcar={(s) => void marcar(s)}
+            onEditar={() => setEditando(e)}
+            onExcluir={() => setExcluindo(e)}
+          />
+        ))}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.07] px-5 py-3">
+          <LinkAcao onClick={() => setAdicionando(true)}>+ exercício</LinkAcao>
+          {sessaoAtiva && (
+            <button
+              type="button"
+              onClick={() => void concluirTreino()}
+              disabled={finalizarSessao.isPending}
+              className={`${classeBotaoCheio} !w-auto`}
+            >
+              Concluir treino
+            </button>
+          )}
+        </div>
+      </>
+    );
+  }
 
   return (
-    <div className="animate-fadeSlide flex flex-col gap-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="font-syne text-3xl font-bold text-text">Treinos</h1>
-        {activeSessaoId ? (
-          <Button
-            variant="danger"
-            onClick={handleFinalizarTreino}
-            isLoading={finalizarSessao.isPending}
-          >
-            <TimerIcon size={16} />
-            Finalizar Treino
-          </Button>
-        ) : (
-          <Button onClick={handleIniciarTreino} isLoading={iniciarSessao.isPending}>
-            <Dumbbell size={16} />
-            Iniciar Treino
-          </Button>
-        )}
+    <TelaCaderno>
+      <Cabecalho titulo="Treino" contexto={contexto} />
+      <Subabas />
+
+      <div className="border-b border-white/[0.07] px-5 py-4">
+        <SeletorDias dias={dias} selecionado={dia} hoje={hoje} onSelecionar={setDia} />
       </div>
 
-      {/* Active session elapsed */}
-      {activeSessaoId && sessionStartTime && (
-        <Card variant="orange" className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange/20">
-              <TimerIcon size={20} className="text-orange" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-text">Treino em andamento</p>
-              <p className="text-xs text-muted">{treinoAtivo?.nome}</p>
-            </div>
-          </div>
-          <span className="font-syne text-2xl font-bold text-orange">
-            {formatElapsed(elapsed)}
-          </span>
-        </Card>
-      )}
+      {conteudo}
 
-      {/* Week progress */}
-      <WeekProgress days={weekStatuses} />
+      <LembreteTreino
+        ligado={lembreteQ.isError ? null : lembreteQ.data}
+        salvando={salvarLembrete.isPending}
+        onAlterar={(ligado) =>
+          salvarLembrete.mutate(ligado, { onError: () => toast.error('Não deu para salvar o lembrete. Tente de novo.') })
+        }
+      />
 
-      {/* Stats row */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard
-          label="Treinos na semana"
-          value={treinosNaSemana}
-          icon={<Dumbbell size={16} />}
-        />
-        <StatCard
-          label="Sequencia atual"
-          value={`${streak ?? 0} dias`}
-          tag={
-            (streak ?? 0) >= 7
-              ? { text: 'Fogo!', color: 'orange' as const }
-              : undefined
-          }
-        />
-        <StatCard label="Duracao media" value={`${duracaoMedia} min`} />
-        <StatCard
-          label="Total no mes"
-          value={treinosNaSemana}
-          tag={{ text: format(today, 'MMM'), color: 'purple' as const }}
-        />
-      </div>
-
-      {/* Agente IA — Banner dinâmico */}
-      {!dismissedAI && (
-        <AgentBanner
-          contexto={contextoAgente}
-          onDismiss={() => setDismissedAI(true)}
-        />
-      )}
-
-      {/* Day selector tabs */}
-      <div className="flex gap-1 overflow-x-auto rounded-lg bg-card2 p-1">
-        {tabLabels.map((tab, i) => (
-          <button
-            key={i}
-            onClick={() => setSelectedTab(i)}
-            className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-md px-2 py-2.5 text-xs transition-all duration-200 ${
-              selectedTab === i
-                ? 'bg-orange text-bg font-bold shadow-sm'
-                : tab.isToday
-                  ? 'text-orange hover:bg-card'
-                  : 'text-muted hover:bg-card hover:text-text'
-            }`}
-          >
-            <span className="font-medium">{tab.short}</span>
-            {tab.treino && (
-              <span className="max-w-full truncate text-[10px] opacity-80">
-                {tab.treino}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Timer de descanso inteligente */}
       <TimerDescanso
-        isOpen={restTimer.show}
-        tempoInicial={restTimer.seconds}
-        serieAtual={restTimer.serieAtual}
-        totalSeries={restTimer.totalSeries}
-        proximaSerie={restTimer.proximaSerie}
-        onComplete={() => {
-          setRestTimer((r) => ({ ...r, show: false }));
-          toast.info('Descanso finalizado! Próxima série.');
-        }}
-        onSkip={() => {
-          setRestTimer((r) => ({ ...r, show: false }));
-          toast.info('Descanso pulado.');
-        }}
-        onClose={() => setRestTimer((r) => ({ ...r, show: false }))}
+        isOpen={descanso.aberto}
+        tempoInicial={descanso.segundos}
+        serieAtual={descanso.serie}
+        totalSeries={descanso.total}
+        proximaSerie={descanso.proxima}
+        onComplete={() => setDescanso((d) => ({ ...d, aberto: false }))}
+        onSkip={() => setDescanso((d) => ({ ...d, aberto: false }))}
+        onClose={() => setDescanso((d) => ({ ...d, aberto: false }))}
       />
 
-      {/* Exercise list */}
-      {isLoading ? (
-        <SkeletonList count={4} />
-      ) : isDiaDescanso ? (
-        <Card className="flex flex-col items-center py-12 text-center">
-          <span className="mb-3 text-4xl">😴</span>
-          <h3 className="font-syne text-lg font-bold text-text">Dia de descanso</h3>
-          <p className="mt-1 text-sm text-muted">
-            Aproveite para recuperar. O descanso faz parte do progresso!
-          </p>
-        </Card>
-      ) : exercicios.length === 0 ? (
-        <EmptyState
-          icon={<Dumbbell size={40} />}
-          title="Nenhum exercicio cadastrado"
-          description="Adicione exercicios para este dia de treino."
-          actionLabel="Adicionar Exercicio"
-          onAction={() => setShowAddModal(true)}
-        />
-      ) : (
-        <div className="flex flex-col gap-3">
-          {exercicios.map((exercicio) => (
-            <ExercicioCard
-              key={exercicio.id}
-              exercicio={exercicio}
-              sessaoId={activeSessaoId}
-              series={(seriesDaSessao ?? []).filter(
-                (s) => s.exercicio_id === exercicio.id,
-              )}
-              onEdit={() => setEditingExercicio(exercicio)}
-              onDelete={() => setDeletingExercicio(exercicio)}
-              onSerieComplete={handleSerieComplete}
-            />
-          ))}
-
-          {/* Add exercise button */}
-          <Button
-            variant="ghost"
-            className="mt-2 w-full border border-dashed border-border py-4"
-            onClick={() => setShowAddModal(true)}
-          >
-            <Plus size={16} />
-            Adicionar Exercicio
-          </Button>
-        </div>
-      )}
-
-      {/* Add exercise modal */}
-      <AddExercicioModal
-        isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onSubmit={handleAddExercicio}
-        isLoading={adicionarExercicio.isPending}
-      />
-
-      {/* Edit exercise modal */}
-      {editingExercicio && (
-        <AddExercicioModal
-          isOpen={!!editingExercicio}
-          onClose={() => setEditingExercicio(null)}
-          onSubmit={handleEditExercicio}
-          isLoading={atualizarExercicio.isPending}
-          title="Editar Exercicio"
-          defaultValues={{
-            nome: editingExercicio.nome,
-            series: editingExercicio.series,
-            repeticoes: editingExercicio.repeticoes,
-            carga: editingExercicio.carga,
-            tempo_descanso: editingExercicio.tempo_descanso,
-            observacao: editingExercicio.observacao,
+      <Modal isOpen={criandoTreino} onClose={() => setCriandoTreino(false)} title={`Treino de ${nomeDia.toLowerCase()}`}>
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void salvarTreinoNovo();
           }}
-        />
-      )}
+        >
+          <Input
+            label="Nome do treino"
+            placeholder="Ex.: Superior A"
+            value={nomeTreino}
+            onChange={(e) => setNomeTreino(e.target.value)}
+            maxLength={100}
+            autoFocus
+          />
+          <div className="flex justify-end gap-3">
+            <Button variant="ghost" type="button" onClick={() => setCriandoTreino(false)}>Cancelar</Button>
+            <Button type="submit" isLoading={criarTreino.isPending} disabled={!nomeTreino.trim()}>Salvar</Button>
+          </div>
+        </form>
+      </Modal>
 
-      {/* Delete confirmation */}
+      <AddExercicioModal
+        key={editando?.id ?? 'novo'}
+        isOpen={adicionando || !!editando}
+        onClose={() => {
+          setAdicionando(false);
+          setEditando(null);
+        }}
+        onSubmit={(data) => void salvarExercicio(data)}
+        isLoading={adicionarExercicio.isPending || atualizarExercicio.isPending}
+        title={editando ? 'Editar exercício' : 'Adicionar exercício'}
+        defaultValues={
+          editando
+            ? {
+                nome: editando.nome,
+                series: editando.series,
+                repeticoes: editando.repeticoes,
+                carga: editando.carga,
+                tempo_descanso: editando.tempo_descanso,
+                observacao: editando.observacao,
+              }
+            : undefined
+        }
+      />
+
       <ConfirmDialog
-        isOpen={!!deletingExercicio}
-        onClose={() => setDeletingExercicio(null)}
-        onConfirm={handleDeleteExercicio}
-        title="Excluir exercicio"
-        message={`Tem certeza que deseja excluir "${deletingExercicio?.nome}"? Esta acao nao pode ser desfeita.`}
+        isOpen={!!excluindo}
+        onClose={() => setExcluindo(null)}
+        onConfirm={() => void confirmarExclusao()}
+        title="Excluir exercício"
+        message={`Excluir "${excluindo?.nome ?? ''}" e o histórico de cargas dele? Isso não pode ser desfeito.`}
         confirmLabel="Excluir"
         isLoading={excluirExercicio.isPending}
       />
-    </div>
+    </TelaCaderno>
   );
 }

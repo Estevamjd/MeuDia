@@ -32,6 +32,7 @@ const SECOES_PADRAO: NavSection[] = [
   {
     label: 'Saúde',
     items: [
+      { href: '/saude', label: 'Saúde', emoji: '🩺', colorClass: 'green' },
       { href: '/treinos', label: 'Treinos', emoji: '🏋️', colorClass: 'orange' },
       { href: '/dieta', label: 'Dieta', emoji: '🍽️', colorClass: 'green' },
       { href: '/medicamentos', label: 'Medicamentos', emoji: '💊' },
@@ -49,7 +50,17 @@ const ITENS_FINANCAS: NavItem[] = [
   { href: '/assinaturas', label: 'Assinaturas', emoji: '💳' },
 ];
 
-const SECOES_FINANCAS: NavSection[] = [{ label: 'Finanças', items: ITENS_FINANCAS }];
+// Saúde e Treino no modo Finanças (decisão do Estevam, 04/11): menu lateral e drawer. A BottomNav segue com 5 abas fixas.
+// Saúde = subabas Hoje · Treino · Dieta · Peso; Treinos segue com item próprio.
+const ITENS_SAUDE_FINANCAS: NavItem[] = [
+  { href: '/saude', label: 'Saúde', emoji: '🩺' },
+  { href: '/treinos', label: 'Treinos', emoji: '🏋️' },
+];
+
+const SECOES_FINANCAS: NavSection[] = [
+  { label: 'Finanças', items: ITENS_FINANCAS },
+  { label: 'Saúde', items: ITENS_SAUDE_FINANCAS },
+];
 
 export function secoesSidebar(mode: AppMode): NavSection[] {
   const secoes = mode === 'financas' ? SECOES_FINANCAS : SECOES_PADRAO;
@@ -58,10 +69,10 @@ export function secoesSidebar(mode: AppMode): NavSection[] {
     .filter((secao) => secao.items.length > 0);
 }
 
-/** Drawer mobile (modo Finanças): seções de finanças + Configurações (que hoje também é a área da conta). */
+/** Drawer mobile (modo Finanças): seções de finanças + Saúde + Configurações (que hoje também é a área da conta). */
 export function itensDrawer(mode: AppMode): NavItem[] {
   return filtrarPorModo(
-    [...ITENS_FINANCAS, { href: '/configuracoes', label: 'Configurações', emoji: '⚙️' }],
+    [...ITENS_FINANCAS, ...ITENS_SAUDE_FINANCAS, { href: '/configuracoes', label: 'Configurações', emoji: '⚙️' }],
     mode,
   );
 }
@@ -77,6 +88,7 @@ export const BOTTOM_TABS_PADRAO: readonly NavItem[] = [
 ];
 
 export const MENU_MAIS_PADRAO: readonly NavItem[] = [
+  { href: '/saude', label: 'Saúde', emoji: '🩺' },
   { href: '/treinos', label: 'Treinos', emoji: '🏋️' },
   { href: '/dieta', label: 'Dieta', emoji: '🍽️' },
   { href: '/medicamentos', label: 'Medicamentos', emoji: '💊' },

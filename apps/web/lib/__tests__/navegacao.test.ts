@@ -10,7 +10,8 @@ import {
   secoesSidebar,
 } from '../navegacao';
 
-const OCULTOS_NO_FINANCAS = ['/inicio', '/agenda', '/habitos', '/treinos', '/dieta', '/compras', '/medicamentos', '/notas', '/veiculo'];
+// /treinos saiu: Saúde e Treino aparece para todos (decisão do Estevam, 04/11/2026). Dieta entra na F3.
+const OCULTOS_NO_FINANCAS = ['/inicio', '/agenda', '/habitos', '/dieta', '/compras', '/medicamentos', '/notas', '/veiculo'];
 const hrefs = (itens: readonly { href?: string }[]) => itens.flatMap((i) => (i.href ? [i.href.split('?')[0] ?? i.href] : []));
 
 describe('Sidebar por APP_MODE', () => {
@@ -19,13 +20,16 @@ describe('Sidebar por APP_MODE', () => {
     expect(secoes.map((s) => s.label)).toEqual(['Geral', 'Saúde']);
     expect(secoes.flatMap((s) => hrefs(s.items))).toEqual([
       '/inicio', '/notas', '/agenda', '/financas', '/compras', '/habitos', '/veiculo', '/assinaturas',
-      '/treinos', '/dieta', '/medicamentos',
+      '/saude', '/treinos', '/dieta', '/medicamentos',
     ]);
   });
 
-  it('modo finanças: só rotas de finanças', () => {
-    const todos = secoesSidebar('financas').flatMap((s) => hrefs(s.items));
-    expect(todos).toEqual(['/financas', '/financas/carteiras', '/financas/contas', '/financas/orcamento', '/financas/metas', '/assinaturas']);
+  it('modo finanças: rotas de finanças + seção Saúde com Saúde (Hoje/Dieta/Peso) e Treinos', () => {
+    const secoes = secoesSidebar('financas');
+    expect(secoes.map((s) => s.label)).toEqual(['Finanças', 'Saúde']);
+    const todos = secoes.flatMap((s) => hrefs(s.items));
+    expect(todos).toEqual(['/financas', '/financas/carteiras', '/financas/contas', '/financas/orcamento', '/financas/metas', '/assinaturas', '/saude', '/treinos']);
+    for (const href of todos) expect(isRotaVisivel(href, 'financas')).toBe(true);
     for (const oculto of OCULTOS_NO_FINANCAS) expect(todos).not.toContain(oculto);
   });
 });
@@ -36,6 +40,15 @@ describe('BottomNav modo finanças', () => {
     expect(itens.map((i) => i.label)).toEqual(['Início', 'Gastos', 'Metas', 'Bancos', 'Config']);
     expect(hrefs(itens)).toEqual(['/financas', '/financas/gastos', '/financas/metas', '/financas/carteiras', '/configuracoes']);
     expect(itens.map((i) => i.icone)).toEqual(['house', 'receipt-text', 'target', 'landmark', 'settings']);
+  });
+
+  it('Treinos e Saúde não entram na barra (segue com 5 abas fixas; ficam no menu lateral)', () => {
+    expect(hrefs(itensBottomFinancas())).not.toContain('/treinos');
+    expect(hrefs(itensBottomFinancas())).not.toContain('/saude');
+    expect(isRotaVisivel('/treinos', 'financas')).toBe(true);
+    for (const r of ['/saude', '/saude/dieta', '/saude/peso']) expect(isRotaVisivel(r, 'financas')).toBe(true);
+    // A /dieta antiga (água, lista simples) não entra no modo Finanças.
+    expect(isRotaVisivel('/dieta', 'financas')).toBe(false);
   });
 
   it('todas apontam para rotas visíveis; sem "+" nem Chat na barra', () => {
@@ -53,9 +66,9 @@ describe('BottomNav modo finanças', () => {
 });
 
 describe('Drawer', () => {
-  it('modo finanças: seções de finanças + Configurações, sem módulos ocultos', () => {
+  it('modo finanças: seções de finanças + Saúde + Treinos + Configurações, sem módulos ocultos', () => {
     const todos = hrefs(itensDrawer('financas'));
-    expect(todos).toEqual(['/financas', '/financas/carteiras', '/financas/contas', '/financas/orcamento', '/financas/metas', '/assinaturas', '/configuracoes']);
+    expect(todos).toEqual(['/financas', '/financas/carteiras', '/financas/contas', '/financas/orcamento', '/financas/metas', '/assinaturas', '/saude', '/treinos', '/configuracoes']);
     for (const href of todos) expect(isRotaVisivel(href, 'financas')).toBe(true);
     for (const oculto of OCULTOS_NO_FINANCAS) expect(todos).not.toContain(oculto);
   });

@@ -46,3 +46,5 @@ export const AGUA = {
 
 export const APP_NAME = 'MeuDia';
 export * from './categorias';
+export * from './modelo-saude';
+export * from './saude';

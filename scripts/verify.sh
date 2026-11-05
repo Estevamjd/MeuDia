@@ -47,11 +47,12 @@ db() {
     cd packages/database
     "${q[@]}" -f tests/supabase_stub.sql >/dev/null
     # Cada roteiro roda numa transação com ROLLBACK: 005 sozinha; 000 + 005 + 006 (2x) e o down;
-    # 000 + 005 + 006 + 007 (2x), os downs 007 (2x) e 006 e o up de novo.
+    # 000 + 005 + 006 + 007 (2x), os downs 007 (2x) e 006 e o up de novo; 000 + 005..008 (2x), duas contas e down 008 (2x).
     "${q[@]}" -f tests/005_financas.sql >/dev/null
     "${q[@]}" -f tests/006_carteiras.sql >/dev/null
     "${q[@]}" -f tests/007_excluir_metas.sql >/dev/null
-    echo "ok: tests/005_financas.sql, tests/006_carteiras.sql e tests/007_excluir_metas.sql"
+    "${q[@]}" -f tests/008_saude_treino.sql >/dev/null
+    echo "ok: tests/005_financas.sql, tests/006_carteiras.sql, tests/007_excluir_metas.sql e tests/008_saude_treino.sql"
     bash tests/006_corrigir_saldo_concorrencia.sh
   )
 }

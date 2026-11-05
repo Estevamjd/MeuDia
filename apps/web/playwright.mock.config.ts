@@ -22,7 +22,7 @@ const CHAVE_SINTETICA_BUILD = 'gemini-chave-sintetica-bundle-e2e';
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: /(modo-runtime|novo-usuario|onboarding-loop|onboarding-pular|contas-saldo|excluir-metas|assistente|abas|config)\.spec\.ts$/,
+  testMatch: /(modo-runtime|novo-usuario|onboarding-loop|onboarding-pular|contas-saldo|excluir-metas|assistente|abas|config|treinos|saude)\.spec\.ts$/,
   fullyParallel: false,
   workers: 1,
   retries: 0,

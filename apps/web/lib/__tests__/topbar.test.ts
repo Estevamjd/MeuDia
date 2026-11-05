@@ -6,7 +6,7 @@ it('modo padrão: Topbar idêntica (Início, Treinos, Notas)', () => {
   expect(tabsTopbar('padrao')).toEqual(TOPBAR_TABS);
 });
 
-it('modo finanças: sem Treinos, Notas nem Início (módulos ocultos)', () => {
+it('modo finanças: sem abas no topo (Treinos visível fica na Sidebar; Notas e Início ocultos)', () => {
   const hrefs = tabsTopbar('financas').map((t) => t.href);
   expect(hrefs).not.toContain('/treinos');
   expect(hrefs).not.toContain('/notas');

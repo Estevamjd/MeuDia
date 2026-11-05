@@ -86,6 +86,7 @@ export type {
 export type {
   TipoRefeicao,
   ItemRefeicao,
+  FonteNutricional,
   Refeicao,
   RefeicaoInsert,
   RegistroPeso,

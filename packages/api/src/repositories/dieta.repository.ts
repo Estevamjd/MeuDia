@@ -90,6 +90,32 @@ export async function findRegistrosPeso(userId: string, limit = 30): Promise<Reg
   return (data as unknown) as RegistroPeso[];
 }
 
+/** Registros desde `desde` (inclusive), do mais antigo ao mais novo. Base do gráfico 7/30/90 e da média de 7 dias. */
+export async function findRegistrosPesoDesde(userId: string, desde: string): Promise<RegistroPeso[]> {
+  const { data, error } = await getSupabase()
+    .from('registros_peso')
+    .select('id, user_id, peso, data, observacao')
+    .eq('user_id', userId)
+    .gte('data', desde)
+    .order('data', { ascending: true })
+    .limit(400);
+
+  if (error) throw new AppError(error.message, 'DB_ERROR');
+  return ((data ?? []) as unknown as RegistroPeso[]).map((r) => ({ ...r, peso: Number(r.peso) }));
+}
+
+/** Peso do dia: `registros_peso` é UNIQUE(user_id, data), então registrar de novo no mesmo dia corrige o valor. */
+export async function upsertRegistroPeso(userId: string, input: RegistroPesoInsert & { data: string }): Promise<RegistroPeso> {
+  const { data, error } = await getSupabase()
+    .from('registros_peso')
+    .upsert({ ...input, user_id: userId }, { onConflict: 'user_id,data' })
+    .select('id, user_id, peso, data, observacao')
+    .single();
+
+  if (error) throw new AppError(error.message, 'DB_ERROR');
+  return (data as unknown) as RegistroPeso;
+}
+
 export async function createRegistroPeso(userId: string, input: RegistroPesoInsert): Promise<RegistroPeso> {
   const { data, error } = await getSupabase()
     .from('registros_peso')

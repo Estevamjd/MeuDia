@@ -2,13 +2,23 @@ import type { UUID } from './common';
 
 export type TipoRefeicao = 'cafe' | 'lanche_manha' | 'almoco' | 'lanche_tarde' | 'jantar' | 'ceia';
 
+/** De onde veio o valor do item: TACO, rótulo do produto ou digitado pela pessoa. */
+export type FonteNutricional = 'taco' | 'rotulo' | 'manual';
+
+/**
+ * Item de refeição (JSONB `refeicoes.items`). Nutriente null = "sem valor" (fora da TACO, "NA", "Tr", "*"
+ * ou vazio): nunca vira 0. Itens antigos têm só números e seguem válidos.
+ */
 export interface ItemRefeicao {
   nome: string;
-  calorias: number;
-  proteina?: number;
-  carbo?: number;
-  gordura?: number;
-  quantidade?: number;
+  calorias: number | null;
+  proteina?: number | null;
+  carbo?: number | null;
+  gordura?: number | null;
+  /** Gramas (ou unidade antiga). */
+  quantidade?: number | null;
+  fonte?: FonteNutricional;
+  taco_id?: number | null;
 }
 
 export interface Refeicao {

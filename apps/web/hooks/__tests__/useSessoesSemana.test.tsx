@@ -18,9 +18,9 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-function montar(mode: AppMode) {
+function montar(mode: AppMode, opcoes?: { noModoFinancas?: boolean }) {
   function Quem() {
-    useSessoesSemana();
+    useSessoesSemana(opcoes);
     return null;
   }
   const cliente = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -40,5 +40,10 @@ it('modo Finanças não consulta sessões de treino', async () => {
 
 it('modo padrão segue consultando as sessões da semana', async () => {
   montar('padrao');
+  await waitFor(() => expect(obterSessoesSemana).toHaveBeenCalledWith('u1'));
+});
+
+it('a tela /treinos consulta também no modo Finanças (Treinos aparece para todos)', async () => {
+  montar('financas', { noModoFinancas: true });
   await waitFor(() => expect(obterSessoesSemana).toHaveBeenCalledWith('u1'));
 });

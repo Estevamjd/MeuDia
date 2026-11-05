@@ -86,29 +86,94 @@ export async function update(sessaoId: string, data: Partial<SessaoTreinoInsert>
   return paraSessao(updated as SessaoRow);
 }
 
+// C4 (PLANO-F1): banco real tem `serie_numero`, `carga`, `repeticoes` e `concluida` em `series_realizadas`;
+// o app usa `numero_serie`, `carga_usada`, `reps_feitas` e `concluido`. Pedir os nomes do app dava 400.
+const COLUNAS_SERIE = 'id, sessao_id, exercicio_id, serie_numero, carga, repeticoes, concluida';
+
+export interface SerieRow {
+  id: string;
+  sessao_id: string;
+  exercicio_id: string;
+  serie_numero: number;
+  carga: number | string | null;
+  repeticoes: number | null;
+  concluida: boolean | null;
+}
+
+export function paraSerie(row: SerieRow): SerieRealizada {
+  return {
+    id: row.id,
+    sessao_id: row.sessao_id,
+    exercicio_id: row.exercicio_id,
+    numero_serie: row.serie_numero,
+    carga_usada: row.carga === null || row.carga === undefined ? null : Number(row.carga),
+    reps_feitas: row.repeticoes ?? null,
+    concluido: !!row.concluida,
+  };
+}
+
+export function paraRowSerie(serie: Partial<SerieRealizadaInsert>): Record<string, unknown> {
+  const { numero_serie, carga_usada, reps_feitas, concluido, ...resto } = serie;
+  const row: Record<string, unknown> = { ...resto };
+  if (numero_serie !== undefined) row.serie_numero = numero_serie;
+  if (carga_usada !== undefined) row.carga = carga_usada;
+  if (reps_feitas !== undefined) row.repeticoes = reps_feitas;
+  if (concluido !== undefined) row.concluida = concluido;
+  return row;
+}
+
 export async function createSeriesRealizadas(series: SerieRealizadaInsert[]): Promise<SerieRealizada[]> {
   const { data, error } = await getSupabase()
     .from('series_realizadas')
-    .insert(series)
-    .select('id, sessao_id, exercicio_id, numero_serie, carga_usada, reps_feitas, concluido');
+    .insert(series.map(paraRowSerie))
+    .select(COLUNAS_SERIE);
 
   if (error) throw new AppError(error.message, 'DB_ERROR');
-  return data as SerieRealizada[];
+  return (data as SerieRow[]).map(paraSerie);
 }
 
 export async function findSeriesBySessao(sessaoId: string): Promise<SerieRealizada[]> {
   const { data, error } = await getSupabase()
     .from('series_realizadas')
-    .select('id, sessao_id, exercicio_id, numero_serie, carga_usada, reps_feitas, concluido')
+    .select(COLUNAS_SERIE)
     .eq('sessao_id', sessaoId)
-    .order('numero_serie', { ascending: true });
+    .order('serie_numero', { ascending: true });
 
   if (error) throw new AppError(error.message, 'DB_ERROR');
-  return data as SerieRealizada[];
+  return (data as SerieRow[]).map(paraSerie);
 }
 
 /**
- * Busca as últimas séries realizadas de um exercício específico (últimas N sessões).
+ * Séries das últimas sessões da pessoa (a mais recente primeiro), sem a sessão em andamento.
+ * Base da coluna ANTERIOR e do histórico de cargas: `seriesAnteriores` (shared) escolhe a última vez de cada exercício.
+ */
+export async function findSeriesRecentes(
+  userId: string,
+  exercicioIds: string[],
+  { excluirSessaoId, limiteSessoes = 30 }: { excluirSessaoId?: string | null; limiteSessoes?: number } = {},
+): Promise<{ sessoes: { id: string; inicio: string }[]; series: SerieRealizada[] }> {
+  if (exercicioIds.length === 0) return { sessoes: [], series: [] };
+  let consulta = getSupabase()
+    .from('sessoes_treino')
+    .select('id, inicio')
+    .eq('user_id', userId);
+  if (excluirSessaoId) consulta = consulta.neq('id', excluirSessaoId);
+  const { data: sessoes, error } = await consulta.order('inicio', { ascending: false }).limit(limiteSessoes);
+  if (error) throw new AppError(error.message, 'DB_ERROR');
+  const lista = (sessoes ?? []) as { id: string; inicio: string }[];
+  if (lista.length === 0) return { sessoes: [], series: [] };
+
+  const { data: series, error: erroSeries } = await getSupabase()
+    .from('series_realizadas')
+    .select(COLUNAS_SERIE)
+    .in('sessao_id', lista.map((s) => s.id))
+    .in('exercicio_id', exercicioIds);
+  if (erroSeries) throw new AppError(erroSeries.message, 'DB_ERROR');
+  return { sessoes: lista, series: (series as SerieRow[]).map(paraSerie) };
+}
+
+/**
+ * Busca as últimas séries realizadas de um exercício específico.
  * Usado pelo analisador de carga para sugerir progressão.
  */
 export async function findSeriesByExercicioId(
@@ -117,23 +182,23 @@ export async function findSeriesByExercicioId(
 ): Promise<SerieRealizada[]> {
   const { data, error } = await getSupabase()
     .from('series_realizadas')
-    .select('id, sessao_id, exercicio_id, numero_serie, carga_usada, reps_feitas, concluido')
+    .select(COLUNAS_SERIE)
     .eq('exercicio_id', exercicioId)
-    .order('sessao_id', { ascending: false })
+    .order('created_at', { ascending: false })
     .limit(limit);
 
   if (error) throw new AppError(error.message, 'DB_ERROR');
-  return data as SerieRealizada[];
+  return (data as SerieRow[]).map(paraSerie);
 }
 
 export async function updateSerie(serieId: string, data: Partial<SerieRealizadaInsert>): Promise<SerieRealizada> {
   const { data: updated, error } = await getSupabase()
     .from('series_realizadas')
-    .update(data)
+    .update(paraRowSerie(data))
     .eq('id', serieId)
-    .select('id, sessao_id, exercicio_id, numero_serie, carga_usada, reps_feitas, concluido')
+    .select(COLUNAS_SERIE)
     .single();
 
   if (error) throw new AppError(error.message, 'DB_ERROR');
-  return updated as SerieRealizada;
+  return paraSerie(updated as SerieRow);
 }

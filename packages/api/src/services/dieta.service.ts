@@ -60,6 +60,19 @@ export async function registrarPeso(userId: string, data: unknown) {
   return dietaRepository.createRegistroPeso(userId, parsed);
 }
 
+/** Registros desde `desde` ('AAAA-MM-DD'), em ordem de data. */
+export async function pesoDesde(userId: string, desde: string) {
+  if (!userId) throw new AppError('userId é obrigatório', 'VALIDATION_ERROR');
+  return dietaRepository.findRegistrosPesoDesde(userId, desde);
+}
+
+/** Grava ou corrige o peso de um dia (um registro por dia). */
+export async function registrarPesoDoDia(userId: string, data: unknown) {
+  if (!userId) throw new AppError('userId é obrigatório', 'VALIDATION_ERROR');
+  const parsed = registroPesoInsertSchema.parse(data);
+  return dietaRepository.upsertRegistroPeso(userId, { ...parsed, data: parsed.data ?? format(new Date(), 'yyyy-MM-dd') });
+}
+
 // ── Resumo Nutricional ──
 
 export async function resumoNutricionalDia(userId: string, date?: string) {
