@@ -4,7 +4,7 @@ import { useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { DIAS_SEMANA } from '@meudia/shared';
+import { DIAS_SEMANA, contarExercicios } from '@meudia/shared';
 import type { ContextoUsuario } from '@meudia/shared';
 
 import {
@@ -201,7 +201,7 @@ export default function InicioPage() {
             {treinoHoje ? treinoHoje.nome : 'Descanso'}
           </div>
           <div className="csub">
-            {treinoHoje ? `${numExercicios} exercícios` : `Sem treino para ${DIAS_SEMANA[diaSemana].toLowerCase()}`}
+            {treinoHoje ? contarExercicios(numExercicios) : `Sem treino para ${DIAS_SEMANA[diaSemana].toLowerCase()}`}
           </div>
           {treinoHoje && (
             <div className="tag o" onClick={() => router.push('/treinos')} style={{ cursor: 'pointer' }}>
@@ -222,7 +222,7 @@ export default function InicioPage() {
                 <div className="atime">14:00</div>
                 <div className="ainfo">
                   <div className="atitle">Treino — {treinoHoje.nome}</div>
-                  <div className="asub">🏋️ {numExercicios} exercícios</div>
+                  <div className="asub">🏋️ {contarExercicios(numExercicios)}</div>
                 </div>
                 <div className="tag o" style={{ margin: 0 }}>Treino</div>
               </div>

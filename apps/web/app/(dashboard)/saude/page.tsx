@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { format, getDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AlertCircle } from 'lucide-react';
-import { totalDia, ultimoPeso, type MetasSaude, type RespostasSaude } from '@meudia/shared';
+import { contarExercicios, contarSeries, totalDia, ultimoPeso, type MetasSaude, type RespostasSaude } from '@meudia/shared';
 import {
   hojeLocal,
   usePerfilSaude,
@@ -133,8 +133,8 @@ export default function SaudeHojePage() {
             <h2 className="font-syne text-[22px] font-bold leading-tight text-text">{treino.nome}</h2>
             <p className="mt-0.5 text-[14.5px] text-muted-text tabular-nums">
               {feitoHoje
-                ? `concluído · ${totalSeries} séries`
-                : `${treino.exercicios?.length ?? 0} exercícios · ${totalSeries} séries`}
+                ? `concluído · ${contarSeries(totalSeries)}`
+                : `${contarExercicios(treino.exercicios?.length ?? 0)} · ${contarSeries(totalSeries)}`}
             </p>
           </div>
           {feitoHoje ? (

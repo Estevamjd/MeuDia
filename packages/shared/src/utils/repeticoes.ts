@@ -56,6 +56,16 @@ export function formatarFaixaRepeticoes(faixa: FaixaRepeticoes): string {
 
 /** Prescrição do exercício: "3 × 8–12", "3 × 10" ou "3 séries" (sem repetição). */
 export function formatarPrescricao(series: number, faixa: FaixaRepeticoes): string {
-  if (semRepeticoes(faixa)) return series === 1 ? '1 série' : `${series} séries`;
+  if (semRepeticoes(faixa)) return contarSeries(series);
   return `${series} × ${formatarFaixaRepeticoes(faixa)}`;
+}
+
+/** "1 série" / "3 séries" (0 fica no plural: "0 séries"). */
+export function contarSeries(n: number): string {
+  return n === 1 ? '1 série' : `${n} séries`;
+}
+
+/** "1 exercício" / "4 exercícios" (0 fica no plural: "0 exercícios"). */
+export function contarExercicios(n: number): string {
+  return n === 1 ? '1 exercício' : `${n} exercícios`;
 }

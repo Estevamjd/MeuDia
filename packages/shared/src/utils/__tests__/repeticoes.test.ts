@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  contarExercicios,
+  contarSeries,
   faixaDaLinha,
   formatarFaixaRepeticoes,
   formatarPrescricao,
@@ -56,5 +58,17 @@ describe('formatação', () => {
     expect(formatarPrescricao(2, { min: 10, max: 10 })).toBe('2 × 10');
     expect(formatarPrescricao(3, SEM_REPETICOES)).toBe('3 séries');
     expect(formatarPrescricao(1, SEM_REPETICOES)).toBe('1 série');
+  });
+});
+
+describe('contarSeries / contarExercicios (QA R1: "1 exercícios · 3 séries")', () => {
+  it.each([
+    [0, '0 séries', '0 exercícios'],
+    [1, '1 série', '1 exercício'],
+    [2, '2 séries', '2 exercícios'],
+    [12, '12 séries', '12 exercícios'],
+  ])('%i → "%s" / "%s"', (n, series, exercicios) => {
+    expect(contarSeries(n)).toBe(series);
+    expect(contarExercicios(n)).toBe(exercicios);
   });
 });
