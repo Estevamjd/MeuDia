@@ -75,6 +75,20 @@ export function aplicarOnboardingNoCache(
   return { ...(old ?? {}), ...perfil } as Profile;
 }
 
+/** Cada gravação do onboarding tem tempo limite: rede móvel ruim não pode deixar "Pular"/"Concluir" travados. */
+export const TEMPO_LIMITE_ONBOARDING_MS = 15_000;
+/** Depois do `router.replace`, se a página continuar montada, a troca de rota não aconteceu. */
+export const ESPERA_NAVEGACAO_MS = 6_000;
+
+/** Rejeita se a promessa não terminar no prazo (a requisição em si segue; só deixamos de esperar). */
+export function comTempoLimite<T>(promessa: PromiseLike<T>, ms = TEMPO_LIMITE_ONBOARDING_MS): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const limite = new Promise<never>((_, rejeitar) => {
+    timer = setTimeout(() => rejeitar(new Error('tempo limite do onboarding')), ms);
+  });
+  return Promise.race([Promise.resolve(promessa), limite]).finally(() => clearTimeout(timer));
+}
+
 export const MENSAGEM_ERRO_ONBOARDING =
   'Não foi possível salvar. Verifique sua conexão e tente novamente.';
 

@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "e2e:mock": "playwright test -c playwright.mock.config.ts"
+    "e2e:mock": "playwright test -c playwright.mock.config.ts",
+    "check:bundle-ia": "node scripts/verificar-bundle-ia.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -32,6 +33,7 @@
     "react-hook-form": "^7.54.0",
     "react-window": "^1.8.0",
     "recharts": "^2.15.0",
+    "server-only": "0.0.1",
     "web-push": "^3.6.7",
     "zod": "^3.24.0",
     "zustand": "^5.0.0"

@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { Profile } from '@meudia/shared';
 import {
   aplicarOnboardingNoCache,
+  comTempoLimite,
   deveRedirecionarOnboarding,
   montarCarteirasOnboarding,
   montarPerfilOnboarding,
@@ -140,4 +141,20 @@ it('linha sem id ganha UUID (nunca o índice, que quebraria com 22P02 no banco)'
   expect(a!.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   expect(b!.id).not.toBe(a!.id);
   expect(montarCarteirasOnboarding([{ id: 'fixo', nome: 'Nu', digitos: '' }])[0]!.id).toBe('fixo');
+});
+
+describe('comTempoLimite', () => {
+  it('devolve o resultado no prazo e rejeita quando a promessa não termina', async () => {
+    await expect(comTempoLimite(Promise.resolve(1), 50)).resolves.toBe(1);
+    await expect(comTempoLimite(Promise.reject(new Error('rede')), 50)).rejects.toThrow('rede');
+    vi.useFakeTimers();
+    try {
+      const pendente = comTempoLimite(new Promise(() => {}), 1000);
+      const verificacao = expect(pendente).rejects.toThrow(/tempo limite/);
+      await vi.advanceTimersByTimeAsync(1000);
+      await verificacao;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

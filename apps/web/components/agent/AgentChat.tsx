@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { clsx } from 'clsx';
 import { Send, Bot, User, Loader2 } from 'lucide-react';
 import type { MensagemChat, AcaoRapida } from '@meudia/shared';
@@ -14,6 +14,8 @@ interface AgentChatProps {
   sugestoesIniciais?: AcaoRapida[];
   /** Texto do estado vazio (o modo Finanças não cita módulos ocultos). */
   dicaInicial?: string;
+  /** Conteúdo depois das mensagens (ex.: card do gasto que o assistente entendeu). */
+  rodape?: ReactNode;
 }
 
 export function AgentChat({
@@ -24,17 +26,20 @@ export function AgentChat({
   onAcao,
   sugestoesIniciais,
   dicaInicial = 'Pergunte sobre treinos, hábitos, agenda ou finanças. Estou aqui para ajudar!',
+  rodape,
 }: AgentChatProps) {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-scroll ao receber novas mensagens
+  const temRodape = !!rodape;
+
+  // Auto-scroll ao receber novas mensagens (ou quando o card aparece)
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [mensagens]);
+  }, [mensagens, temRodape]);
 
   const handleEnviar = () => {
     const texto = input.trim();
@@ -143,6 +148,8 @@ export function AgentChat({
             </div>
           ))
         )}
+
+        {rodape}
 
         {/* Indicador de digitando */}
         {isSending && (

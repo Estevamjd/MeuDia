@@ -12,7 +12,7 @@ on:
 jobs:
   static:
     name: Type check, lint e testes unitários
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -25,7 +25,7 @@ jobs:
 
   e2e-mock:
     name: E2E mock (iPhone 13 WebKit)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

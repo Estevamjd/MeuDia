@@ -326,11 +326,12 @@ function gerarRespostaCriarCompromisso(
   const partes: string[] = [];
 
   if (assunto && dataStr && dataISO) {
-    // Temos tudo — oferecer botão "Criar Agora"
+    // Temos tudo — oferecer o botão de criar. O texto não cita o botão pelo nome: quem filtra a ação
+    // (ex.: modo Finanças do web) não deixa uma instrução órfã.
     const titulo = assunto.charAt(0).toUpperCase() + assunto.slice(1);
     partes.push(`Entendi! Vou criar na sua agenda:`);
     partes.push(`${titulo} — ${dataStr}${hora ? ` às ${hora}` : ''}`);
-    partes.push('Clique em "Criar Agora" para confirmar.');
+    partes.push('Confirme no botão abaixo para criar.');
 
     acoes.push({
       label: 'Criar Agora',

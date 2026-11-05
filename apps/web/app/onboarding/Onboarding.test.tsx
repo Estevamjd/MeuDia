@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Page from './page';
+import { ESPERA_NAVEGACAO_MS, TEMPO_LIMITE_ONBOARDING_MS } from '../../lib/onboarding';
 const m = vi.hoisted(() => ({ upsert: vi.fn(), criar: vi.fn(), replace: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: m.replace, refresh: vi.fn() }) }));
 const usuario = { id: 'u', email: 'teste@example.test', user_metadata: {} };
@@ -56,4 +57,53 @@ it('perfil já concluído que passa pelo onboarding não volta a ficar incomplet
   // se a linha já existe com true, não rebaixa.
   expect(m.upsert).toHaveBeenCalledTimes(1);
   expect(m.upsert.mock.calls[0]![0]).not.toHaveProperty('onboarding_feito');
+});
+it('Pular por agora conclui: grava onboarding_feito sem nome/bancos e vai para a home', async () => {
+  montar();
+  fireEvent.click(screen.getByRole('button', { name: 'Pular por agora' }));
+  await waitFor(() => expect(m.replace).toHaveBeenCalledWith('/financas'));
+  expect(m.criar).not.toHaveBeenCalled();
+  expect(m.upsert.mock.calls.at(-1)![0]).toEqual({ id: 'u', email: 'teste@example.test', onboarding_feito: true });
+});
+it('Pular por agora com exceção de rede (promessa rejeitada) não trava: mostra o erro e reabilita os botões', async () => {
+  m.upsert.mockRejectedValueOnce(new TypeError('Load failed'));
+  montar();
+  const pular = screen.getByRole('button', { name: 'Pular por agora' });
+  fireEvent.click(pular);
+  expect((await screen.findByRole('alert')).textContent).toMatch(/Não foi possível salvar/);
+  expect(screen.getByRole('button', { name: 'Pular por agora' })).toHaveProperty('disabled', false);
+  expect(m.replace).not.toHaveBeenCalled();
+  // Tentar de novo funciona.
+  fireEvent.click(screen.getByRole('button', { name: 'Pular por agora' }));
+  await waitFor(() => expect(m.replace).toHaveBeenCalledWith('/financas'));
+});
+it('Pular por agora com requisição que nunca responde destrava após o tempo limite', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    m.upsert.mockReturnValueOnce(new Promise(() => {}));
+    montar();
+    fireEvent.click(screen.getByRole('button', { name: 'Pular por agora' }));
+    expect(screen.getByRole('button', { name: /Salvando/ })).toHaveProperty('disabled', true);
+    await vi.advanceTimersByTimeAsync(TEMPO_LIMITE_ONBOARDING_MS + 100);
+    expect((await screen.findByRole('alert')).textContent).toMatch(/Não foi possível salvar/);
+    expect(screen.getByRole('button', { name: 'Pular por agora' })).toHaveProperty('disabled', false);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+it('se a troca de rota não acontecer, a tela não fica presa: navega de novo e reabilita', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  const assign = vi.fn();
+  vi.stubGlobal('location', { ...window.location, assign });
+  try {
+    montar();
+    fireEvent.click(screen.getByRole('button', { name: 'Pular por agora' }));
+    await waitFor(() => expect(m.replace).toHaveBeenCalledWith('/financas'));
+    await vi.advanceTimersByTimeAsync(ESPERA_NAVEGACAO_MS + 100);
+    expect(assign).toHaveBeenCalledWith('/financas');
+    expect(screen.getByRole('button', { name: 'Pular por agora' })).toHaveProperty('disabled', false);
+  } finally {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  }
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { createClient } from '../../lib/supabase/client';
@@ -18,6 +18,8 @@ import { rotaInicial } from '../../lib/app-mode';
 import {
   MENSAGEM_ERRO_ONBOARDING,
   aplicarOnboardingNoCache,
+  comTempoLimite,
+  ESPERA_NAVEGACAO_MS,
   montarPerfilOnboarding,
   profileKey,
 } from '../../lib/onboarding';
@@ -95,6 +97,10 @@ export default function OnboardingPage() {
     setData((prev) => ({ ...prev, ...partial }));
   };
 
+  // Vigia da troca de rota: limpo ao desmontar (a navegação aconteceu).
+  const vigiaNavegacao = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(vigiaNavegacao.current), []);
+
   const concluir = async (pular: boolean) => {
     if (!user) {
       router.replace('/login');
@@ -103,38 +109,41 @@ export default function OnboardingPage() {
     if (saving) return;
     setSaving(true);
     setErro(null);
+    // Toda saída sem navegar destrava os botões e mostra o erro: nada de tela presa em "salvando".
+    const falhar = (mensagem = MENSAGEM_ERRO_ONBOARDING) => {
+      setSaving(false);
+      setErro(mensagem);
+    };
 
     // Upsert: cria a linha se o perfil não existir (senão o dashboard voltaria para cá). Sem onboarding_feito aqui:
     // perfil novo nasce com o DEFAULT false e um já concluído não é rebaixado se a etapa dos bancos falhar.
     const perfil = montarPerfilOnboarding(user, data, { modoFinancas, pular });
     const dadosPerfil: Partial<typeof perfil> = { ...perfil };
     delete dadosPerfil.onboarding_feito;
-    const { error } = await supabase.from('profiles').upsert(dadosPerfil, { onConflict: 'id' });
-
-    if (error) {
-      setSaving(false);
-      setErro(MENSAGEM_ERRO_ONBOARDING);
-      return;
+    try {
+      const { error } = await comTempoLimite(supabase.from('profiles').upsert(dadosPerfil, { onConflict: 'id' }));
+      if (error) return falhar();
+    } catch {
+      // Exceção de rede ou tempo limite: antes ficava sem catch e `saving` nunca voltava a false.
+      return falhar();
     }
 
     // "Onde fica seu dinheiro?": cria os bancos depois do perfil (carteiras.user_id → profiles).
     if (modoFinancas && !pular) {
       try {
         for (const { id, carteira } of montarCarteirasOnboarding(data.carteiras)) {
-          await carteirasService.criarCarteiraOnboarding(user.id, id, carteira);
+          await comTempoLimite(carteirasService.criarCarteiraOnboarding(user.id, id, carteira));
         }
       } catch {
-        setSaving(false);
-        setErro('Não foi possível salvar seus bancos. Verifique sua conexão e tente novamente.');
-        return;
+        return falhar('Não foi possível salvar seus bancos. Verifique sua conexão e tente novamente.');
       }
     }
 
-    const { error: erroConclusao } = await supabase.from('profiles').upsert(perfil, { onConflict: 'id' });
-    if (erroConclusao) {
-      setSaving(false);
-      setErro(MENSAGEM_ERRO_ONBOARDING);
-      return;
+    try {
+      const { error: erroConclusao } = await comTempoLimite(supabase.from('profiles').upsert(perfil, { onConflict: 'id' }));
+      if (erroConclusao) return falhar();
+    } catch {
+      return falhar();
     }
 
     try { localStorage.removeItem(`onboarding-carteiras:${user.id}`); } catch { /* sem storage */ }
@@ -143,8 +152,16 @@ export default function OnboardingPage() {
     queryClient.setQueryData<Profile | null>(key, (old) => aplicarOnboardingNoCache(old, perfil));
     void queryClient.invalidateQueries({ queryKey: key });
     // replace: o "voltar" não retorna ao onboarding. `saving` segue true até a troca de rota.
-    router.replace(rotaInicial(mode));
+    const destino = rotaInicial(mode);
+    router.replace(destino);
     router.refresh();
+    // Se a página ainda estiver montada depois da espera, a troca de rota não aconteceu: destrava e navega de novo
+    // pelo navegador (o perfil já está concluído no banco).
+    clearTimeout(vigiaNavegacao.current);
+    vigiaNavegacao.current = setTimeout(() => {
+      setSaving(false);
+      window.location.assign(destino);
+    }, ESPERA_NAVEGACAO_MS);
   };
 
   const handleFinish = () => concluir(false);
@@ -196,8 +213,9 @@ export default function OnboardingPage() {
               onClick={handleSkip}
               className="text-sm text-muted transition-colors hover:text-text disabled:pointer-events-none disabled:opacity-50"
               disabled={saving}
+              aria-busy={saving}
             >
-              Pular por agora
+              {saving ? 'Salvando…' : 'Pular por agora'}
             </button>
 
             <div className="flex gap-3">
