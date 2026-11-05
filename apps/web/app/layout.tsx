@@ -8,7 +8,8 @@ import { getAppMode } from '../lib/app-mode';
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
-  weight: ['400', '500'],
+  // 700: links e números do Caderno (Saúde e Treino) em negrito real, sem negrito sintético.
+  weight: ['400', '500', '700'],
   variable: '--font-dm',
   display: 'swap',
 });

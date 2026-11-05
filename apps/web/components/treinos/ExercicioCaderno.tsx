@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { clsx } from 'clsx';
 import type { Exercicio, SerieRealizada } from '@meudia/shared';
 import { formatarPrescricao, formatarSerieAnterior, resumoUltimaVez } from '@meudia/shared';
+import { LinkAcao } from '../caderno';
 
 export interface MarcarSerie {
   exercicio_id: string;
@@ -220,15 +221,5 @@ export function ExercicioCaderno({
   );
 }
 
-export function LinkAcao({ onClick, children, disabled }: { onClick: () => void; children: ReactNode; disabled?: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="min-h-11 text-[14px] font-bold text-accent3 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent3"
-    >
-      {children}
-    </button>
-  );
-}
+// Mesmo link de texto do resto do Caderno (DM Sans, sem letter-spacing, sem quebra).
+export { LinkAcao };

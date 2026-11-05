@@ -1,9 +1,9 @@
-import type { DiaSemana, TipoTreino } from '../types';
+import type { DiaSemana, TipoRefeicao, TipoTreino } from '../types';
 
 /**
  * Modelo inicial de treino (BRIEF §3.3, plano do Estevam). Toda conta pode usar e depois editar.
  * Só o que o BRIEF diz: nome, séries e faixa. Carga e descanso ficam vazios (a pessoa preenche).
- * As refeições do modelo (BRIEF §3.4) entram na F3, sem valor nutricional inventado.
+ * As refeições do modelo (BRIEF §3.4) ficam em `MODELO_DIETA_V1`, só com nomes: sem gramas nem valor nutricional.
  * `ORIGEM_MODELO_TREINO` vai em `treinos.modelo_origem`/`exercicios.modelo_origem` (008) para aplicar uma vez só.
  */
 export const ORIGEM_MODELO_TREINO = 'modelo-estevam-v1';
@@ -85,4 +85,27 @@ export const MODELO_TREINO_V1: readonly TreinoModelo[] = [
   },
   { dia_semana: 6, nome: 'Descanso ou atividade leve', tipo: 'descanso', exercicios: [] },
   { dia_semana: 0, nome: 'Descanso ou atividade leve', tipo: 'descanso', exercicios: [] },
+];
+
+export interface RefeicaoModelo {
+  tipo: TipoRefeicao;
+  /** Nome mostrado na tela (o `tipo` vira só categoria; PLANO-F1 §3.2, P13). */
+  nome: string;
+  /** 'HH:MM'. */
+  horario: string;
+  /** Só os nomes do BRIEF; valor nutricional fica vazio até a pessoa preencher. */
+  itens: readonly string[];
+}
+
+/**
+ * Dia de refeições do modelo (BRIEF §3.4). Um horário por `tipo`, na ordem do dia.
+ * Sem a 009 (`refeicoes.nome/horario`), é daqui que vêm o nome e a hora de cada refeição na tela.
+ */
+export const MODELO_DIETA_V1: readonly RefeicaoModelo[] = [
+  { tipo: 'cafe', nome: 'Café da manhã', horario: '07:00', itens: ['2 pães franceses', '3 ovos', 'queijo'] },
+  { tipo: 'lanche_manha', nome: 'Lanche', horario: '10:00', itens: ['banana', 'iogurte natural', 'aveia'] },
+  { tipo: 'almoco', nome: 'Almoço', horario: '12:30', itens: ['arroz', 'feijão', 'frango', 'legumes'] },
+  { tipo: 'lanche_tarde', nome: 'Lanche da tarde', horario: '17:00', itens: ['pão com ovos', 'banana'] },
+  { tipo: 'jantar', nome: 'Vitamina', horario: '20:30', itens: ['Profit 28500', 'leite', 'banana'] },
+  { tipo: 'ceia', nome: 'Jantar', horario: '21:30', itens: ['macarrão', 'carne moída', 'legumes'] },
 ];

@@ -1,12 +1,17 @@
 import { z } from 'zod';
 
+// Nutriente null = "sem valor" (fora da TACO, "NA", "Tr", "*" ou vazio): nunca vira 0.
+const nutriente = z.number().min(0).nullable();
+
 const itemRefeicaoSchema = z.object({
-  nome: z.string().min(1, 'Nome do item é obrigatório'),
-  calorias: z.number().min(0),
-  proteina: z.number().min(0).optional(),
-  carbo: z.number().min(0).optional(),
-  gordura: z.number().min(0).optional(),
-  quantidade: z.number().min(0).optional(),
+  nome: z.string().trim().min(1, 'Nome do item é obrigatório').max(120),
+  calorias: nutriente,
+  proteina: nutriente.optional(),
+  carbo: nutriente.optional(),
+  gordura: nutriente.optional(),
+  quantidade: nutriente.optional(),
+  fonte: z.enum(['taco', 'rotulo', 'manual']).optional(),
+  taco_id: z.number().int().positive().nullable().optional(),
 });
 
 export const refeicaoInsertSchema = z.object({
@@ -20,7 +25,8 @@ export const refeicaoInsertSchema = z.object({
 });
 
 export const registroPesoInsertSchema = z.object({
-  peso: z.number().min(0.1, 'Peso deve ser maior que zero'),
+  // registros_peso.peso é DECIMAL(5,2).
+  peso: z.number().min(0.1, 'Peso deve ser maior que zero').max(999.99),
   data: z.string().optional(),
   observacao: z.string().nullable().optional(),
 });

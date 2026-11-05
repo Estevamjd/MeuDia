@@ -19,6 +19,7 @@ const config: Config = {
         accent3: '#6affda',
         orange: '#ff9f4a',
         green: '#4ade80',
+        'green-dark': '#22a35a',
         yellow: '#fbbf24',
         red: '#f87171',
         text: '#eeeef8',

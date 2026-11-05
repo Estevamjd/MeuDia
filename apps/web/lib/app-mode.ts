@@ -14,6 +14,7 @@ export const ROTAS_MODULOS = [
   '/habitos',
   '/veiculo',
   '/assinaturas',
+  '/saude',
   '/treinos',
   '/dieta',
   '/medicamentos',
@@ -22,8 +23,9 @@ export const ROTAS_MODULOS = [
 
 export const MODULOS_VISIVEIS: Record<AppMode, readonly string[]> = {
   padrao: ROTAS_MODULOS,
-  // Saúde e Treino aparece para todos (decisão do Estevam, 04/11/2026). F2: só Treinos; Dieta entra na F3.
-  financas: ['/financas', '/assinaturas', '/treinos', '/configuracoes'],
+  // Saúde e Treino aparece para todos (decisão do Estevam, 04/11/2026): /saude (Hoje, Dieta, Peso) e /treinos.
+  // A /dieta antiga (água, lista simples) segue só no modo padrão.
+  financas: ['/financas', '/assinaturas', '/saude', '/treinos', '/configuracoes'],
 };
 
 export function getAppMode(valor: string | undefined = process.env.APP_MODE): AppMode {

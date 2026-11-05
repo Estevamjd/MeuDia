@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { getDay } from 'date-fns';
-import { AlertCircle, Dumbbell } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { DIAS_SEMANA } from '@meudia/shared';
 import type { Exercicio } from '@meudia/shared';
 import { calcularDescansoSugerido } from '@meudia/ai';
@@ -33,7 +33,8 @@ import { useToast } from '../../../components/ui/Toast';
 import { TimerDescanso } from '../../../components/agent';
 import { AddExercicioModal, type ExercicioFormData } from '../../../components/modules/AddExercicioModal';
 import { SeletorDias, type DiaSeletor } from '../../../components/treinos/SeletorDias';
-import { ExercicioCaderno, LinkAcao, type MarcarSerie } from '../../../components/treinos/ExercicioCaderno';
+import { ExercicioCaderno, type MarcarSerie } from '../../../components/treinos/ExercicioCaderno';
+import { Cabecalho, LinkAcao, Subabas, TelaCaderno, VazioCaderno, classeBotaoCheio } from '../../../components/caderno';
 import { LembreteTreino } from '../../../components/treinos/LembreteTreino';
 
 // Segunda primeiro (S T Q Q S S D); valores de `treinos.dia_semana` (0 = domingo).
@@ -214,22 +215,22 @@ export default function TreinosPage() {
     );
   } else if (!treino) {
     conteudo = (
-      <EmptyState
-        icon={<Dumbbell size={36} aria-hidden="true" />}
-        title={`Nenhum treino na ${nomeDia.toLowerCase()}.`}
-        description="Crie o treino do dia e depois adicione os exercícios."
-        actionLabel="Criar treino"
-        onAction={() => setCriandoTreino(true)}
+      <VazioCaderno
+        rotulo={nomeDia}
+        titulo={`Nenhum treino na ${nomeDia.toLowerCase()}.`}
+        explicacao="Crie o treino do dia e depois adicione os exercícios."
+        acao="Criar treino"
+        onAcao={() => setCriandoTreino(true)}
       />
     );
   } else if (exercicios.length === 0) {
     conteudo = (
-      <EmptyState
-        icon={<Dumbbell size={36} aria-hidden="true" />}
-        title="Nenhum exercício neste treino."
-        description="Adicione o primeiro com séries, repetições e carga."
-        actionLabel="Adicionar exercício"
-        onAction={() => setAdicionando(true)}
+      <VazioCaderno
+        rotulo={treino.nome}
+        titulo="Nenhum exercício neste treino."
+        explicacao="Adicione o primeiro com séries, repetições e carga."
+        acao="Adicionar exercício"
+        onAcao={() => setAdicionando(true)}
       />
     );
   } else {
@@ -257,7 +258,7 @@ export default function TreinosPage() {
               type="button"
               onClick={() => void concluirTreino()}
               disabled={finalizarSessao.isPending}
-              className="min-h-11 rounded bg-accent3 px-5 text-[14px] font-bold text-[#04201a] disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent3"
+              className={`${classeBotaoCheio} !w-auto`}
             >
               Concluir treino
             </button>
@@ -268,14 +269,11 @@ export default function TreinosPage() {
   }
 
   return (
-    // -mx-4 no celular: as linhas finas vão de ponta a ponta, com a margem de 20px do Caderno dentro de cada seção.
-    <div className="-mx-4 max-w-2xl md:mx-0">
-      <header className="flex items-end justify-between gap-3 px-5 pb-4 pt-4">
-        <h1 className="font-syne text-[30px] font-extrabold leading-none tracking-[-0.5px] text-text">Treino</h1>
-        <p className="truncate text-[12px] uppercase tracking-[1.6px] text-muted-text">{contexto}</p>
-      </header>
+    <TelaCaderno>
+      <Cabecalho titulo="Treino" contexto={contexto} />
+      <Subabas />
 
-      <div className="border-b border-white/[0.07] px-5 pb-4">
+      <div className="border-b border-white/[0.07] px-5 py-4">
         <SeletorDias dias={dias} selecionado={dia} hoje={hoje} onSelecionar={setDia} />
       </div>
 
@@ -356,6 +354,6 @@ export default function TreinosPage() {
         confirmLabel="Excluir"
         isLoading={excluirExercicio.isPending}
       />
-    </div>
+    </TelaCaderno>
   );
 }

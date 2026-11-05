@@ -11,6 +11,9 @@ import { NavDrawer } from './NavDrawer';
 
 const PAGE_TITLES: Record<string, string> = {
   '/inicio': '✦ MeuDia',
+  '/saude': '🩺 Saúde',
+  '/saude/dieta': '🩺 Saúde',
+  '/saude/peso': '🩺 Saúde',
   '/treinos': '🏋️ Treinos',
   '/notas': '📝 Notas',
   '/agenda': '📅 Agenda',

@@ -32,6 +32,7 @@ const SECOES_PADRAO: NavSection[] = [
   {
     label: 'Saúde',
     items: [
+      { href: '/saude', label: 'Saúde', emoji: '🩺', colorClass: 'green' },
       { href: '/treinos', label: 'Treinos', emoji: '🏋️', colorClass: 'orange' },
       { href: '/dieta', label: 'Dieta', emoji: '🍽️', colorClass: 'green' },
       { href: '/medicamentos', label: 'Medicamentos', emoji: '💊' },
@@ -50,7 +51,11 @@ const ITENS_FINANCAS: NavItem[] = [
 ];
 
 // Saúde e Treino no modo Finanças (decisão do Estevam, 04/11): menu lateral e drawer. A BottomNav segue com 5 abas fixas.
-const ITENS_SAUDE_FINANCAS: NavItem[] = [{ href: '/treinos', label: 'Treinos', emoji: '🏋️' }];
+// Saúde = subabas Hoje · Treino · Dieta · Peso; Treinos segue com item próprio.
+const ITENS_SAUDE_FINANCAS: NavItem[] = [
+  { href: '/saude', label: 'Saúde', emoji: '🩺' },
+  { href: '/treinos', label: 'Treinos', emoji: '🏋️' },
+];
 
 const SECOES_FINANCAS: NavSection[] = [
   { label: 'Finanças', items: ITENS_FINANCAS },
@@ -83,6 +88,7 @@ export const BOTTOM_TABS_PADRAO: readonly NavItem[] = [
 ];
 
 export const MENU_MAIS_PADRAO: readonly NavItem[] = [
+  { href: '/saude', label: 'Saúde', emoji: '🩺' },
   { href: '/treinos', label: 'Treinos', emoji: '🏋️' },
   { href: '/dieta', label: 'Dieta', emoji: '🍽️' },
   { href: '/medicamentos', label: 'Medicamentos', emoji: '💊' },

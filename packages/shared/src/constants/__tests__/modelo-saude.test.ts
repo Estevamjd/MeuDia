@@ -49,3 +49,15 @@ describe('MODELO_TREINO_V1 (BRIEF §3.3)', () => {
     for (const t of MODELO_TREINO_V1) for (const e of t.exercicios) expect(Object.keys(e).sort()).toEqual(['nome', 'repeticoes_max', 'repeticoes_min', 'series']);
   });
 });
+
+describe('MODELO_DIETA_V1 (BRIEF §3.4)', () => {
+  it('6 refeições na ordem do dia, um tipo cada, só com nomes', async () => {
+    const { MODELO_DIETA_V1 } = await import('../modelo-saude');
+    expect(MODELO_DIETA_V1.map((r) => `${r.horario} ${r.nome}`)).toEqual([
+      '07:00 Café da manhã', '10:00 Lanche', '12:30 Almoço', '17:00 Lanche da tarde', '20:30 Vitamina', '21:30 Jantar',
+    ]);
+    expect(new Set(MODELO_DIETA_V1.map((r) => r.tipo)).size).toBe(6);
+    // Sem valor nutricional inventado: só strings.
+    for (const r of MODELO_DIETA_V1) expect(r.itens.every((i) => typeof i === 'string')).toBe(true);
+  });
+});

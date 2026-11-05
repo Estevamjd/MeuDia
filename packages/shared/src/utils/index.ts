@@ -9,3 +9,7 @@ export * from './gastos';
 export * from './renda-principal';
 export * from './repeticoes';
 export * from './treino';
+export * from './metas-saude';
+export * from './peso';
+export * from './nutricao';
+export * from './creatina';

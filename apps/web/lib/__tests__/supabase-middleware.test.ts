@@ -55,8 +55,8 @@ it.each(['/privacidade', '/termos'])('%s segue acessível para usuário logado',
   expect(response.headers.get('location')).toBeNull();
 });
 
-// Saúde e Treino aparece para todos (decisão do Estevam, 04/11/2026): /treinos não redireciona no modo Finanças.
-it.each(['/treinos', '/treinos?dia=1'])('modo Finanças: %s segue aberto para usuário logado', async path => {
+// Saúde e Treino aparece para todos (decisão do Estevam, 04/11/2026): /treinos e /saude não redirecionam no modo Finanças.
+it.each(['/treinos', '/treinos?dia=1', '/saude', '/saude/dieta', '/saude/peso'])('modo Finanças: %s segue aberto para usuário logado', async path => {
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.invalid');
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'fixture');
   vi.stubEnv('APP_MODE', 'financas');
