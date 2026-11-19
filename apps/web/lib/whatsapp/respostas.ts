@@ -11,10 +11,15 @@ export const AJUDA = [
   '• treinei peito 40min',
   '• almocei arroz, feijão e frango',
   '• lembra que não gosto de academia de manhã',
+  '• lembretes às 19h / parar lembretes',
   'Pode escrever "ontem" para o dia anterior. "esquece tudo" apaga o que eu lembro.',
 ].join('\n');
 
 export const LEMBREI = (nome?: string | null) => `Guardado${nome ? `, ${primeiroNome(nome)}` : ''}! Vou levar isso em conta 😉`;
+export const LEMBRETES_PARADOS = 'Combinado, parei os lembretes. Se quiser de volta, é só mandar "voltar lembretes" 😉';
+export const LEMBRETES_VOLTARAM = 'Lembretes de volta! Vou te dar um toque de vez em quando: no máximo 2 por dia e nunca entre 22h e 8h 😉';
+export const LEMBRETE_HORA = (h: number) => `Fechado: lembrete de treino lá pelas ${h}h ⏰`;
+export const LEMBRETE_HORA_INVALIDA = 'Só mando lembretes entre 8h e 21h. Me fala um horário nesse intervalo?';
 export const ESQUECI = 'Pronto, esqueci tudo o que você tinha me pedido pra lembrar.';
 
 export const NAO_ENTENDI = 'Não entendi 🤔 Tente algo como "gastei 30 no uber" ou "treinei pernas 50min". Mande "ajuda" para ver exemplos.';

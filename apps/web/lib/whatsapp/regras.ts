@@ -96,6 +96,16 @@ export function interpretarPorRegras(mensagem: string, ctx: ContextoRegras): Int
   const t = semAcento(original);
   if (/^(?:ajuda|help|menu|oi|ola|bom dia|boa tarde|boa noite|\?|comandos?)\b[!.?\s]*$/.test(t)) return { tipo: 'ajuda' };
 
+  // Lembretes proativos: "parar lembretes"/"pare", "voltar lembretes", "lembretes às 19h".
+  if (/^(?:pare|para|parar|stop|chega)[!. ]*$/.test(t) || /\b(?:parar?|pare|desativ\w*|deslig\w*|cancel\w*|sem)\s+(?:os\s+|com\s+os\s+|de\s+(?:me\s+)?mandar\s+)?lembretes?\b/.test(t) || /\bpar[ae] de me lembrar\b/.test(t)) {
+    return { tipo: 'lembretes', ativos: false, hora: null };
+  }
+  const hora = /\b(?:lembretes?|me lembr[ae](?: de treinar)?)\s+(?:as|a partir das|depois das)\s*(\d{1,2})\s*(?:h|horas?)?\b/.exec(t);
+  if (hora) return { tipo: 'lembretes', ativos: null, hora: Number(hora[1]) };
+  if (/\b(?:volt\w*|ativ\w*|lig\w*|quero)\s+(?:os\s+|com\s+os\s+)?lembretes?\b/.test(t) || /\bpode voltar a me lembrar\b/.test(t)) {
+    return { tipo: 'lembretes', ativos: true, hora: null };
+  }
+
   // Memória curta: "lembra que não gosto de academia de manhã", "sou vegetariana", "esquece tudo".
   if (/^esquec[ea]r?\b.*\b(?:tudo|isso|o que (?:eu )?(?:te )?(?:disse|contei|falei))\b/.test(t)) return { tipo: 'esquecer' };
   const pedido = /^(?:lembra(?:r)?|lembre(?:-se)?|anota(?: ai)?|guarda(?: ai)?|grava(?: ai)?)\s+(?:(?:de|disso)\s*:?\s*)?(?:que\s+)?/.exec(t);

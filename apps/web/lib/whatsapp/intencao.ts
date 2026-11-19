@@ -7,6 +7,7 @@ export type Intencao =
   | { tipo: 'refeicao'; refeicao: TipoRefeicaoRapida; descricao: string; data?: string }
   | { tipo: 'lembrar'; fato: string }
   | { tipo: 'esquecer' }
+  | { tipo: 'lembretes'; ativos: boolean | null; hora: number | null }
   | { tipo: 'ajuda' }
   | { tipo: 'desconhecido' };
 

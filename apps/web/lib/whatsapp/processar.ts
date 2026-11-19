@@ -9,8 +9,8 @@ import { ganchoDaMeta } from './ganchos';
 import { passoOnboarding, type ExtrairIA } from './onboarding';
 import { comentarComHumor, conversar, extrairOnboardingIA } from './persona';
 import { interpretarPorRegras } from './regras';
-import { AJUDA, ESQUECI, FALHOU, LEMBREI, LIMITE_DIA, NAO_ENTENDI, confirmacao, erroRpc } from './respostas';
-import { buscarContato, lembrarFato, registrarNoBanco, responder, salvarOnboarding } from './servicos';
+import { AJUDA, ESQUECI, FALHOU, LEMBREI, LEMBRETE_HORA, LEMBRETE_HORA_INVALIDA, LEMBRETES_PARADOS, LEMBRETES_VOLTARAM, LIMITE_DIA, NAO_ENTENDI, confirmacao, erroRpc } from './respostas';
+import { buscarContato, configurarLembretes, lembrarFato, registrarNoBanco, responder, salvarOnboarding } from './servicos';
 import { numeroPermitido, telefoneDoPayload } from './telefone';
 
 /** HMAC-SHA512 do corpo cru (`X-Webhook-Hmac`, igual ao WAHA). Comparação em tempo constante. */
@@ -32,6 +32,7 @@ export interface Dependencias {
   conversarIA?: typeof conversar;
   comentarIA?: typeof comentarComHumor;
   lembrar?: typeof lembrarFato;
+  lembretes?: typeof configurarLembretes;
   contato?: typeof buscarContato;
   onboarding?: typeof salvarOnboarding;
   registrar?: typeof registrarNoBanco;
@@ -63,6 +64,7 @@ export async function processarEvento(evento: unknown, deps: Dependencias = {}):
     conversarIA = conversar,
     comentarIA = comentarComHumor,
     lembrar = lembrarFato,
+    lembretes = configurarLembretes,
     contato: buscar = buscarContato,
     onboarding = salvarOnboarding,
     registrar = registrarNoBanco,
@@ -117,6 +119,13 @@ export async function processarEvento(evento: unknown, deps: Dependencias = {}):
     const comentario = gancho ? await comentarIA({ contato, intencao, gancho, extras: reg.extras, hojeISO }) : null;
     const r = await responderCom(intencao.tipo, confirmacao(intencao, reg.nome ?? contato.nome, reg.extras, contato.estilo, comentario));
     return comentario ? { ...r, comentario: true } as Resultado : r;
+  }
+  if (intencao.tipo === 'lembretes') {
+    if (intencao.hora != null && (intencao.hora < 8 || intencao.hora > 21)) return responderCom('lembretes', aplicarEstilo(LEMBRETE_HORA_INVALIDA, contato.estilo));
+    const r = await lembretes(telefone, intencao.hora != null ? true : intencao.ativos, intencao.hora);
+    if (!r.ok) return responderCom('lembretes', FALHOU);
+    const txt = intencao.hora != null ? LEMBRETE_HORA(intencao.hora) : intencao.ativos ? LEMBRETES_VOLTARAM : LEMBRETES_PARADOS;
+    return responderCom('lembretes', aplicarEstilo(txt, contato.estilo));
   }
   if (intencao.tipo === 'lembrar' || intencao.tipo === 'esquecer') {
     const r = await lembrar(telefone, intencao.tipo === 'lembrar' ? intencao.fato : null);

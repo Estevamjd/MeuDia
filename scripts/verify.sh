@@ -56,7 +56,8 @@ db() {
     "${q[@]}" -f tests/010_treino_dieta_whatsapp.sql >/dev/null
     "${q[@]}" -f tests/011_whatsapp_onboarding.sql >/dev/null
     "${q[@]}" -f tests/012_whatsapp_amigo.sql >/dev/null
-    echo "ok: tests/005..012 (financas, carteiras, excluir_metas, saude_treino, origem_lancamento, treino_dieta_whatsapp, whatsapp_onboarding, whatsapp_amigo)"
+    "${q[@]}" -f tests/013_whatsapp_lembretes.sql >/dev/null
+    echo "ok: tests/005..013 (financas, carteiras, excluir_metas, saude_treino, origem_lancamento, treino_dieta_whatsapp, whatsapp_onboarding, whatsapp_amigo, whatsapp_lembretes)"
     bash tests/006_corrigir_saldo_concorrencia.sh
   )
 }

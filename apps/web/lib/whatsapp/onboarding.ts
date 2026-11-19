@@ -89,7 +89,8 @@ function final(nome: string): string {
   return (
     `Prontinho${nome ? `, ${nome}` : ''}! ✅\n` +
     'Agora é só abrir este link pra criar sua senha e ligar seu WhatsApp à sua conta (vale 7 dias e é só seu):\n{LINK}\n\n' +
-    'Depois é só me mandar coisas como "gastei 30 no uber" ou "treinei pernas 50min".'
+    'Depois é só me mandar coisas como "gastei 30 no uber" ou "treinei pernas 50min".\n' +
+    'De vez em quando eu te dou um toque (treino do dia, conta vencendo), no máximo 2 por dia. Não curtiu? Manda "parar lembretes".'
   );
 }
 

@@ -1,0 +1,28 @@
+{
+  "name": "MeuDia · lembretes do WhatsApp (a cada 15 min)",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "minutes", "minutesInterval": 15 }] } },
+      "name": "A cada 15 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://meudia.srv2176785.hstgr.cloud/api/whatsapp/lembretes",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": { "timeout": 600000 }
+      },
+      "name": "MeuDia /api/whatsapp/lembretes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [260, 0],
+      "credentials": { "httpHeaderAuth": { "id": "__CREDENCIAL__", "name": "MeuDia lembretes (Bearer)" } }
+    }
+  ],
+  "connections": { "A cada 15 min": { "main": [[{ "node": "MeuDia /api/whatsapp/lembretes", "type": "main", "index": 0 }]] } },
+  "settings": { "executionOrder": "v1", "timezone": "America/Sao_Paulo", "saveDataSuccessExecution": "none", "saveDataErrorExecution": "all" }
+}

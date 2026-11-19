@@ -115,6 +115,7 @@ Exemplos que já funcionam (sem IA, só com regras):
 | `... ontem` | Registra no dia anterior |
 | `comprei um hambúrguer` (sem valor) | Refeição (o tipo vem da hora). Com valor (`comprei um hambúrguer 32`) vira gasto · Comida |
 | `lembra que não gosto de academia de manhã` / `sou vegetariana` | Fato guardado (memória curta). `esquece tudo` apaga |
+| `parar lembretes` / `voltar lembretes` / `lembretes às 19h` | Desliga, religa ou muda a hora dos lembretes |
 | `ajuda` | Mostra exemplos |
 | outra coisa ("hoje foi puxado") | Resposta da persona com uma sugestão (se houver chave da Anthropic) |
 
@@ -129,13 +130,19 @@ Tudo o que chega pelo WhatsApp aparece no app com o selo **WhatsApp** (`origem =
 | Segredos | Ficam no `.env` do app | Mais um lugar com credenciais |
 | Custo/memória | Zero extra | O n8n já roda, mas cada fluxo pesa e falha em silêncio |
 
-**Decisão sobre o n8n (19/11/2026): hoje ele não é dono de nada.**
+**Decisão sobre o n8n (19/11/2026, revista): ele é o relógio dos lembretes, e só isso.**
 
-- **Lembretes proativos:** desenhados e **desligados** (ver 7.1). Quando forem ligados, o agendador será o
-  cron do próprio app (`/api/cron/lembretes`, que já existe para push), não o n8n, para ficar versionado e testado.
-- **Alerta de erro por fluxo n8n: não agora.** Não há fluxo no n8n que possa falhar, e alertar pelo WhatsApp
-  seria uma mensagem proativa (risco de banimento). Os erros do webhook ficam no log do container
-  (`docker logs meudia-meudia-1 | grep whatsapp`). O healthcheck do Docker reinicia o app.
+- **Agendador dos lembretes = n8n.** Um fluxo de 2 nós (`deploy/n8n/lembretes-whatsapp.json`): "a cada 15 min"
+  → `POST https://meudia…/api/whatsapp/lembretes` com `Authorization: Bearer <WHATSAPP_LEMBRETES_SEGREDO>`
+  (guardado como credencial do n8n, nunca no JSON). Toda a regra (quem, quando, o quê, tetos) fica no app,
+  versionada e testada; o n8n só bate o relógio.
+  - Por que n8n e não cron dentro do app: o container do Next (standalone) não tem agendador, e pôr um
+    `setInterval` no servidor web duplicaria rodadas em reinícios. Um contêiner extra só com `crond` também
+    funcionaria, mas o n8n já roda, tem agendador confiável e mostra as execuções com erro no painel (as de
+    sucesso não são guardadas). Se o n8n cair, nada é enviado: falha segura.
+  - Rodadas sobrepostas não duplicam mensagem: cada lembrete é reservado no banco com chave única antes de enviar.
+- **Alerta de erro por fluxo n8n: não.** Alertar pelo WhatsApp seria mensagem proativa extra (risco de ban).
+  As execuções com erro ficam no painel do n8n e os envios no log do app (`[whatsapp/lembrete] …`).
 - **Endurecido:** `N8N_DIAGNOSTICS_ENABLED=false`, `N8N_VERSION_NOTIFICATIONS_ENABLED=false`,
   `EXECUTIONS_DATA_PRUNE=true`, `EXECUTIONS_DATA_MAX_AGE=336` (14 dias). A porta, que estava aberta em HTTP
   numa porta alta pública, agora só escuta em `127.0.0.1` (acesso só por https://n8n-5bnh.srv2176785.hstgr.cloud).
@@ -152,8 +159,8 @@ mídia, cada mensagem tem deduplicação no banco, e a memória por contato é a
 - **Conexão não oficial.** O WAHA usa o WhatsApp Web (engine GOWS). Os termos do WhatsApp proíbem uso
   automatizado/não pessoal e **o número pode ser banido** (livro 19 da Mestres Play). Por isso:
   - use um **chip dedicado** ao bot, **nunca** o seu número pessoal;
-  - o bot **só responde** a quem escreveu e a quem está na lista. **Nada de envio em massa.**
-    Os lembretes proativos estão **desligados**: nenhum código envia mensagem sem alguém ter escrito antes;
+  - o bot **só fala com quem escreveu antes** e está na lista. **Nada de envio em massa.**
+    Os lembretes proativos só vão para quem já escreveu nos últimos 14 dias e não pediu para parar (ver 7.1);
   - grupos são ignorados.
 - **Portão:** só conversa com quem está em `WHATSAPP_NUMEROS_PERMITIDOS`. Com
   `WHATSAPP_ONBOARDING_ABERTO=true` qualquer número pode fazer o onboarding (padrão: `false`). **Lista vazia e
@@ -182,7 +189,7 @@ mídia, cada mensagem tem deduplicação no banco, e a memória por contato é a
 | WAHA Core (grátis) | VPS `/docker/waha` (compose versionado em `deploy/waha/docker-compose.yml`) | Imagem `devlikeapro/waha:gows`, limite de 768 MB. Sessão `default` criada e esperando o QR. Fala com o app por dentro da rede `meudia_default`. |
 | Segredos do WAHA | VPS `/docker/waha/.env` (600) | `WAHA_API_KEY` (só o hash sha512), usuário e senha do painel, `WHATSAPP_HOOK_HMAC_KEY` |
 | Webhook | `apps/web/app/api/whatsapp/webhook/route.ts` + `apps/web/lib/whatsapp/` | Parser por regras, Claude opcional, RPC e resposta |
-| Banco | migrations `010_treino_dieta_whatsapp.sql`, `011_whatsapp_onboarding.sql` e `012_whatsapp_amigo.sql` (aplicadas em 19/11/2026) | `profiles.whatsapp`, `registros_treino`, `registros_refeicao`, `whatsapp_contatos` (com `fatos`), `private.*`, RPCs |
+| Banco | migrations `010_treino_dieta_whatsapp.sql`, `011_whatsapp_onboarding.sql`, `012_whatsapp_amigo.sql` e `013_whatsapp_lembretes.sql` (aplicadas em 19/11/2026) | `profiles.whatsapp`, `registros_treino`, `registros_refeicao`, `whatsapp_contatos` (com `fatos`), `private.*`, RPCs |
 | Onboarding, persona e amigo | `apps/web/lib/whatsapp/{onboarding,persona,ganchos,contato,ia}.ts`, página `app/whatsapp/page.tsx` | Máquina de estados e ganchos testados com Haiku simulado |
 | Cópias dos segredos | Só no computador do assistente (`/workspace/secrets/`, 600) | `waha-api-key.txt`, `waha-dashboard.txt`, `whatsapp-hmac.txt`, `whatsapp-rpc-segredo.txt`. Nunca no git. |
 
@@ -198,6 +205,8 @@ Variáveis do app (`/docker/meudia/.env` no VPS):
 | `WHATSAPP_NUMEROS_PERMITIDOS` | **vazio** | Lista de quem pode escrever (separada por vírgula) |
 | `WHATSAPP_ONBOARDING_ABERTO` | `false` | `true` = qualquer número pode fazer o onboarding |
 | `WHATSAPP_LIMITE_DIA` | `30` | Mensagens por número por dia |
+| `WHATSAPP_LEMBRETES_ATIVOS` | `true` | Interruptor global dos lembretes proativos |
+| `WHATSAPP_LEMBRETES_SEGREDO` | definido | Bearer que o n8n usa para chamar `/api/whatsapp/lembretes` |
 | `ANTHROPIC_API_KEY` | definido | Claude Haiku 4.5: onboarding, persona e frases que as regras não entendem |
 | `WHATSAPP_IA_MODELO` | (padrão `claude-haiku-4-5`) | Opcional |
 
@@ -227,16 +236,54 @@ sabendo do risco de banimento do chip.
 
 ## 7. Próximos passos (v2)
 
-### 7.1 Lembretes proativos (desenhado, DESLIGADO)
+### 7.1 Lembretes proativos (LIGADOS, com travas)
 
-Nenhum código envia mensagem sem a pessoa ter escrito antes. Quando for ligar:
+O bot puxa conversa com base no que está registrado no sistema, como um amigo que lembra das coisas.
 
-- **Opt-in explícito** pelo chat ("quero lembretes") → coluna `lembretes_whatsapp boolean default false` em
-  `whatsapp_contatos`, via migration aditiva.
-- **Agendador:** o cron do app (`/api/cron/lembretes`, já protegido por `CRON_SECRET`) roda 1×/dia às 9h (SP).
-  Ele busca contas que vencem hoje ou amanhã das pessoas com opt-in e manda **no máximo 1 mensagem por dia**,
-  só para quem conversou com o bot nas últimas 24h (janela parecida com a da API oficial, que reduz o risco de ban).
-- Interruptor `WHATSAPP_LEMBRETES=false` por padrão. "parar" desliga na hora.
+**Pesquisa (19/11/2026).** WAHA ("How to avoid blocking"), Central de Ajuda do WhatsApp e guias de API não oficial:
+só mandar para quem escreveu antes ou pediu; nada de mensagem em massa ou com texto idêntico; atraso aleatório
+e "digitando…"; parar na primeira falha; sempre dar uma saída fácil ("parar"); poucas mensagens por pessoa.
+Estudos de apps de hábito (JMIR mHealth 2023; revisão PMC9231655; Renfree et al. CHI 2016): lembrete demais
+cansa e é desligado; personalizar hora e conteúdo funciona melhor que horário fixo; não depender de lembrete
+todo dia (por isso o check-in é sorteado e há teto semanal).
+
+| Lembrete | Quando | Condição (dados do sistema) | Frequência |
+|---|---|---|---|
+| Treino do plano | hora preferida, senão 1h antes do horário do treino no plano, senão 1h antes da hora em que costuma registrar, senão 18h (+0–40 min aleatórios) | há treino para hoje em Treino → Plano e ainda não registrou (app ou WhatsApp) | 1 por dia |
+| Parabéns | mesma janela | já registrou o treino de hoje | sorteio de 30%, no máx. 2 por semana |
+| Conta a vencer | 9h–12h | conta ativa vence em até 2 dias e não foi paga | 1 vez por conta e vencimento |
+| Check-in "teve algum gasto hoje?" | 20h–21h45 | nenhum gasto lançado no dia | dias sorteados (~55%), no máx. 3 por semana |
+| Refeição | 12h30–14h | só com meta de alimentação e sem refeição registrada | sorteio de 40%, no máx. 2 por semana |
+
+**Travas (código + banco):**
+
+- Só quem tem conta ligada, **escreveu para o bot nos últimos 14 dias** e não pediu para parar. Número que
+  nunca escreveu não recebe nada.
+- Opt-in já vem ligado no onboarding (a mensagem final avisa). "parar lembretes" / "pare" desliga,
+  "voltar lembretes" religa, "lembretes às 19h" muda a hora (8h–21h). O 1º lembrete de cada pessoa traz o aviso
+  de como parar.
+- **Máximo 2 por pessoa por dia** (conferido também no banco na reserva), 1 por rodada, nunca entre 22h e 8h.
+- Depois de **3 lembretes sem a pessoa escrever nada**, para até ela voltar a falar.
+- Horário com atraso aleatório por pessoa e dia; textos variados (Haiku, até 70 tokens, com o mesmo "amigo
+  engraçado" e as mesmas regras de tom; texto pronto se a IA falhar ou sair do tom). Em conta, se a IA errar o
+  valor, vale o texto pronto.
+- Fila global lenta: no máx. 10 envios por rodada, com 8–20 s entre pessoas e "digitando…" antes. **Na primeira
+  falha de envio, a rodada para.**
+- Interruptor global `WHATSAPP_LEMBRETES_ATIVOS` (hoje `true`). Sem sessão do WAHA conectada (`WORKING`), a
+  rodada só planeja: não reserva nem envia.
+- Log de cada envio: `private.whatsapp_envios` (tipo, chave, dia, status; 60 dias; some com a conta) e linha
+  `[whatsapp/lembrete] tipo=… tel=••••1234 status=…` no log do app (sem o texto).
+- Simular: `POST /api/whatsapp/lembretes?dry=1&agora=2026-11-23T19:00:00-03:00` (com o Bearer; `&ia=1` usa o
+  Haiku). Não reserva nem envia.
+
+Exemplos reais do Haiku (dados fictícios, nada enviado):
+
+- Treino (plano: perna): "Lia, tá na hora de fazer aquelas pernas ficarem mais fortes! Já sabe, sem treino de
+  perna hoje é como pizza sem queijo, né? 💪"
+- Check-in (sem emoji): "E aí, Lia, o dia fechou zerado nos gastos ou só não anotou aquele cafezinho por aí?"
+- Conta: "Lia, aquela Luz de R$ 120,00 vence amanhã, hein! Sua meta de dinheiro tá de olho nessa? 💡"
+
+Custo: ~US$ 0,0006 por lembrete, no máx. 2 por pessoa por dia.
 
 ### 7.2 Outros
 

@@ -7,7 +7,7 @@ import type { IntencaoEscrita } from './intencao';
 import type { Extras } from './servicos';
 import type { ExtrairIA } from './onboarding';
 
-const REGRAS_DE_OURO = [
+export const REGRAS_DE_OURO = [
   'Humor de amigo: leve, carinhoso, uma provocação de brincadeira no máximo. Nunca maldoso, nunca sermão, nunca culpa.',
   'Nunca comente corpo, peso, aparência ou "gordice"; não chame comida de errada nem de pecado. Fale da META que a pessoa escolheu, não da pessoa.',
   'Varie as piadas: não repita bordões nem comece sempre igual.',
@@ -46,7 +46,7 @@ export async function conversar(contato: Contato, mensagem: string, hojeISO: str
 
 // ── Comentário com humor depois de um registro (só quando há gancho com a meta) ──
 
-const ANGULOS = [
+export const ANGULOS = [
   'como um amigo que percebeu e dá uma piscadinha',
   'com uma pergunta retórica divertida',
   'com um exagero cômico e carinhoso',
@@ -67,7 +67,7 @@ const PEDIDO: Record<Gancho['motivo'], string> = {
 /** Palavras que nunca podem sair (se sair, cai no texto pronto). */
 const PROIBIDO = /\b(?:gord|obes|baleia|porc[oa]|fei[oa]|vergonha|culpa|nojo|pecad|lixo|burr|preguic|fracass|desist|deveria)/i;
 
-function seguro(texto: string): string | null {
+export function seguro(texto: string): string | null {
   const t = texto.replace(/^["'“]|["'”]$/g, '').trim();
   return t && !PROIBIDO.test(t.normalize('NFD').replace(/[\u0300-\u036f]/g, '')) ? t : null;
 }

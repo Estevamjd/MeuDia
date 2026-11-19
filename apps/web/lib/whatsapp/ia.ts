@@ -11,7 +11,7 @@ const PRECO_ENTRADA = 1;
 const PRECO_SAIDA = 5;
 
 export interface PedidoClaude {
-  uso: 'interpretar' | 'onboarding' | 'conversa' | 'comentario';
+  uso: 'interpretar' | 'onboarding' | 'conversa' | 'comentario' | 'lembrete';
   system: string;
   mensagem: string;
   maxTokens: number;
