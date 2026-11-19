@@ -138,8 +138,8 @@ Tudo o que chega pelo WhatsApp aparece no app com o selo **WhatsApp** (`origem =
   versionada e testada; o n8n só bate o relógio.
   - Por que n8n e não cron dentro do app: o container do Next (standalone) não tem agendador, e pôr um
     `setInterval` no servidor web duplicaria rodadas em reinícios. Um contêiner extra só com `crond` também
-    funcionaria, mas o n8n já roda, tem agendador confiável e mostra as execuções com erro no painel (as de
-    sucesso não são guardadas). Se o n8n cair, nada é enviado: falha segura.
+    funcionaria, mas o n8n já roda, tem agendador confiável e mostra cada execução no painel (guardadas por 14 dias,
+    pela limpeza automática). Se o n8n cair, nada é enviado: falha segura.
   - Rodadas sobrepostas não duplicam mensagem: cada lembrete é reservado no banco com chave única antes de enviar.
 - **Alerta de erro por fluxo n8n: não.** Alertar pelo WhatsApp seria mensagem proativa extra (risco de ban).
   As execuções com erro ficam no painel do n8n e os envios no log do app (`[whatsapp/lembrete] …`).
