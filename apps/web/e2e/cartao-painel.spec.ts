@@ -140,7 +140,7 @@ test('cartão deslizante: 2 páginas sem meta, 3 com meta; botões, setas e anú
     await page.screenshot({ path: path.join(pasta, `04-inicio-p3-${sufixo}.png`), animations: 'disabled' });
 
     // ── Painel (antigo Relatório) ──
-    await page.getByRole('navigation', { name: 'Navegação principal' }).getByRole('link', { name: 'Relatório' }).click();
+    await page.getByRole('navigation', { name: 'Navegação principal' }).getByRole('link', { name: 'Painel' }).click();
     await page.waitForURL(/\/financas\/relatorio$/);
     await expect(page.getByRole('heading', { level: 1 }).first()).toHaveText('Painel');
     await expect(page.getByTestId('painel-sobra-valor')).toHaveText(brl('139,10'));

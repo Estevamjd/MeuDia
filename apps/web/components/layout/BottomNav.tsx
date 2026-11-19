@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
 import { clsx } from 'clsx';
-import { Dumbbell, FileText, House, Salad, type LucideIcon } from 'lucide-react';
+import { Dumbbell, House, LayoutDashboard, Salad, type LucideIcon } from 'lucide-react';
 import { useAppMode } from '../AppModeProvider';
 import {
   BOTTOM_TABS_PADRAO,
@@ -26,14 +26,14 @@ const ICONES: Record<IconeAba, LucideIcon> = {
   house: House,
   dumbbell: Dumbbell,
   salad: Salad,
-  'file-text': FileText,
+  'layout-dashboard': LayoutDashboard,
 };
 
 const ABA =
   'relative flex min-h-[56px] min-w-[44px] flex-1 flex-col items-center justify-center gap-1 px-1 pb-1 pt-2 text-[11px] font-medium leading-tight transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
 
 /**
- * Modo Finanças: Início · Treino · Dieta · Relatório (docs/ia-navegacao.md). Sem "Mais": o ☰ no topo já abre o menu.
+ * Modo Finanças: Início · Treino · Dieta · Painel (docs/ia-navegacao.md). Sem "Mais": o ☰ no topo já abre o menu.
  * A ativa fica ciano, com `aria-current="page"`.
  */
 function BottomNavFinancas() {

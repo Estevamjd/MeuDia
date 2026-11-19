@@ -25,7 +25,7 @@ describe('Sidebar por APP_MODE', () => {
     ]);
   });
 
-  it('modo finanças: Finanças (com Relatório) + Saúde (Treino, Dieta, Plano, Calorias e peso)', () => {
+  it('modo finanças: Finanças (com Painel) + Saúde (Treino, Dieta, Plano, Calorias e peso)', () => {
     const secoes = secoesSidebar('financas');
     expect(secoes.map((s) => s.label)).toEqual(['Finanças', 'Saúde']);
     const todos = secoes.flatMap((s) => hrefs(s.items));
@@ -39,11 +39,11 @@ describe('Sidebar por APP_MODE', () => {
 });
 
 describe('BottomNav modo finanças', () => {
-  it('Início, Treino, Dieta e Relatório; sem "Mais" (o ☰ do topo já abre o menu)', () => {
+  it('Início, Treino, Dieta e Painel; sem "Mais" (o ☰ do topo já abre o menu)', () => {
     const itens = itensBottomFinancas();
-    expect(itens.map((i) => i.label)).toEqual(['Início', 'Treino', 'Dieta', 'Relatório']);
+    expect(itens.map((i) => i.label)).toEqual(['Início', 'Treino', 'Dieta', 'Painel']);
     expect(hrefs(itens)).toEqual(['/financas', '/treinos', '/refeicoes', '/financas/relatorio']);
-    expect(itens.map((i) => i.icone)).toEqual(['house', 'dumbbell', 'salad', 'file-text']);
+    expect(itens.map((i) => i.icone)).toEqual(['house', 'dumbbell', 'salad', 'layout-dashboard']);
     expect(itens.map((i) => i.label)).not.toContain('Mais');
   });
 

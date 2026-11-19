@@ -27,7 +27,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/financas/gastos': '🧾 Gastos',
   '/financas/metas': '🎯 Metas',
   '/financas/carteiras': '🏦 Bancos',
-  '/financas/relatorio': 'Relatório',
+  '/financas/relatorio': 'Painel',
   '/compras': '🛒 Compras',
   '/veiculo': '🚗 Veículo',
   '/assinaturas': '💳 Assinaturas',

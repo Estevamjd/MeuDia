@@ -4,7 +4,7 @@ import { test, expect } from './mock-guard';
 import { pastaEvidencias } from './evidencias';
 
 /**
- * Abas Treino e Dieta (19/11/2026, docs/ia-navegacao.md): barra Início · Treino · Dieta · Relatório, registro
+ * Abas Treino e Dieta (19/11/2026, docs/ia-navegacao.md): barra Início · Treino · Dieta · Painel, registro
  * rápido, resumo da semana e selo de origem (Manual / WhatsApp). Também o campo "Seu WhatsApp" em Configurações.
  * Só mock (nunca Supabase real).
  */
@@ -48,7 +48,7 @@ test('Treino e Dieta: abas, registro rápido, semana e origem; WhatsApp em Confi
   await fecharBanner(page);
 
   const nav = page.getByRole('navigation', { name: 'Navegação principal' });
-  await expect(nav.getByRole('link')).toHaveText(['Início', 'Treino', 'Dieta', 'Relatório']);
+  await expect(nav.getByRole('link')).toHaveText(['Início', 'Treino', 'Dieta', 'Painel']);
   await shot('nav-inicio-390.png');
 
   // ── Treino: vazio honesto, sem números inventados ──

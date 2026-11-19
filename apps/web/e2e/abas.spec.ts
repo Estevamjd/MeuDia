@@ -70,7 +70,7 @@ const despesa = (descricao: string, categoria: string, valor: number, data: stri
   tipo: 'despesa', descricao, categoria, valor, data, carteira_id, banco, created_at: `${data}T${hora}:00:00.000Z`,
 });
 
-test('design v2: Início, Treino, Dieta e Relatório (menu no ☰); Ver todos, Chat no header, Gastei e filtros de Gastos', async ({ page }) => {
+test('design v2: Início, Treino, Dieta e Painel (menu no ☰); Ver todos, Chat no header, Gastei e filtros de Gastos', async ({ page }) => {
   const erros = coletarErros(page);
   const EVIDENCIAS = pastaEvidencias('icones-abas');
   // Dados típicos: 2 bancos, 2 contas, 3 gastos (e 1 em setembro), salário já recebido.
@@ -133,14 +133,14 @@ test('design v2: Início, Treino, Dieta e Relatório (menu no ☰); Ver todos, C
   expect(larguras.scroll, 'rolagem lateral na Início').toBeLessThanOrEqual(larguras.cliente);
   await page.screenshot({ path: path.join(EVIDENCIAS, '10-inicio-resumida.png'), animations: 'disabled' });
 
-  // ── Barra: Início, Treino, Dieta, Relatório (sem "Mais": o ☰ abre o menu), ≥ 44px, safe-area, aria-current ──
+  // ── Barra: Início, Treino, Dieta, Painel (sem "Mais": o ☰ abre o menu), ≥ 44px, safe-area, aria-current ──
   expect(await nav.getAttribute('style')).toContain('safe-area-inset-bottom');
   expect(caixaNav.y + caixaNav.height).toBeLessThanOrEqual(844);
   const abas = [
     { nome: 'Início', url: /\/financas$/, titulo: 'Olá, Lia' },
     { nome: 'Treino', url: /\/treinos$/, titulo: 'Treino' },
     { nome: 'Dieta', url: /\/refeicoes$/, titulo: 'Dieta' },
-    { nome: 'Relatório', url: /\/financas\/relatorio$/, titulo: 'Painel' },
+    { nome: 'Painel', url: /\/financas\/relatorio$/, titulo: 'Painel' },
   ];
   await expect(nav.getByRole('link')).toHaveText(abas.map((a) => a.nome));
   await expect(nav.getByRole('button')).toHaveCount(0);

@@ -41,9 +41,9 @@ const SECOES_PADRAO: NavSection[] = [
 ];
 
 // Modo Finanças (IA de navegação 19/11/2026, docs/ia-navegacao.md): a barra de baixo tem as 4 áreas do dia
-// (Início · Treino · Dieta · Relatório); o menu ☰ tem só o que NÃO está na barra, em grupos. Sem "Mais".
+// (Início · Treino · Dieta · Painel); o menu ☰ tem só o que NÃO está na barra, em grupos. Sem "Mais".
 const RESUMO_DO_MES: NavItem = { href: '/financas', label: 'Resumo do mês', emoji: '💸', exato: true };
-const RELATORIO: NavItem = { href: '/financas/relatorio', label: 'Relatório mensal', emoji: '📄' };
+const RELATORIO: NavItem = { href: '/financas/relatorio', label: 'Painel do mês', emoji: '📊' };
 const TREINO: NavItem = { href: '/treinos', label: 'Treino', emoji: '🏋️', exato: true };
 const DIETA: NavItem = { href: '/refeicoes', label: 'Dieta', emoji: '🥗' };
 
@@ -121,7 +121,7 @@ export const MENU_MAIS_PADRAO: readonly NavItem[] = [
 export const HREF_NOVA_CONTA = '/financas/contas?nova=1';
 
 /** Nome do ícone lucide (kebab-case) de cada aba; o componente mapeia para o ícone. */
-export type IconeAba = 'house' | 'dumbbell' | 'salad' | 'file-text';
+export type IconeAba = 'house' | 'dumbbell' | 'salad' | 'layout-dashboard';
 
 export type ItemBottomFinancas = NavItem & { icone: IconeAba };
 
@@ -130,7 +130,7 @@ const BOTTOM_FINANCAS: ItemBottomFinancas[] = [
   { href: '/financas', label: 'Início', emoji: '🏠', icone: 'house', exato: true },
   { href: '/treinos', label: 'Treino', emoji: '🏋️', icone: 'dumbbell', exato: true },
   { href: '/refeicoes', label: 'Dieta', emoji: '🥗', icone: 'salad' },
-  { href: '/financas/relatorio', label: 'Relatório', emoji: '📄', icone: 'file-text' },
+  { href: '/financas/relatorio', label: 'Painel', emoji: '📊', icone: 'layout-dashboard' },
 ];
 
 export function itensBottomFinancas(mode: AppMode = 'financas'): ItemBottomFinancas[] {
