@@ -1,0 +1,45 @@
+# Deploy behind the existing Traefik on srv2176785.hstgr.cloud.
+# Do not add another proxy. Do not change the n8n compose project.
+services:
+  meudia:
+    image: meudia-web:latest
+    build:
+      context: ./src
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+        NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-MeuDia}
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+    restart: unless-stopped
+    mem_limit: 1g
+    memswap_limit: 1g
+    ports:
+      - "3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      APP_MODE: ${APP_MODE:-financas}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.meudia.rule=Host(`meudia.srv2176785.hstgr.cloud`)
+      - traefik.http.routers.meudia.entrypoints=websecure
+      - traefik.http.routers.meudia.tls.certresolver=letsencrypt
+      - traefik.http.services.meudia.loadbalancer.server.port=3000
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/login').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 8s
+      retries: 5
+      start_period: 40s
