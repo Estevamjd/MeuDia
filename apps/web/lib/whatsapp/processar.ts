@@ -5,11 +5,12 @@ import { horaSP } from '../../components/registros/datas';
 import { interpretarComClaude } from './claude';
 import { aplicarEstilo, contatoDoRpc } from './contato';
 import { ehEscrita, type Intencao } from './intencao';
+import { ganchoDaMeta } from './ganchos';
 import { passoOnboarding, type ExtrairIA } from './onboarding';
-import { conversar, extrairOnboardingIA } from './persona';
+import { comentarComHumor, conversar, extrairOnboardingIA } from './persona';
 import { interpretarPorRegras } from './regras';
-import { AJUDA, FALHOU, LIMITE_DIA, NAO_ENTENDI, confirmacao, erroRpc } from './respostas';
-import { buscarContato, registrarNoBanco, responder, salvarOnboarding } from './servicos';
+import { AJUDA, ESQUECI, FALHOU, LEMBREI, LIMITE_DIA, NAO_ENTENDI, confirmacao, erroRpc } from './respostas';
+import { buscarContato, lembrarFato, registrarNoBanco, responder, salvarOnboarding } from './servicos';
 import { numeroPermitido, telefoneDoPayload } from './telefone';
 
 /** HMAC-SHA512 do corpo cru (`X-Webhook-Hmac`, igual ao WAHA). Comparação em tempo constante. */
@@ -22,12 +23,15 @@ export function assinaturaValida(corpo: string, assinatura: string | null, chave
 
 export type Resultado =
   | { status: 'ignorado'; motivo: string }
-  | { status: 'respondido'; intencao: Intencao['tipo'] | 'onboarding' | 'conversa' | 'limite'; texto: string };
+  | { status: 'respondido'; intencao: Intencao['tipo'] | 'onboarding' | 'conversa' | 'limite';
+      comentario?: boolean; texto: string };
 
 export interface Dependencias {
   interpretarIA?: typeof interpretarComClaude;
   extrairIA?: ExtrairIA;
   conversarIA?: typeof conversar;
+  comentarIA?: typeof comentarComHumor;
+  lembrar?: typeof lembrarFato;
   contato?: typeof buscarContato;
   onboarding?: typeof salvarOnboarding;
   registrar?: typeof registrarNoBanco;
@@ -57,6 +61,8 @@ export async function processarEvento(evento: unknown, deps: Dependencias = {}):
     interpretarIA = interpretarComClaude,
     extrairIA = extrairOnboardingIA,
     conversarIA = conversar,
+    comentarIA = comentarComHumor,
+    lembrar = lembrarFato,
     contato: buscar = buscarContato,
     onboarding = salvarOnboarding,
     registrar = registrarNoBanco,
@@ -105,7 +111,17 @@ export async function processarEvento(evento: unknown, deps: Dependencias = {}):
   if (ehEscrita(intencao)) {
     const reg = await registrar(telefone, typeof p.id === 'string' ? p.id : null, intencao);
     if (reg.duplicada) return { status: 'ignorado', motivo: 'duplicada' };
-    return responderCom(intencao.tipo, reg.ok ? confirmacao(intencao, reg.nome ?? contato.nome, reg.extras, contato.estilo) : erroRpc(reg.erro));
+    if (!reg.ok) return responderCom(intencao.tipo, erroRpc(reg.erro));
+    // Amigo que conhece a pessoa: só comenta quando o registro cruza com uma meta dela (regra decide; IA só escreve).
+    const gancho = ganchoDaMeta(intencao, contato, reg.extras);
+    const comentario = gancho ? await comentarIA({ contato, intencao, gancho, extras: reg.extras, hojeISO }) : null;
+    const r = await responderCom(intencao.tipo, confirmacao(intencao, reg.nome ?? contato.nome, reg.extras, contato.estilo, comentario));
+    return comentario ? { ...r, comentario: true } as Resultado : r;
+  }
+  if (intencao.tipo === 'lembrar' || intencao.tipo === 'esquecer') {
+    const r = await lembrar(telefone, intencao.tipo === 'lembrar' ? intencao.fato : null);
+    if (!r.ok) return responderCom(intencao.tipo, FALHOU);
+    return responderCom(intencao.tipo, aplicarEstilo(intencao.tipo === 'lembrar' ? LEMBREI(contato.nome) : ESQUECI, contato.estilo));
   }
   if (intencao.tipo === 'ajuda') return responderCom('ajuda', aplicarEstilo(AJUDA, contato.estilo));
   const livre = await conversarIA(contato, texto, hojeISO);

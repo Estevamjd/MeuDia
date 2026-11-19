@@ -1,4 +1,5 @@
 import { categoriaInfo, CATEGORIA_ENTRADA_EXTRA, CATEGORIA_OUTROS, CATEGORIA_SALARIO, refeicaoPelaHora, somarDias, type TipoRefeicaoRapida } from '@meudia/shared';
+import { COMIDA } from './ganchos';
 import type { Intencao } from './intencao';
 
 /**
@@ -80,6 +81,10 @@ const VERBOS_REFEICAO: [RegExp, TipoRefeicaoRapida | null][] = [
   [/^comi\b/, null],
 ];
 
+/** Frases que contam algo sobre a pessoa (viram fato guardado, não registro). */
+const FATO_DECLARADO =
+  /^(?:eu\s+)?(?:nao gosto|odeio|detesto|amo|adoro|prefiro|gosto (?:de|mais)|sou (?:alergic|intolerante|vegetarian|vegan|diabetic|celiac)|nao (?:como|bebo|tomo)|trabalho (?:de|a|em|no|na|como)|acordo|durmo|tenho (?:filh|alergia|intoler))/;
+
 export interface ContextoRegras {
   hojeISO: string;
   horaSP: number;
@@ -90,6 +95,16 @@ export function interpretarPorRegras(mensagem: string, ctx: ContextoRegras): Int
   if (!original) return { tipo: 'desconhecido' };
   const t = semAcento(original);
   if (/^(?:ajuda|help|menu|oi|ola|bom dia|boa tarde|boa noite|\?|comandos?)\b[!.?\s]*$/.test(t)) return { tipo: 'ajuda' };
+
+  // Memória curta: "lembra que não gosto de academia de manhã", "sou vegetariana", "esquece tudo".
+  if (/^esquec[ea]r?\b.*\b(?:tudo|isso|o que (?:eu )?(?:te )?(?:disse|contei|falei))\b/.test(t)) return { tipo: 'esquecer' };
+  const pedido = /^(?:lembra(?:r)?|lembre(?:-se)?|anota(?: ai)?|guarda(?: ai)?|grava(?: ai)?)\s+(?:(?:de|disso)\s*:?\s*)?(?:que\s+)?/.exec(t);
+  if (pedido && original.length - pedido[0].length >= 3 && !extrairValor(original)) {
+    return { tipo: 'lembrar', fato: maiuscula(original.slice(pedido[0].length).replace(/[.!]+$/, '').trim()).slice(0, 140) };
+  }
+  if (FATO_DECLARADO.test(t) && !/r\$|reais/.test(t) && original.length <= 140) {
+    return { tipo: 'lembrar', fato: maiuscula(original.replace(/[.!]+$/, '')) };
+  }
 
   const data = /\bontem\b/.test(t) ? somarDias(ctx.hojeISO, -1) : undefined;
   const comData = <T extends object>(o: T) => (data ? { ...o, data } : o);
@@ -112,6 +127,13 @@ export function interpretarPorRegras(mensagem: string, ctx: ContextoRegras): Int
       if (!desc || extrairValor(desc)?.trecho.match(/r\$|reais/i)) break; // "almoço 35 reais" é gasto
       return comData({ tipo: 'refeicao' as const, refeicao: tipo ?? refeicaoPelaHora(ctx.horaSP), descricao: maiuscula(desc).slice(0, 200) });
     }
+  }
+
+  // "comprei um hambúrguer" / "pedi uma pizza" (sem valor) = o que comeu; com valor vira gasto (abaixo).
+  const compra = /^(?:comprei|pedi|peguei|bebi|tomei)\b/.exec(t);
+  if (compra && !extrairValor(original) && COMIDA.test(t)) {
+    const desc = limparDescricao(original.slice(compra[0].length));
+    if (desc) return comData({ tipo: 'refeicao' as const, refeicao: refeicaoPelaHora(ctx.horaSP), descricao: maiuscula(desc).slice(0, 200) });
   }
 
   // Dinheiro: "recebi 500 do freela", "gastei 45,90 no mercado", "uber 23"

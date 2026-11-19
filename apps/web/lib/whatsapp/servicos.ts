@@ -10,6 +10,10 @@ export interface Extras {
   conta_dia?: number;
   treinos_semana?: number;
   refeicoes_dia?: number;
+  /** Últimos 5 registros de 7 dias, mais novo primeiro (012). */
+  recentes?: { tipo: 'gasto' | 'treino' | 'refeicao'; descricao?: string; valor?: number; data?: string }[];
+  /** Treino: dias desde o treino anterior (012); ausente se é o primeiro. */
+  dias_sem_treino?: number | null;
 }
 
 export interface RespostaRpc {
@@ -52,6 +56,11 @@ export function buscarContato(telefone: string, limite: number, fetchFn: typeof 
 /** Grava respostas do onboarding; com `gerarToken` devolve o token do link (whatsapp_onboarding, 011). */
 export function salvarOnboarding(telefone: string, dados: Record<string, unknown>, gerarToken: boolean, fetchFn: typeof fetch = fetch) {
   return rpc<{ ok: boolean; erro?: string; token?: string }>('whatsapp_onboarding', { p_telefone: telefone, p_dados: dados, p_gerar_token: gerarToken }, fetchFn);
+}
+
+/** Guarda um fato que a pessoa pediu para lembrar; `null` esquece todos (whatsapp_lembrar, 012). */
+export function lembrarFato(telefone: string, fato: string | null, fetchFn: typeof fetch = fetch) {
+  return rpc<{ ok: boolean; erro?: string; total?: number }>('whatsapp_lembrar', { p_telefone: telefone, p_fato: fato }, fetchFn);
 }
 
 /** Grava pelo RPC `whatsapp_registrar` (chave anon + segredo do webhook; o servidor não tem service role). */

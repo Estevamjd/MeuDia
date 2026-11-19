@@ -1,7 +1,7 @@
 # Assistente do MeuDia no WhatsApp
 
 Estado em 19/11/2026: **pronto, esperando o número.** Falta só ler o QR com o chip do bot e pôr os números
-autorizados na lista. O onboarding pelo WhatsApp e a persona estão no ar (migration 011).
+autorizados na lista. O onboarding pelo WhatsApp, a persona de amigo engraçado e a memória curta estão no ar (migrations 011 e 012).
 
 ## 1. Como funciona
 
@@ -43,22 +43,65 @@ ter). Criar usuário ou mandar link de senha para um e-mail digitado no chat abr
 e-mail de terceiros. O link com token deixa a criação da conta no fluxo normal (e-mail + senha, com
 confirmação).
 
-### 1.2 Persona (Haiku 4.5)
+### 1.2 Persona (Haiku 4.5): o amigo engraçado que conhece a pessoa
 
 `apps/web/lib/whatsapp/persona.ts`, no formato "SOUL de uma página" (livro 19):
 
-- MeuDia, assistente com IA; português do Brasil; **alegre, atencioso e prático**; trata pelo primeiro nome.
-- **Proativo, "faz antes de pedir":** depois de um gasto, mostra quanto resta do orçamento da categoria ou
-  avisa de uma conta que vence em até 3 dias. Depois de um treino, comemora a semana ("Já são 3 dias de
-  treino nesta semana"). Os números vêm do banco, no retorno do `whatsapp_registrar`, nunca da IA.
-- Respeita o estilo salvo: curto (1 dica, até 2 frases) ou detalhado (todas as dicas); sem emoji remove todos.
+- MeuDia, assistente com IA, **como um amigo próximo e engraçado**; português do Brasil; alegre, atencioso e
+  prático; trata pelo primeiro nome; respostas curtas.
+- **Regras de ouro do humor:** leve e carinhoso, uma provocação de brincadeira no máximo; nunca maldoso, nunca
+  sermão, nunca culpa. **Nunca comenta corpo, peso ou aparência**, nem chama comida de "errada" ou "pecado":
+  fala da meta que a pessoa escolheu, não da pessoa. Varia as piadas (cada chamada sorteia um "ângulo":
+  pergunta retórica, narrador esportivo, trocadilho…).
+- **Proativo, "faz antes de pedir":** depois de um gasto, mostra quanto resta do orçamento ou avisa de conta que
+  vence em até 3 dias. Depois de um treino, comemora a semana. Os números vêm sempre do banco.
+- Respeita o estilo salvo: curto ou detalhado, com ou sem emoji (sem emoji, o app remove todos, até os da IA).
 - Limites: não move dinheiro, não dá recomendação de investimento nem diagnóstico; nunca inventa números.
-- **Regras primeiro.** A IA só entra quando as regras não entendem: para interpretar um registro (200
-  tokens de saída), entender uma resposta do onboarding (100) ou responder uma conversa livre (200).
-  Cada chamada loga `[whatsapp/ia] uso=… in=… out=… custo_usd=…` (só contagem, sem texto).
 
-Custo (Haiku 4.5: US$ 1/M de entrada, US$ 5/M de saída): interpretar ≈ US$ 0,002; onboarding ≈ US$ 0,0005;
-conversa ≈ US$ 0,0015. No pior caso (30 mensagens/dia, todas com IA), fica em ~US$ 0,05 por pessoa por dia.
+#### Comentário de amigo depois de um registro
+
+```
+registro (regras) ─► whatsapp_registrar ─► extras: orçamento, conta próxima, semana de treino,
+                                           dias sem treino, últimos 5 registros (7 dias)
+                 ─► ganchoDaMeta (regra, grátis): o registro cruza com uma meta da pessoa?
+                       não ─► só a confirmação (sem IA)
+                       sim ─► Haiku escreve UMA frase (até 80 tokens) com meta + fatos + contexto
+                              (frase fora do tom ou IA fora do ar ─► texto pronto, sorteado)
+                 ─► "🥗 Jantar anotado: Hambúrguer." + a frase
+```
+
+| Registro | Meta que precisa existir | Gancho |
+|---|---|---|
+| Refeição ou gasto com hambúrguer, pizza, refri, doce, cerveja… | `dieta` nas metas ou objetivo como "emagrecer", "secar", "comer melhor" | brincadeira com a meta de alimentação |
+| Refeição com salada, grelhado, fruta… | idem | comemora |
+| Gasto em Lazer, Comida, Restaurante, Roupa, Streaming… | objetivo de dinheiro ("guardar pra viajar", "sair das dívidas") | cutucada lembrando a meta |
+| Gasto que passou do orçamento da categoria | objetivo de dinheiro ou `dinheiro` nas metas | aviso com humor |
+| Treino com 2+ dias na semana | `treino` nas metas ou objetivo de treino | comemora a sequência |
+| Treino depois de 7+ dias parado | idem | "sumiu, hein" + comemora a volta (só quando a pessoa escreve) |
+
+**Sem meta que combine, não tem comentário nem chamada de IA.** Exemplos reais do Haiku (dados fictícios):
+
+- "comprei um hambúrguer" (meta: emagrecer) → "🥗 Jantar anotado: Hambúrguer. Hambúrguer agora? Alguém tá
+  testando a dieta ou a dieta tá testando você? 🍔"
+- "gastei 80 no bar com a galera" (meta: juntar dinheiro pra viajar pro Chile; sem emoji) → "Anotado, Lia: gasto
+  de R$ 80,00 · Lazer (Bar com a galera). Lia, bar com a galera conta como investimento em memórias pro Chile,
+  né? Brincadeira, bora poupar pra lá!"
+- "treinei pernas 50min" depois de 9 dias parado (meta: ganhar massa) → "💪 Treino anotado: Pernas · 50 min.
+  Boa, Lia! Sumiu do mapa por 9 dias e voltou com tudo nas pernas, hein? 💪"
+
+#### Memória curta (fatos)
+
+"lembra que não gosto de academia de manhã", "sou vegetariana", "não bebo", "acordo 5h"… viram fatos guardados
+em `whatsapp_contatos.fatos` (até 10; os mais novos ficam; sem repetir), pela função `whatsapp_lembrar` (migration
+012, com o segredo do webhook, só número com conta). Os fatos entram no prompt da conversa e do comentário.
+"esquece tudo" apaga. A pessoa lê os próprios fatos pelo RLS; eles somem com a conta.
+
+#### Custo
+
+Haiku 4.5 (US$ 1/M entrada, US$ 5/M saída): comentário ≈ US$ 0,0006 (~380 tokens de entrada, ~40 de saída,
+medido); interpretar ≈ US$ 0,002; onboarding ≈ US$ 0,0005; conversa ≈ US$ 0,0015. Regras primeiro: o comentário
+só existe quando há gancho com a meta. No pior caso (30 mensagens/dia, todas com IA), fica em ~US$ 0,05 por
+pessoa por dia.
 
 Exemplos que já funcionam (sem IA, só com regras):
 
@@ -70,6 +113,8 @@ Exemplos que já funcionam (sem IA, só com regras):
 | `treinei peito 40min` / `corri 5km 30 min` | Treino (aba Treino) |
 | `almocei arroz, feijão, frango` / `comi uma maçã` | Refeição (aba Dieta). O tipo vem do verbo ou da hora |
 | `... ontem` | Registra no dia anterior |
+| `comprei um hambúrguer` (sem valor) | Refeição (o tipo vem da hora). Com valor (`comprei um hambúrguer 32`) vira gasto · Comida |
+| `lembra que não gosto de academia de manhã` / `sou vegetariana` | Fato guardado (memória curta). `esquece tudo` apaga |
 | `ajuda` | Mostra exemplos |
 | outra coisa ("hoje foi puxado") | Resposta da persona com uma sugestão (se houver chave da Anthropic) |
 
@@ -137,8 +182,8 @@ mídia, cada mensagem tem deduplicação no banco, e a memória por contato é a
 | WAHA Core (grátis) | VPS `/docker/waha` (compose versionado em `deploy/waha/docker-compose.yml`) | Imagem `devlikeapro/waha:gows`, limite de 768 MB. Sessão `default` criada e esperando o QR. Fala com o app por dentro da rede `meudia_default`. |
 | Segredos do WAHA | VPS `/docker/waha/.env` (600) | `WAHA_API_KEY` (só o hash sha512), usuário e senha do painel, `WHATSAPP_HOOK_HMAC_KEY` |
 | Webhook | `apps/web/app/api/whatsapp/webhook/route.ts` + `apps/web/lib/whatsapp/` | Parser por regras, Claude opcional, RPC e resposta |
-| Banco | migrations `010_treino_dieta_whatsapp.sql` e `011_whatsapp_onboarding.sql` (aplicadas em 19/11/2026) | `profiles.whatsapp`, `registros_treino`, `registros_refeicao`, `whatsapp_contatos`, `private.*`, RPCs |
-| Onboarding e persona | `apps/web/lib/whatsapp/{onboarding,persona,contato,ia}.ts`, página `app/whatsapp/page.tsx` | Máquina de estados testada com IA simulada |
+| Banco | migrations `010_treino_dieta_whatsapp.sql`, `011_whatsapp_onboarding.sql` e `012_whatsapp_amigo.sql` (aplicadas em 19/11/2026) | `profiles.whatsapp`, `registros_treino`, `registros_refeicao`, `whatsapp_contatos` (com `fatos`), `private.*`, RPCs |
+| Onboarding, persona e amigo | `apps/web/lib/whatsapp/{onboarding,persona,ganchos,contato,ia}.ts`, página `app/whatsapp/page.tsx` | Máquina de estados e ganchos testados com Haiku simulado |
 | Cópias dos segredos | Só no computador do assistente (`/workspace/secrets/`, 600) | `waha-api-key.txt`, `waha-dashboard.txt`, `whatsapp-hmac.txt`, `whatsapp-rpc-segredo.txt`. Nunca no git. |
 
 Variáveis do app (`/docker/meudia/.env` no VPS):

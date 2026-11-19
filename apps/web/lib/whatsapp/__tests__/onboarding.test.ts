@@ -3,7 +3,7 @@ import type { Contato } from '../contato';
 import { BOAS_VINDAS, metasPorRegra, nomePorRegra, passoOnboarding, rendaPorRegra } from '../onboarding';
 
 const contato = (c: Partial<Contato> = {}): Contato => ({
-  vinculado: false, etapa: 'inicio', tentativas: 0, nome: null, objetivo: null, metas: [],
+  vinculado: false, etapa: 'inicio', tentativas: 0, nome: null, objetivo: null, metas: [], fatos: [],
   estilo: { tamanho: 'curto', emoji: true }, msgsHoje: 1, limiteExcedido: false, ...c,
 });
 const semIA = vi.fn(async () => null);

@@ -10,8 +10,12 @@ export const AJUDA = [
   '• recebi 500 do freela',
   '• treinei peito 40min',
   '• almocei arroz, feijão e frango',
-  'Pode escrever "ontem" para o dia anterior.',
+  '• lembra que não gosto de academia de manhã',
+  'Pode escrever "ontem" para o dia anterior. "esquece tudo" apaga o que eu lembro.',
 ].join('\n');
+
+export const LEMBREI = (nome?: string | null) => `Guardado${nome ? `, ${primeiroNome(nome)}` : ''}! Vou levar isso em conta 😉`;
+export const ESQUECI = 'Pronto, esqueci tudo o que você tinha me pedido pra lembrar.';
 
 export const NAO_ENTENDI = 'Não entendi 🤔 Tente algo como "gastei 30 no uber" ou "treinei pernas 50min". Mande "ajuda" para ver exemplos.';
 export const SEM_CONTA = 'Este número ainda não está ligado a uma conta. Mande "oi" que eu te ajudo a ligar, ou no app: Configurações → Seu WhatsApp.';
@@ -44,7 +48,7 @@ export function dicasProativas(i: IntencaoEscrita, extras: Extras | undefined): 
   return dicas;
 }
 
-export function confirmacao(i: IntencaoEscrita, nome?: string | null, extras?: Extras, estilo: Estilo = ESTILO_PADRAO): string {
+export function confirmacao(i: IntencaoEscrita, nome?: string | null, extras?: Extras, estilo: Estilo = ESTILO_PADRAO, comentario?: string | null): string {
   const oi = nome ? `, ${primeiroNome(nome)}` : '';
   let base: string;
   switch (i.tipo) {
@@ -61,9 +65,10 @@ export function confirmacao(i: IntencaoEscrita, nome?: string | null, extras?: E
       base = `🥗 ${rotuloRefeicao(i.refeicao)} anotado: ${i.descricao}${quando(i.data)}.`;
       break;
   }
-  // Curto: só a dica mais útil. Detalhado: todas.
-  const dicas = dicasProativas(i, extras).slice(0, estilo.tamanho === 'curto' ? 1 : undefined);
-  return aplicarEstilo([base, ...dicas].join('\n'), estilo);
+  // Curto: só a dica mais útil (o comentário de amigo, quando há, vem no lugar dela). Detalhado: todas + comentário.
+  const todas = dicasProativas(i, extras);
+  const dicas = estilo.tamanho === 'detalhado' ? todas : comentario ? [] : todas.slice(0, 1);
+  return aplicarEstilo([base, ...dicas, comentario].filter(Boolean).join('\n'), estilo);
 }
 
 export const LIMITE_DIA = (app: string) =>

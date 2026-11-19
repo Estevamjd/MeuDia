@@ -5,6 +5,8 @@ export type Intencao =
   | { tipo: 'gasto' | 'entrada'; valor: number; descricao: string; categoria: string; data?: string }
   | { tipo: 'treino'; descricao: string; duracao_min: number | null; data?: string }
   | { tipo: 'refeicao'; refeicao: TipoRefeicaoRapida; descricao: string; data?: string }
+  | { tipo: 'lembrar'; fato: string }
+  | { tipo: 'esquecer' }
   | { tipo: 'ajuda' }
   | { tipo: 'desconhecido' };
 

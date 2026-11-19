@@ -14,6 +14,8 @@ export interface Contato {
   nome: string | null;
   objetivo: string | null;
   metas: Meta[];
+  /** Coisas que a pessoa pediu para lembrar (migration 012), mais antiga primeiro. */
+  fatos: string[];
   estilo: Estilo;
   msgsHoje: number;
   limiteExcedido: boolean;
@@ -30,6 +32,7 @@ export function contatoDoRpc(r: Record<string, unknown>): Contato {
     nome: typeof r.nome === 'string' && r.nome ? r.nome : null,
     objetivo: typeof r.objetivo === 'string' ? r.objetivo : null,
     metas: Array.isArray(r.metas) ? (r.metas as Meta[]) : [],
+    fatos: Array.isArray(r.fatos) ? (r.fatos as unknown[]).filter((f): f is string => typeof f === 'string').slice(-10) : [],
     estilo: { tamanho: r.estilo_tamanho === 'detalhado' ? 'detalhado' : 'curto', emoji: r.estilo_emoji !== false },
     msgsHoje: Number(r.msgs_hoje ?? 0),
     limiteExcedido: r.limite_excedido === true,
