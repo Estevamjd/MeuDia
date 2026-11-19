@@ -121,6 +121,16 @@ Exemplos que já funcionam (sem IA, só com regras):
 
 Tudo o que chega pelo WhatsApp aparece no app com o selo **WhatsApp** (`origem = 'whatsapp'`).
 
+### 1.3 Gastos pelo WhatsApp, Sobra e Cofrinho (modelo de 19/11/2026)
+
+- Todo gasto anotado pelo WhatsApp entra em **Gastos do mês** e baixa o **Deve sobrar** da Início.
+- O WhatsApp **nunca** mexe no **Cofrinho** (dinheiro guardado). O Cofrinho só muda no app: Guardar, Tirar,
+  Corrigir e "guardar a sobra" no fechamento do mês. Ver `docs/financas/COFRINHO.md`.
+- O assistente não mostra saldo, sobra nem Cofrinho (a persona não vê os números da conta e não inventa valores).
+  Se um dia passar a mostrar, use estes nomes: "deve sobrar" (mês) e "Cofrinho" (guardado).
+- Limitação conhecida: `paguei 120 de luz` vira um gasto comum, não o "Paguei" da conta Luz. Se a Luz estiver
+  cadastrada como conta fixa, marque "Paguei" no app em vez de anotar pelo WhatsApp (senão conta duas vezes).
+
 ## 2. Por que webhook direto (e não n8n)
 
 | | Webhook no MeuDia (escolhido) | n8n |

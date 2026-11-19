@@ -2,17 +2,22 @@ import type { Carteira, Renda, Transacao, Transferencia } from '@meudia/shared';
 import {
   AppError,
   CATEGORIA_ENTRADA_EXTRA,
+  competenciaAnterior,
   competenciaDe,
   comecouMesCom,
   dataAncora,
   dataRendaNoMes,
+  fimDoMes,
   hojeSP,
   saldoCarteira,
   saldoHoje,
   saldosCarteiras,
+  saldoCofrinho,
+  sobraDoMes,
 } from '@meudia/shared';
 import {
   carteirasRepository,
+  cofrinhoRepository,
   contasPagarRepository,
   pagamentosContaRepository,
   recebimentosRendaRepository,
@@ -154,26 +159,63 @@ export interface RendaAReceber {
   data: string;
 }
 
+/** Cofrinho do usuário: congela o ponto de partida no primeiro acesso com banco (usuário novo depois da 014). */
+async function lerCofrinho(userId: string, temCarteira: boolean) {
+  let dados = await cofrinhoRepository.carregar(userId);
+  if (dados && temCarteira && !dados.movimentos.some((m) => m.tipo === 'inicial')) {
+    await cofrinhoRepository.rpcIniciar();
+    dados = await cofrinhoRepository.carregar(userId);
+  }
+  if (!dados) return null;
+  return {
+    saldo: saldoCofrinho(dados.movimentos),
+    inicioEm: dados.movimentos.find((m) => m.tipo === 'inicial')?.created_at ?? null,
+    respondidas: dados.fechamentos.map((f) => f.competencia),
+    movimentos: dados.movimentos,
+  };
+}
+
 /**
- * Tudo que a home precisa para o "Cofrinho", "Começou o mês com", "Recebi" e as entradas da sobra do mês
- * (`sobraDoMes`, calculada na home com os lançamentos do mês que ela já lê).
+ * Tudo que a home precisa: bancos, Cofrinho (014), "Recebi" e as entradas da sobra do mês (`sobraDoMes`, calculada
+ * na home com os lançamentos do mês que ela já lê) + a sobra do mês anterior (fechamento do mês).
  * Cálculo nas funções puras de `@meudia/shared`; aqui só a leitura.
  */
 export async function painelSaldo(userId: string, hojeISO = hojeSP()) {
   usuario(userId);
   const competencia = competenciaDe(hojeISO);
+  const anterior = competenciaAnterior(competencia);
   const carteiras = await carteirasRepository.findAll(userId);
   const desde = carteiras.map(dataAncora).sort()[0];
-  const [transacoes, transferencias, rendas, recebimentos, contas, pagamentos] = await Promise.all([
+  const [transacoes, transferencias, rendas, recebimentos, contas, pagamentos, doisMeses, cofrinho] = await Promise.all([
     desde ? transacaoRepository.findComCarteiraDesde(userId, desde) : Promise.resolve([] as Transacao[]),
     desde ? transferenciasRepository.findDesde(userId, desde) : Promise.resolve([] as Transferencia[]),
     rendasRepository.findAll(userId, { ativo: true }),
-    recebimentosRendaRepository.findByCompetencias(userId, [competencia]),
+    recebimentosRendaRepository.findByCompetencias(userId, [anterior, competencia]),
     contasPagarRepository.findAll(userId, { ativo: true }),
-    pagamentosContaRepository.findByCompetencias(userId, [competencia]),
+    pagamentosContaRepository.findByCompetencias(userId, [anterior, competencia]),
+    transacaoRepository.findByDateRange(userId, `${anterior}-01`, fimDoMes(competencia)),
+    lerCofrinho(userId, carteiras.length > 0),
   ]);
+  // Lançamentos que são "Paguei" de alguma conta: entram só como a conta, nunca como gasto extra.
+  const despesas = doisMeses.filter((t) => t.tipo === 'despesa' && !t.ajuste).map((t) => t.id);
+  const vinculos = despesas.length ? await pagamentosContaRepository.findByTransacoes(userId, despesas) : [];
+  const porId = new Map(doisMeses.map((t) => [t.id, t]));
+  const foraDaJanela = pagamentos.flatMap((p) => (p.transacao_id && !porId.has(p.transacao_id) ? [p.transacao_id] : []));
+  const pagasFora = foraDaJanela.length ? await transacaoRepository.findByIds(userId, foraDaJanela) : [];
+  const transacoesDeContas: Record<string, number> = {};
+  for (const id of [...vinculos.map((v) => v.transacao_id), ...pagamentos.map((p) => p.transacao_id)]) {
+    const t = id ? porId.get(id) ?? pagasFora.find((x) => x.id === id) : undefined;
+    if (t) transacoesDeContas[t.id] = Number(t.valor);
+  }
+  const doMes = (c: string) => <T extends { competencia: string }>(xs: T[]) => xs.filter((x) => x.competencia === c);
+  const recebimentosMes = doMes(competencia)(recebimentos);
+  const pagamentosMes = doMes(competencia)(pagamentos);
+  const sobraAnterior = sobraDoMes({
+    competencia: anterior, transacoes: doisMeses, rendas, contas, transacoesDeContas,
+    recebimentos: doMes(anterior)(recebimentos), pagamentos: doMes(anterior)(pagamentos),
+  });
   const saldos = saldosCarteiras(carteiras, transacoes, transferencias, hojeISO);
-  const recebidas = new Set(recebimentos.map((r) => r.renda_id));
+  const recebidas = new Set(recebimentosMes.map((r) => r.renda_id));
   const rendasAReceber: RendaAReceber[] = rendas
     .filter((r) => r.ativo && !recebidas.has(r.id))
     .map((renda) => ({ renda, competencia, data: dataRendaNoMes(renda, competencia) }))
@@ -188,11 +230,16 @@ export async function painelSaldo(userId: string, hojeISO = hojeSP()) {
     competencia,
     carteiras: saldos,
     arquivadas: carteiras.filter((c) => c.arquivada),
+    /** Total nos bancos ativos "no total" hoje (não é mais o Cofrinho). */
     saldoHoje: saldoHoje(carteiras, transacoes, transferencias, hojeISO),
     comecouMes: comecouMesCom(carteiras, transacoes, transferencias, competencia),
     rendasAReceber,
     /** Entradas de `sobraDoMes` na competência corrente. */
-    mes: { rendas, recebimentos, contas, pagamentos },
+    mes: { rendas, recebimentos: recebimentosMes, contas, pagamentos: pagamentosMes, transacoesDeContas },
+    /** "Deve sobrar" do mês anterior (pergunta do fechamento). */
+    mesAnterior: { competencia: anterior, sobra: sobraAnterior.valor },
+    /** `null`: banco sem a 014 (a tela mostra o total dos bancos como antes). */
+    cofrinho,
     carteiraPadraoId: ultima ?? saldos[0]?.carteira.id ?? null,
     transacoesCarteiras: transacoes,
     transferencias,

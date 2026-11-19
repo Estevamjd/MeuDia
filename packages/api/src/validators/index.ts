@@ -68,3 +68,4 @@ export {
 export * from './metas.validator';
 
 export { registroTreinoInsertSchema, registroRefeicaoInsertSchema } from './registros.validator';
+export * from './cofrinho.validator';

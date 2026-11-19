@@ -16,6 +16,8 @@ describe('CardSobraMes: "Sobra do mês" × "No fim do mês sobra"', () => {
     competencia: '2026-10', renda: { lancada: 1000, aReceber: 0, total: 1000 }, rendasAReceber: [],
     despesasLancadas: 381, contasAPagar: [{ id: 'j', descricao: 'Júlia', categoria: 'Outros', valor: 100, vencimento: '2026-10-25' }],
     despesas: 481, valor: 519,
+    previsao: false, totalContasFixas: 100, totalContasPagas: 0, gastosExtras: 381,
+    contasFixas: [{ id: 'j', descricao: 'Júlia', categoria: 'Outros', valor: 100, vencimento: '2026-10-25', paga: false, pagoEm: null }],
   };
 
   it('até agora não desconta a conta a pagar; fim do mês desconta e diz isso', () => {

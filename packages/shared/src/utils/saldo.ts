@@ -168,12 +168,24 @@ export interface ContaAPagarDoMes {
 
 export interface EntradaSobraDoMes {
   competencia: Competencia;
-  /** Lançamentos; só os da competência (por `data`) entram. */
-  transacoes: readonly Pick<Transacao, 'tipo' | 'valor' | 'data' | 'ajuste'>[];
+  /** Lançamentos; só os da competência (por `data`) entram. Sem `id`, nenhum é reconhecido como pagamento de conta. */
+  transacoes: readonly (Pick<Transacao, 'tipo' | 'valor' | 'data' | 'ajuste'> & { id?: string })[];
   rendas: readonly Renda[];
   recebimentos: readonly Pick<RecebimentoRenda, 'renda_id' | 'competencia'>[];
   contas: readonly ContaPagar[];
-  pagamentos: readonly Pick<PagamentoConta, 'conta_id' | 'competencia'>[];
+  pagamentos: readonly (Pick<PagamentoConta, 'conta_id' | 'competencia'> & Partial<Pick<PagamentoConta, 'transacao_id' | 'pago_em'>>)[];
+  /**
+   * Lançamentos que são o "Paguei" de alguma conta (qualquer competência): id → valor pago.
+   * Eles entram só como a conta (não como gasto extra). Os `transacao_id` de `pagamentos` também contam.
+   */
+  transacoesDeContas?: Readonly<Record<string, number>>;
+}
+
+/** Uma conta fixa no mês: paga (com o valor pago) ou a pagar (com o valor cadastrado). */
+export interface ContaFixaDoMes extends ContaAPagarDoMes {
+  paga: boolean;
+  /** Data do "Paguei" (`yyyy-MM-dd`) quando paga. */
+  pagoEm: string | null;
 }
 
 export interface SobraDoMes {
@@ -181,20 +193,31 @@ export interface SobraDoMes {
   /** `rendaDoMes`: receitas lançadas (o "Recebi" vira uma delas) + rendas fixas ainda sem "Recebi". */
   renda: RendaDoMes;
   rendasAReceber: RendaAReceberDoMes[];
-  /** `gastoDoMes`: despesas lançadas na competência, sem ajustes (o "Paguei" vira uma delas). */
+  /** `true` enquanto falta algum "Recebi": a renda mostrada ainda é previsão. */
+  previsao: boolean;
+  /** TODAS as contas fixas do mês, pagas ou não (vencimento, descrição). */
+  contasFixas: ContaFixaDoMes[];
+  totalContasFixas: number;
+  totalContasPagas: number;
+  /** Gastos do mês que não são conta fixa nem ajuste de saldo. */
+  gastosExtras: number;
+  /** `gastoDoMes`: todas as despesas lançadas na competência, sem ajustes (inclui os "Paguei" com data no mês). */
   despesasLancadas: number;
   /** Ocorrências de contas da competência ainda sem "Paguei". */
   contasAPagar: ContaAPagarDoMes[];
+  /** Contas fixas + gastos extras. */
   despesas: number;
+  /** "Deve sobrar" = renda − contas fixas (pagas ou não) − gastos extras. */
   valor: number;
 }
 
 /**
- * "No fim do mês sobra" = renda do mês − despesas do mês (lançadas + contas da competência ainda não pagas).
- * Não usa saldo de carteira. Cada real entra uma vez só: "Recebi" tira a renda de `aReceber` e a põe em receita
- * lançada; "Paguei" tira a conta de `contasAPagar` e a põe em despesa lançada.
+ * "Deve sobrar" do mês = renda (recebida, ou prevista antes do "Recebi") − TODAS as contas fixas do mês (pagas ou não)
+ * − gastos extras lançados no mês. Não usa saldo de banco nem Cofrinho.
+ * Cada real entra uma vez só: o lançamento de um "Paguei" é a própria conta (conta na competência da conta, mesmo
+ * que tenha sido pago com data em outro mês) e nunca é gasto extra; "Recebi" tira a renda de `aReceber`.
  */
-export function sobraDoMes({ competencia, transacoes, rendas, recebimentos, contas, pagamentos }: EntradaSobraDoMes): SobraDoMes {
+export function sobraDoMes({ competencia, transacoes, rendas, recebimentos, contas, pagamentos, transacoesDeContas = {} }: EntradaSobraDoMes): SobraDoMes {
   const doMes = transacoes.filter((t) => competenciaDe(t.data) === competencia);
   const doMesRecebidas = recebimentos.filter((r) => r.competencia === competencia);
   const renda = rendaDoMes(competencia, doMes, rendas, doMesRecebidas);
@@ -203,17 +226,37 @@ export function sobraDoMes({ competencia, transacoes, rendas, recebimentos, cont
     .filter((r) => rendaVigente(r, competencia) && !recebidas.has(r.id))
     .map((r) => ({ id: r.id, descricao: r.descricao, valor: Number(r.valor), data: dataRendaNoMes(r, competencia) }))
     .sort((a, b) => a.data.localeCompare(b.data));
-  const pagas = new Set(pagamentos.filter((p) => p.competencia === competencia).map((p) => p.conta_id));
-  const contasAPagar: ContaAPagarDoMes[] = [];
+  const deContas = new Set(Object.keys(transacoesDeContas));
+  for (const p of pagamentos) if (p.transacao_id) deContas.add(p.transacao_id);
+  const valorTransacao = new Map(transacoes.flatMap((t) => (t.id ? [[t.id, Number(t.valor)] as const] : [])));
+  const pagamentoDe = new Map(pagamentos.filter((p) => p.competencia === competencia).map((p) => [p.conta_id, p]));
+  const contasFixas: ContaFixaDoMes[] = [];
   for (const conta of contas) {
     const ocorrencia = ocorrenciaDaConta(conta, competencia);
-    if (!ocorrencia || pagas.has(conta.id)) continue;
-    contasAPagar.push({ id: conta.id, descricao: conta.descricao, categoria: conta.categoria, valor: Number(conta.valor), vencimento: ocorrencia.vencimento });
+    const pagamento = pagamentoDe.get(conta.id);
+    // Conta paga neste mês mas desativada/fora da regra depois: ainda é uma conta deste mês.
+    if (!ocorrencia && !pagamento) continue;
+    const tid = pagamento?.transacao_id ?? null;
+    const valorPago = tid ? transacoesDeContas[tid] ?? valorTransacao.get(tid) : undefined;
+    contasFixas.push({
+      id: conta.id, descricao: conta.descricao, categoria: conta.categoria,
+      valor: centavos(valorPago ?? Number(conta.valor)),
+      vencimento: ocorrencia?.vencimento ?? vencimentoNoMes(conta.dia_vencimento ?? 1, Number(competencia.slice(0, 4)), Number(competencia.slice(5, 7))),
+      paga: !!pagamento, pagoEm: pagamento?.pago_em?.slice(0, 10) ?? null,
+    });
   }
-  contasAPagar.sort((a, b) => a.vencimento.localeCompare(b.vencimento) || a.descricao.localeCompare(b.descricao));
-  const despesasLancadas = gastoDoMes(doMes);
-  const despesas = centavos(despesasLancadas + contasAPagar.reduce((s, c) => s + c.valor, 0));
-  return { competencia, renda, rendasAReceber, despesasLancadas, contasAPagar, despesas, valor: centavos(renda.total - despesas) };
+  contasFixas.sort((a, b) => a.vencimento.localeCompare(b.vencimento) || a.descricao.localeCompare(b.descricao));
+  const contasAPagar: ContaAPagarDoMes[] = contasFixas
+    .filter((c) => !c.paga)
+    .map(({ id, descricao, categoria, valor, vencimento }) => ({ id, descricao, categoria, valor, vencimento }));
+  const totalContasFixas = centavos(contasFixas.reduce((s, c) => s + c.valor, 0));
+  const totalContasPagas = centavos(contasFixas.filter((c) => c.paga).reduce((s, c) => s + c.valor, 0));
+  const gastosExtras = gastoDoMes(doMes.filter((t) => !(t.id && deContas.has(t.id))));
+  const despesas = centavos(totalContasFixas + gastosExtras);
+  return {
+    competencia, renda, rendasAReceber, previsao: rendasAReceber.length > 0, contasFixas, totalContasFixas, totalContasPagas,
+    gastosExtras, despesasLancadas: gastoDoMes(doMes), contasAPagar, despesas, valor: centavos(renda.total - despesas),
+  };
 }
 
 /**

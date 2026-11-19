@@ -3,6 +3,7 @@ import type { Carteira } from '@meudia/shared';
 import * as service from '../carteiras.service';
 import {
   carteirasRepository as carteiras,
+  cofrinhoRepository as cofrinho,
   contasPagarRepository as contas,
   pagamentosContaRepository as pagamentos,
   recebimentosRendaRepository as recebimentos,
@@ -13,12 +14,13 @@ import {
 
 vi.mock('../../repositories', () => ({
   carteirasRepository: { rpcCorrigirSaldo: vi.fn(), findAll: vi.fn(), findById: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn() },
-  transacaoRepository: { create: vi.fn(), findComCarteiraDesde: vi.fn() },
+  transacaoRepository: { create: vi.fn(), findComCarteiraDesde: vi.fn(), findByDateRange: vi.fn(), findByIds: vi.fn() },
   transferenciasRepository: { create: vi.fn(), findDesde: vi.fn(), remove: vi.fn() },
   recebimentosRendaRepository: { findByCompetencias: vi.fn(), rpcReceber: vi.fn(), rpcDesfazer: vi.fn() },
   rendasRepository: { findAll: vi.fn() },
   contasPagarRepository: { findAll: vi.fn() },
-  pagamentosContaRepository: { findByCompetencias: vi.fn() },
+  pagamentosContaRepository: { findByCompetencias: vi.fn(), findByTransacoes: vi.fn() },
+  cofrinhoRepository: { carregar: vi.fn(), rpcIniciar: vi.fn() },
 }));
 
 const HOJE = '2026-10-17';
@@ -39,6 +41,10 @@ beforeEach(() => {
   vi.mocked(rendas.findAll).mockResolvedValue([]);
   vi.mocked(contas.findAll).mockResolvedValue([]);
   vi.mocked(pagamentos.findByCompetencias).mockResolvedValue([]);
+  vi.mocked(pagamentos.findByTransacoes).mockResolvedValue([]);
+  vi.mocked(transacoes.findByDateRange).mockResolvedValue([]);
+  vi.mocked(transacoes.findByIds).mockResolvedValue([]);
+  vi.mocked(cofrinho.carregar).mockResolvedValue({ movimentos: [], fechamentos: [] });
 });
 
 describe('carteiras: cadastro', () => {
@@ -156,16 +162,63 @@ describe('painelSaldo', () => {
     expect(p.carteiraPadraoId).toBe(NU);
     expect(p.comecouMes).toBeNull();
     expect(transacoes.findComCarteiraDesde).toHaveBeenCalledWith('u', HOJE);
-    expect(recebimentos.findByCompetencias).toHaveBeenCalledWith('u', ['2026-10']);
+    expect(recebimentos.findByCompetencias).toHaveBeenCalledWith('u', ['2026-09', '2026-10']);
   });
-  it('sem carteiras: não lê lançamentos; recebimentos e pagamentos só da competência corrente', async () => {
+  it('sem carteiras: não lê saldo de banco nem inicia o Cofrinho; lê o mês anterior e o atual', async () => {
     vi.mocked(carteiras.findAll).mockResolvedValue([]);
     const p = await service.painelSaldo('u', '2026-10-28');
     expect(p.saldoHoje).toBe(0);
     expect(p.carteiraPadraoId).toBeNull();
     expect(transacoes.findComCarteiraDesde).not.toHaveBeenCalled();
-    expect(recebimentos.findByCompetencias).toHaveBeenCalledWith('u', ['2026-10']);
-    expect(pagamentos.findByCompetencias).toHaveBeenCalledWith('u', ['2026-10']);
+    expect(transacoes.findByDateRange).toHaveBeenCalledWith('u', '2026-09-01', '2026-10-31');
+    expect(recebimentos.findByCompetencias).toHaveBeenCalledWith('u', ['2026-09', '2026-10']);
+    expect(pagamentos.findByCompetencias).toHaveBeenCalledWith('u', ['2026-09', '2026-10']);
+    expect(cofrinho.rpcIniciar).not.toHaveBeenCalled();
+    expect(p.cofrinho).toEqual({ saldo: 0, inicioEm: null, respondidas: [], movimentos: [] });
+  });
+  it('Cofrinho: soma os movimentos; gasto no banco não muda; primeiro acesso com banco congela o ponto de partida', async () => {
+    vi.mocked(carteiras.findAll).mockResolvedValue([carteira(NU, 'Nubank', 235)]);
+    const inicial = { id: 'm1', user_id: 'u', tipo: 'inicial', valor: 150, competencia: null, chave: null, valor_informado: null, created_at: '2026-11-19T15:00:00Z' } as const;
+    vi.mocked(cofrinho.carregar)
+      .mockResolvedValueOnce({ movimentos: [], fechamentos: [] })
+      .mockResolvedValueOnce({ movimentos: [inicial, { ...inicial, id: 'm2', tipo: 'guardar', valor: 50 }], fechamentos: [{ user_id: 'u', competencia: '2026-10', decisao: 'agora_nao', valor: null, created_at: '' }] });
+    vi.mocked(transacoes.findComCarteiraDesde).mockResolvedValue([{ id: 'g', tipo: 'despesa', valor: 100, data: HOJE, carteira_id: NU, created_at: '2026-10-17T16:00:00Z', ajuste: false }] as never);
+    const p = await service.painelSaldo('u', HOJE);
+    expect(cofrinho.rpcIniciar).toHaveBeenCalledTimes(1);
+    expect(p.saldoHoje).toBe(135);
+    expect(p.cofrinho).toMatchObject({ saldo: 200, inicioEm: '2026-11-19T15:00:00Z', respondidas: ['2026-10'] });
+  });
+  it('banco sem a 014: cofrinho null (a tela mostra o total dos bancos)', async () => {
+    vi.mocked(cofrinho.carregar).mockResolvedValue(null);
+    vi.mocked(carteiras.findAll).mockResolvedValue([carteira(NU, 'Nubank', 235)]);
+    const p = await service.painelSaldo('u', HOJE);
+    expect(p.cofrinho).toBeNull();
+    expect(cofrinho.rpcIniciar).not.toHaveBeenCalled();
+  });
+  it('"Paguei" (inclusive com data fora da janela) vira transacoesDeContas; sobra do mês anterior usa o mesmo modelo', async () => {
+    vi.mocked(carteiras.findAll).mockResolvedValue([]);
+    vi.mocked(rendas.findAll).mockResolvedValue([
+      { id: 'r', descricao: 'Salário', valor: 2000, dia_recebimento: 1, ativo: true, created_at: '2026-08-01T15:00:00Z' },
+    ] as never);
+    vi.mocked(contas.findAll).mockResolvedValue([
+      { id: 'tab', descricao: 'Tablet', categoria: 'Contas', valor: 100, recorrencia: 'mensal', dia_vencimento: 1, ativo: true, created_at: '2026-08-01T15:00:00Z' },
+    ] as never);
+    vi.mocked(transacoes.findByDateRange).mockResolvedValue([
+      { id: 'tTab', tipo: 'despesa', valor: 100, data: '2026-09-30', ajuste: false },
+      { id: 'tMerc', tipo: 'despesa', valor: 30, data: '2026-09-12', ajuste: false },
+    ] as never);
+    vi.mocked(pagamentos.findByTransacoes).mockResolvedValue([{ conta_id: 'tab', competencia: '2026-10', transacao_id: 'tTab' }] as never);
+    vi.mocked(pagamentos.findByCompetencias).mockResolvedValue([
+      { conta_id: 'tab', competencia: '2026-10', transacao_id: 'tTab', pago_em: '2026-09-30' },
+      { conta_id: 'tab', competencia: '2026-09', transacao_id: 'tVelha', pago_em: '2026-08-31' },
+    ] as never);
+    vi.mocked(transacoes.findByIds).mockResolvedValue([{ id: 'tVelha', tipo: 'despesa', valor: 95, data: '2026-08-31' }] as never);
+    const p = await service.painelSaldo('u', HOJE);
+    expect(transacoes.findByIds).toHaveBeenCalledWith('u', ['tVelha']);
+    expect(p.mes.transacoesDeContas).toEqual({ tTab: 100, tVelha: 95 });
+    expect(p.mes.pagamentos.map((x) => x.competencia)).toEqual(['2026-10']);
+    // Setembro: 2000 (previsão) − Tablet pago 95 − mercado 30 (o Tablet de outubro pago em 30/09 não é extra).
+    expect(p.mesAnterior).toEqual({ competencia: '2026-09', sobra: 1875 });
   });
   it('Recebi da competência tira a renda de "a receber"; recebimento de outra competência não', async () => {
     vi.mocked(carteiras.findAll).mockResolvedValue([carteira(NU, 'Nubank', 235)]);

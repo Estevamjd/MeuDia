@@ -29,3 +29,4 @@ export * as transferenciasRepository from './transferencias.repository';
 export * as recebimentosRendaRepository from './recebimentos-renda.repository';
 export * as metasRepository from './metas.repository';
 export * as registrosRepository from './registros.repository';
+export * as cofrinhoRepository from './cofrinho.repository';

@@ -52,9 +52,10 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
     await expect(alerta).toBeHidden();
   };
   const bottomNav = page.getByRole('navigation', { name: 'Navegação principal' });
-  const hoje = page.getByTestId('saldo-hoje-valor');
+  // 014: a Início mostra o Cofrinho (dinheiro guardado), que NÃO muda com gasto, entrada, transferência nem Recebi.
+  const cofrinho = page.getByTestId('linha-cofrinho-valor');
   const fimMes = page.getByTestId('previsao-fim-mes-valor');
-  const chips = page.getByRole('list', { name: 'Saldo por banco' });
+  const linhaResumo = (id: string) => page.getByTestId(id);
   const semScrollHorizontal = async () => {
     const { scroll, largura } = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, largura: window.innerWidth }));
     expect(scroll, 'scroll horizontal em 390px').toBeLessThanOrEqual(largura);
@@ -107,10 +108,8 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await banner.getByRole('button', { name: 'Fechar' }).click();
   await expect(banner).toBeHidden();
 
-  // 1. Nubank 650 + Caixa 50 → Hoje R$ 700.
-  await expect(hoje).toHaveText(brl('700,00'));
-  await expect(chips).toContainText(/Nubank\s*R\$\s650,00/);
-  await expect(chips).toContainText(/Caixa\s*R\$\s50,00/);
+  // 1. Nubank 650 + Caixa 50: o Cofrinho começa com o que havia nos bancos (R$ 700).
+  await expect(cofrinho).toHaveText(brl('700,00'));
 
   // 2. Entrou dinheiro R$ 100 na Caixa → R$ 800 (Nubank 650 · Caixa 150).
   let folha = await abrirAcao(/Entrou dinheiro/);
@@ -122,9 +121,7 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await shot('04-entrou-dinheiro.png');
   await folha.getByRole('button', { name: 'Salvar entrada' }).click();
   await confirmarToast('Entrada salva');
-  await expect(hoje).toHaveText(brl('800,00'));
-  await expect(chips).toContainText(/Nubank\s*R\$\s650,00/);
-  await expect(chips).toContainText(/Caixa\s*R\$\s150,00/);
+  await expect(cofrinho).toHaveText(brl('700,00'));
 
   // 3. Contas pendentes: luz R$ 120 (20/10) e internet R$ 100 (25/10). Contas fica no menu lateral.
   await page.getByRole('button', { name: 'Abrir menu' }).click();
@@ -146,23 +143,21 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   }
   await bottomNav.getByRole('link', { name: 'Início' }).click();
   await page.waitForURL(/\/financas$/);
-  await expect(hoje).toHaveText(brl('800,00'));
-  // Sobra do mês = renda 100 (entrada extra; sem renda fixa) − contas 220 = −120. Sem o card "Em 7 dias".
+  await expect(cofrinho).toHaveText(brl('700,00'));
+  // Deve sobrar = renda 100 (entrada extra; sem renda fixa) − contas fixas 220 − gastos 0 = −120. Sem o card "Em 7 dias".
   await expect(page.getByText('Em 7 dias você terá')).toHaveCount(0);
-  await expect(page.getByRole('region', { name: 'Cofrinho' })).toBeVisible();
-  // Cofrinho com 2 bancos: "Corrigir" abre Bancos pedindo para escolher o banco; voltar para a Início.
-  await tocar(page.getByRole('link', { name: 'Corrigir saldo de um banco' }));
+  await expect(page.getByRole('region', { name: 'Resumo de outubro' })).toBeVisible();
+  await expect(linhaResumo('resumo-renda')).toHaveText(brl('100,00'));
+  await expect(linhaResumo('resumo-contas-fixas')).toHaveText(/^− R\$\s220,00$/);
+  await expect(linhaResumo('resumo-gastos')).toHaveText(/^− R\$\s0,00$/);
+  await expect(fimMes).toHaveText(/^−R\$\s120,00$/);
+  // A linha do Cofrinho abre Bancos, com o cartão do Cofrinho e o total dos bancos separados.
+  await tocar(page.getByTestId('linha-cofrinho'));
   await page.waitForURL(/\/financas\/carteiras$/);
-  await expect(page.getByText('no banco que está com o valor errado')).toBeVisible();
-  await expect(page.getByRole('dialog', { name: 'Corrigir saldo', exact: true })).toHaveCount(0);
+  await expect(page.getByTestId('cofrinho-valor')).toHaveText(brl('700,00'));
+  await expect(page.getByTestId('total-bancos')).toContainText(/Total nos bancos: R\$\s800,00/);
   await bottomNav.getByRole('link', { name: 'Início' }).click();
   await page.waitForURL(/\/financas$/);
-  await expect(fimMes).toHaveText(/^−R\$\s120,00$/);
-  // A conta do fim do mês fica no "por quê?" do bloco Sobra do mês (design v2): abre, confere e fecha.
-  const porQue = page.getByRole('button', { name: 'por quê? No fim do mês sobra' });
-  await tocar(porQue);
-  await expect(page.getByTestId('previsao-fim-mes-conta')).toHaveText(/^Renda R\$\s100,00 − gastos lançados R\$\s0,00 − contas a pagar R\$\s220,00 = faltam R\$\s120,00$/);
-  await tocar(porQue);
 
   // 4. Transferir R$ 50 Caixa → Nubank: total igual, Nubank 700 · Caixa 100; gasto do mês não muda.
   folha = await abrirAcao(/Transferir/);
@@ -174,12 +169,10 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await shot('05-transferir.png');
   await folha.getByRole('button', { name: 'Transferir' }).click();
   await confirmarToast('Transferência feita');
-  await expect(hoje).toHaveText(brl('800,00'));
-  await expect(chips).toContainText(/Nubank\s*R\$\s700,00/);
-  await expect(chips).toContainText(/Caixa\s*R\$\s100,00/);
+  await expect(cofrinho).toHaveText(brl('700,00'));
   await expect(page.getByText('Nenhum gasto neste mês ainda.', { exact: false })).toBeVisible();
 
-  // 5. Gastei R$ 25 em Comida no Nubank → Hoje 775, rosca Comida 25, fim do mês −145.
+  // 5. Gastei R$ 25 em Comida no Nubank → o Cofrinho NÃO cai (700); deve sobrar −145.
   folha = await abrirAcao(/Gastei/);
   // Regressão: a folha reabria com o form da última ação (Transferir) por um quadro e apagava o valor (corrigido 19/11).
   await folha.getByLabel('Valor').fill('2500');
@@ -192,36 +185,37 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await shot('03-gastei.png');
   await folha.getByRole('button', { name: 'Salvar gasto' }).click();
   await confirmarToast('Gasto salvo');
-  await expect(hoje).toHaveText(brl('775,00'));
+  await expect(cofrinho).toHaveText(brl('700,00'));
   await expect(page.getByRole('region', { name: 'Últimos lançamentos' })).toContainText(/R\$\s25,00/);
+  await expect(linhaResumo('resumo-gastos')).toHaveText(/^− R\$\s25,00$/);
   await expect(fimMes).toHaveText(/^−R\$\s145,00$/);
 
-  // 6. Só agora a renda: R$ 900 dia 5 (sem Recebi) entra na renda do mês: sobra 1.000 − 245 = 755.
+  // 6. Só agora a renda: R$ 900 dia 5 (sem Recebi) entra como previsão: deve sobrar 1.000 − 220 − 25 = 755.
   await tocar(page.getByRole('button', { name: 'Cadastrar minha renda' }));
   const modalRenda = page.getByRole('dialog', { name: 'Sua renda do mês' });
   await modalRenda.getByLabel('Valor').fill('90000');
   await modalRenda.getByLabel('Dia que recebe (opcional)').fill('5');
   await modalRenda.getByRole('button', { name: 'Salvar' }).click();
   await confirmarToast('Renda salva');
-  await expect(hoje).toHaveText(brl('775,00'));
+  await expect(cofrinho).toHaveText(brl('700,00'));
   await expect(fimMes).toHaveText(brl('755,00'));
+  await expect(page.getByTestId('renda-previsao')).toBeVisible();
   await semScrollHorizontal();
   await shot('02-home-dashboard.png');
   // Viewport (o que a usuária vê no iPhone): topo da home e rolada até os gráficos.
   await page.evaluate(() => window.scrollTo(0, 0));
   await shot('02-home-dashboard-viewport.png', false);
 
-  // "por quê?" do fim do mês = renda e cada conta.
-  await tocar(page.getByRole('button', { name: 'por quê? No fim do mês sobra' }));
-  const explicacaoFim = page.getByRole('region', { name: 'No fim do mês sobra' });
-  await expect(explicacaoFim).toContainText(/Renda principal \(sem "Recebi", dia 05\/10\)/);
-  await expect(explicacaoFim).toContainText(/Despesas lançadas no mês\s*−R\$\s25,00/);
-  await expect(explicacaoFim).toContainText(/Luz \(vence 20\/10\)/);
-  await expect(explicacaoFim).toContainText(/Internet \(vence 25\/10\)/);
-  await explicacaoFim.evaluate((el) => el.scrollIntoView({ block: 'center' }));
-  await shot('08-por-que-previsao.png');
+  // Contas fixas: a lista mostra cada conta com "a pagar" (pagas ou não, já contam na sobra).
+  await tocar(page.getByRole('button', { name: /Contas fixas/ }));
+  const listaContas = page.getByRole('list', { name: 'Contas fixas de outubro' });
+  await expect(listaContas.getByRole('listitem')).toHaveCount(2);
+  await expect(listaContas.getByRole('listitem').first()).toContainText(/Luz.*vence 20\/10.*a pagar/);
+  await expect(listaContas.getByRole('listitem').last()).toContainText(/Internet.*vence 25\/10.*a pagar/);
+  await listaContas.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await shot('08-contas-fixas.png');
 
-  // Recebi: R$ 900 no Nubank → Hoje 1.675; a sobra não muda (a renda a receber virou receita lançada).
+  // Recebi: R$ 900 no Nubank → a renda deixa de ser previsão; a sobra não muda e o Cofrinho também não.
   await tocar(page.getByRole('button', { name: 'Recebi Renda principal' }));
   const modalRecebi = page.getByRole('dialog', { name: 'Recebi o salário' });
   await modalRecebi.getByRole('radio', { name: 'Nubank' }).click();
@@ -229,8 +223,9 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await shot('06-recebi.png');
   await modalRecebi.getByRole('button', { name: /Confirmar/ }).click();
   await confirmarToast('Recebido: Renda principal');
-  await expect(hoje).toHaveText(brl('1.675,00'));
+  await expect(cofrinho).toHaveText(brl('700,00'));
   await expect(fimMes).toHaveText(brl('755,00'));
+  await expect(page.getByTestId('renda-previsao')).toHaveCount(0);
   await expect(page.getByText('A receber: Renda principal', { exact: false })).toHaveCount(0);
   // Gastos › Análise: salário recebido 900 de 900 + extra 100; o "Saiu" segue só com o gasto (sem transferência).
   await irPara('Gastos', /\/financas\/gastos$/);
@@ -262,12 +257,13 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await confirmar.getByRole('button', { name: 'Excluir' }).click();
   await confirmarToast('Lançamento excluído. A renda voltou a ficar a receber.');
   await irPara('Início', /\/financas$/);
-  await expect(hoje).toHaveText(brl('775,00'));
+  await expect(cofrinho).toHaveText(brl('700,00'));
+  await expect(page.getByTestId('renda-previsao')).toBeVisible();
   await tocar(page.getByRole('button', { name: 'Recebi Renda principal' }));
   await modalRecebi.getByRole('radio', { name: 'Nubank' }).click();
   await modalRecebi.getByRole('button', { name: /Confirmar/ }).click();
   await confirmarToast('Recebido: Renda principal');
-  await expect(hoje).toHaveText(brl('1.675,00'));
+  await expect(cofrinho).toHaveText(brl('700,00'));
 
   // Gaveta → Bancos e carteira.
   await page.getByRole('button', { name: 'Abrir menu' }).click();
@@ -280,6 +276,8 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   const lista = cartaoBanco('Nubank');
   await expect(lista).toContainText(/R\$\s1\.575,00/);
   await expect(cartaoBanco('Caixa')).toContainText(/R\$\s100,00/);
+  await expect(page.getByTestId('total-bancos')).toContainText(/Total nos bancos: R\$\s1\.675,00/);
+  await expect(page.getByTestId('cofrinho-valor')).toHaveText(brl('700,00'));
   await semScrollHorizontal();
   await shot('07-carteiras.png');
 
@@ -293,6 +291,7 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   const ajustes = corrigido.tables.transacoes.filter((t: { user_id: string; ajuste: boolean }) => t.user_id === uid && t.ajuste);
   expect(ajustes).toHaveLength(1);
   expect(ajustes[0]).toMatchObject({ valor: 75, tipo: 'despesa', chave_ajuste: expect.stringMatching(/^[0-9a-f-]{36}$/) });
+  await expect(page.getByTestId('cofrinho-valor')).toHaveText(brl('700,00'));
 
   expect(erros, 'erros na página ou respostas HTTP ≥ 400').toEqual([]);
 });
@@ -352,29 +351,25 @@ const coletarErros = (page: Page) => {
   return erros;
 };
 
-/** Exemplo A do Estevam: salário 2.200 dia 1 sem Recebi, Internet 110 dia 20 → "No fim do mês sobra" 2.090; sem "Em 7 dias". */
+/** Exemplo A do Estevam: salário 2.200 dia 1 sem Recebi, Internet 110 dia 20 → "Deve sobrar" 2.090; sem "Em 7 dias". */
 test('previsão A: fim do mês = 2.090 e o card "Em 7 dias" não aparece', async ({ page }) => {
   await page.clock.setFixedTime(new Date(AGORA));
   const erros = coletarErros(page);
   await cadastrarCenario(page, 'Caio A', 1);
-  await expect(page.getByTestId('saldo-hoje-valor')).toHaveText(brl('235,00'));
-  await expect(page.getByRole('region', { name: 'Cofrinho' })).toBeVisible();
+  await expect(page.getByTestId('linha-cofrinho-valor')).toHaveText(brl('235,00'));
   await expect(page.getByTestId('previsao-fim-mes-valor')).toHaveText(brl('2.090,00'));
-  // Cofrinho com 1 banco: tocar no card abre Bancos; "Corrigir" já abre o "Corrigir saldo" do Nubank (sem lançar nada).
-  await page.getByTestId('saldo-hoje-link').click();
+  // A conta explícita: 2.200 (previsão) − 110 − 0 = 2.090.
+  await expect(page.getByTestId('resumo-renda')).toHaveText(brl('2.200,00'));
+  await expect(page.getByTestId('renda-previsao')).toBeVisible();
+  await expect(page.getByTestId('resumo-contas-fixas')).toHaveText(/^− R\$\s110,00$/);
+  await expect(page.getByTestId('resumo-gastos')).toHaveText(/^− R\$\s0,00$/);
+  await expect(page.getByTestId('resumo-comprometida')).toHaveText(/^5% da renda já está comprometida · R\$\s110,00 de R\$\s2\.200,00$/);
+  // A linha do Cofrinho abre Bancos.
+  await page.getByTestId('linha-cofrinho').click();
   await page.waitForURL(/\/financas\/carteiras$/);
+  await expect(page.getByTestId('cofrinho-valor')).toHaveText(brl('235,00'));
   await page.goBack();
   await page.waitForURL(/\/financas$/);
-  await page.getByRole('link', { name: 'Corrigir saldo de Nubank' }).click();
-  const correcao = page.getByRole('dialog', { name: 'Corrigir saldo', exact: true });
-  await expect(correcao.getByLabel('Quanto o banco mostra agora?')).toBeVisible();
-  await expect(page).toHaveURL(/\/financas\/carteiras$/);
-  await page.keyboard.press('Escape');
-  await expect(correcao).toBeHidden();
-  await page.goBack();
-  await page.waitForURL(/\/financas$/);
-  await page.getByRole('button', { name: 'por quê? No fim do mês sobra' }).click();
-  await expect(page.getByTestId('previsao-fim-mes-conta')).toHaveText(/^Renda R\$\s2\.200,00 − gastos lançados R\$\s0,00 − contas a pagar R\$\s110,00 = sobra R\$\s2\.090,00$/);
   await expect(page.getByText('Em 7 dias você terá')).toHaveCount(0);
   expect(erros, 'erros na página ou respostas HTTP ≥ 400').toEqual([]);
 });
@@ -384,7 +379,7 @@ test('previsão B/C: fim do mês 2.090 continua igual depois de Recebi e de Pagu
   await page.clock.setFixedTime(new Date(AGORA));
   const erros = coletarErros(page);
   const { tocar } = await cadastrarCenario(page, 'Caio B', 25);
-  const hoje = page.getByTestId('saldo-hoje-valor');
+  const cofrinho = page.getByTestId('linha-cofrinho-valor');
   const fimMes = page.getByTestId('previsao-fim-mes-valor');
   const confirmarToast = async (texto: string) => {
     const alerta = page.getByRole('alert').filter({ hasText: texto });
@@ -393,19 +388,23 @@ test('previsão B/C: fim do mês 2.090 continua igual depois de Recebi e de Pagu
     await expect(alerta).toBeHidden();
   };
 
-  await expect(hoje).toHaveText(brl('235,00'));
+  await expect(cofrinho).toHaveText(brl('235,00'));
   await expect(fimMes).toHaveText(brl('2.090,00'));
 
   await tocar(page.getByRole('button', { name: 'Recebi Renda principal' }));
   const modalRecebi = page.getByRole('dialog', { name: 'Recebi o salário' });
   await modalRecebi.getByRole('button', { name: /Confirmar/ }).click();
   await confirmarToast('Recebido: Renda principal');
-  await expect(hoje).toHaveText(brl('2.435,00'));
+  await expect(cofrinho).toHaveText(brl('235,00'));
   await expect(fimMes).toHaveText(brl('2.090,00'));
 
   await tocar(page.getByRole('button', { name: 'Paguei Internet' }));
   await confirmarToast('"Internet" marcada como paga.');
-  await expect(hoje).toHaveText(brl('2.325,00'));
+  // "Paguei" não conta duas vezes: a despesa dele é a conta fixa (agora "pago"), não um gasto do mês.
+  await expect(cofrinho).toHaveText(brl('235,00'));
   await expect(fimMes).toHaveText(brl('2.090,00'));
+  await expect(page.getByTestId('resumo-gastos')).toHaveText(/^− R\$\s0,00$/);
+  await expect(page.getByTestId('resumo-contas-fixas')).toHaveText(/^− R\$\s110,00$/);
+  await expect(page.getByText('1 paga · 0 a pagar', { exact: false })).toBeVisible();
   expect(erros, 'erros na página ou respostas HTTP ≥ 400').toEqual([]);
 });

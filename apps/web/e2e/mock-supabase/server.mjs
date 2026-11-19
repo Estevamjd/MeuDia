@@ -7,6 +7,7 @@
 // MOCK_LATENCY_MS (env): atraso artificial em cada chamada de Auth/PostgREST, simulando a rede até o Supabase.
 import http from 'node:http';
 import { corrigirSaldo } from './corrigir-saldo.mjs';
+import { rpcCofrinho } from './cofrinho.mjs';
 import crypto from 'node:crypto';
 
 const PORT = Number(process.argv[2] || process.env.MOCK_SUPABASE_PORT || 54329);
@@ -733,6 +734,10 @@ function handleRpc(req, res, fn, args = {}, uid) {
   if (!uid) throw new PgError(401, '42501', `permission denied for function ${fn}`);
   if (fn === 'corrigir_saldo') return send(res, 200, corrigirSaldo({ uid, args, rowsOf, carteiraAtivaDe, PgError, hojeSP, defaults: DEFAULTS.transacoes }));
   if (fn === 'pagar_conta') return send(res, 200, pagarConta(uid, args));
+  if (fn.startsWith('cofrinho_')) {
+    const r = rpcCofrinho(fn, { uid, args, rowsOf, PgError, hojeSP, nowIso });
+    if (r !== undefined) return send(res, 200, r);
+  }
   if (fn === 'whatsapp_vincular') {
     // 011 simplificado: token hex64 terminado em "0" é inválido/expirado; o resto liga um número de teste.
     if (!/^[0-9a-f]{64}$/.test(args.p_token ?? '') || args.p_token.endsWith('0')) return send(res, 200, { ok: false, erro: 'token_invalido' });

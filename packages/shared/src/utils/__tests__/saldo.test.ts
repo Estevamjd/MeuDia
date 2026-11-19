@@ -213,7 +213,7 @@ describe('decisão final: "No fim do mês sobra" = renda do mês − despesas do
   // Hoje 17/10, saldo informado 235 em 17/10, Salário 2.200 dia 1 sem Recebi, conta mensal 110 dia 5 criada em 16/10.
   const salario = renda(2200, 1, { created_at: '2026-10-16T15:00:00Z' });
   const internet = { ...conta('net', 'Internet', 110, 5), created_at: '2026-10-16T15:00:00Z' };
-  const sobra = (transacoes: Transacao[] = [], pagamentos: { conta_id: string; competencia: string }[] = []) =>
+  const sobra = (transacoes: Transacao[] = [], pagamentos: { conta_id: string; competencia: string; transacao_id?: string }[] = []) =>
     sobraDoMes({ competencia: '2026-10', transacoes, rendas: [salario], recebimentos: [], contas: [internet], pagamentos });
 
   it('aceite: sobra 2.200 − 110 = 2.090 (o card antigo dava 2.435)', () => {
@@ -229,7 +229,9 @@ describe('decisão final: "No fim do mês sobra" = renda do mês − despesas do
 
   it('Paguei 110 não muda a sobra: a despesa lançada substitui a conta a pagar', () => {
     const antes = sobra().valor;
-    const depois = sobra([tx({ valor: 110, categoria: 'Contas', carteira_id: 'nu' })], [{ conta_id: 'net', competencia: '2026-10' }]);
+    // O "Paguei" sempre liga o pagamento à despesa (pagar_conta_v2): ela é a conta, não um gasto extra.
+    const paguei = tx({ valor: 110, categoria: 'Contas', carteira_id: 'nu' });
+    const depois = sobra([paguei], [{ conta_id: 'net', competencia: '2026-10', transacao_id: paguei.id }]);
     expect(depois.contasAPagar).toEqual([]);
     expect(depois.despesasLancadas).toBe(110);
     expect(depois.valor).toBe(antes);

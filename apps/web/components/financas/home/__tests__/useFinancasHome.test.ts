@@ -36,6 +36,7 @@ const m = vi.hoisted(() => ({
   painel: { data: undefined as unknown, isLoading: false, isError: false, error: null as unknown },
   criarRenda: { mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false },
   toast: { error: vi.fn(), success: vi.fn() },
+  fecharMes: { mutate: vi.fn(), isPending: false },
 }));
 
 vi.mock('../../../../hooks', () => ({
@@ -47,6 +48,7 @@ vi.mock('../../../../hooks', () => ({
   useCriarRenda: () => m.criarRenda,
   usePainelSaldo: () => m.painel,
   useReceberRenda: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false }),
+  useFecharMesCofrinho: () => m.fecharMes,
 }));
 vi.mock('../../../ui', () => ({ useToast: () => m.toast }));
 vi.mock('../../usePagamentoAcoes', () => ({ usePagamentoAcoes: () => ({ pagarConta: m.pagar, desfazerPagamento: vi.fn(), contaOcupada: null }) }));
@@ -200,3 +202,40 @@ it.each([['arquivada', 'primeira'], ['segunda', 'segunda'], [null, 'primeira']])
     expect(result.current.dashboard!.recebiSheet.carteiraPadrao).toBe(esperada);
   });
 
+describe('fechamento do mês (Cofrinho)', () => {
+  const painel = (respondidas: string[] = []) => ({
+    carteiras: [{ carteira: { id: 'primeira', nome: 'Nubank' }, saldo: 100 }], carteiraPadraoId: 'primeira',
+    hojeISO: '2026-10-01', competencia: '2026-10', saldoHoje: 100, comecouMes: null,
+    arquivadas: [], rendasAReceber: [], transacoesCarteiras: [], transferencias: [],
+    mes: { rendas: [], recebimentos: [], contas: [], pagamentos: [], transacoesDeContas: {} },
+    mesAnterior: { competencia: '2026-09', sobra: 99 },
+    cofrinho: { saldo: 150, inicioEm: '2026-09-19T15:00:00Z', respondidas, movimentos: [] },
+  });
+  const montarEm = () => renderHook(() => useFinancasHome('2026-10', '2026-10-01', onGastei)).result;
+
+  it('primeiro acesso do mês: pergunta da sobra do mês anterior; Guardar manda o valor editado', () => {
+    preparar();
+    m.painel.data = painel();
+    const r = montarEm();
+    const sheet = r.current.dashboard!.fechamentoSheet;
+    expect(r.current.dashboard!.cofrinho).toBe(150);
+    expect(sheet.pergunta).toEqual({ competencia: '2026-09', valor: 99 });
+    expect(sheet.aberto).toBe(true);
+    sheet.onGuardar(80);
+    expect(m.fecharMes.mutate).toHaveBeenCalledWith({ competencia: '2026-09', guardar: true, valor: 80 }, expect.anything());
+  });
+  it('Agora não grava a resposta sem mexer no Cofrinho; fechar no X só adia nesta visita', () => {
+    preparar();
+    m.painel.data = painel();
+    const r = montarEm();
+    r.current.dashboard!.fechamentoSheet.onAgoraNao();
+    expect(m.fecharMes.mutate).toHaveBeenCalledWith({ competencia: '2026-09', guardar: false }, expect.anything());
+    act(() => r.current.dashboard!.fechamentoSheet.onClose());
+    expect(r.current.dashboard!.fechamentoSheet.aberto).toBe(false);
+  });
+  it('mês já respondido: não pergunta', () => {
+    preparar();
+    m.painel.data = painel(['2026-09']);
+    expect(montarEm().current.dashboard!.fechamentoSheet.pergunta).toBeNull();
+  });
+});

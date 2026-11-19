@@ -76,7 +76,8 @@ test('excluir lançamentos, transferências e banco; criar, guardar e excluir me
   // Viewport do iPhone (o que ela vê), sem os toasts por cima.
   const shot = (nome: string) =>
     page.screenshot({ path: path.join(pasta, nome), animations: 'disabled', style: '.z-toast { display: none !important; }' });
-  const hoje = page.getByTestId('saldo-hoje-valor');
+  // 014: a Início mostra o Cofrinho (dinheiro guardado); gasto, Paguei e transferência não mexem nele.
+  const cofrinho = page.getByTestId('linha-cofrinho-valor');
   const confirmar = async (titulo: string, print?: string) => {
     const dialog = page.getByRole('dialog', { name: titulo, exact: true });
     await expect(dialog).toContainText('Excluir? Isso não pode ser desfeito.');
@@ -122,29 +123,38 @@ test('excluir lançamentos, transferências e banco; criar, guardar e excluir me
     await folha.getByRole('button', { name: 'Transferir', exact: true }).click();
     await expect(folha).toBeHidden();
   };
-  await expect(page.getByRole('region', { name: 'Cofrinho' })).toBeVisible();
+  await expect(page.getByTestId('linha-cofrinho')).toBeVisible();
   await expect(page.getByText('Em 7 dias você terá')).toHaveCount(0);
-  await expect(hoje).toHaveText(brl('285,00'));
+  await expect(cofrinho).toHaveText(brl('285,00'));
   await shot('01-inicio-cofrinho.png');
   await gastar('Lanche');
-  await expect(hoje).toHaveText(brl('260,00'));
+  await expect(cofrinho).toHaveText(brl('285,00'));
+  await expect(page.getByTestId('resumo-gastos')).toHaveText(/^− R\$\s25,00$/);
   // Editar/excluir lançamento fica em Gastos › Últimas despesas.
   await aba('Gastos');
   await tocar(page.getByRole('button', { name: 'Excluir lançamento Lanche', exact: true }));
   await confirmar('Excluir lançamento', '02-confirmar-excluir-gasto.png');
   await expect(page.getByRole('button', { name: 'Excluir lançamento Lanche', exact: true })).toHaveCount(0);
   await aba('Início');
-  await expect(hoje).toHaveText(brl('285,00'));
+  await expect(cofrinho).toHaveText(brl('285,00'));
+  await expect(page.getByTestId('resumo-gastos')).toHaveText(/^− R\$\s0,00$/);
 
+  // "Paguei": a conta vira "pago" nas Contas fixas de Gastos e não aparece como gasto do mês (não conta duas vezes).
   await tocar(page.getByRole('button', { name: 'Paguei Internet' }));
-  await expect(hoje).toHaveText(brl('175,00'));
+  await expect(page.getByRole('button', { name: 'Paguei Internet' })).toHaveCount(0);
+  await expect(cofrinho).toHaveText(brl('285,00'));
   await aba('Gastos');
-  await tocar(page.getByRole('button', { name: 'Excluir lançamento Internet', exact: true }));
-  await expect(page.getByRole('dialog', { name: 'Excluir lançamento' })).toContainText('a conta volta a ficar a pagar');
-  await confirmar('Excluir lançamento');
+  const contasFixas = page.getByTestId('contas-fixas-mes');
+  await expect(contasFixas.locator('[data-conta-fixa="paga"]')).toContainText(/Internet.*pago em/);
+  await expect(page.getByTestId('total-gastos')).toHaveText(brl('0,00'));
+  await expect(page.getByRole('button', { name: 'Excluir lançamento Internet', exact: true })).toHaveCount(0);
+  await shot('02b-gastos-contas-fixas.png');
+  // Desfazer o Paguei no próprio card: a conta volta a ficar a pagar e o lançamento dela some.
+  await tocar(contasFixas.getByRole('button', { name: 'Desfazer pagamento de Internet' }));
+  await expect(contasFixas.locator('[data-conta-fixa="a-pagar"]')).toContainText('Internet');
   await aba('Início');
   await expect(page.getByRole('button', { name: 'Paguei Internet' })).toBeVisible();
-  await expect(hoje).toHaveText(brl('285,00'));
+  await expect(cofrinho).toHaveText(brl('285,00'));
 
   await transferir();
   await page.goto('/financas/carteiras');

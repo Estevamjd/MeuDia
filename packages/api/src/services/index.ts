@@ -14,6 +14,7 @@ export * as medicamentosService from './medicamentos.service';
 export * as contasPagarService from './contas-pagar.service';
 export * as orcamentoService from './orcamento.service';
 export * as carteirasService from './carteiras.service';
+export * as cofrinhoService from './cofrinho.service';
 export type { PainelSaldo, RendaAReceber } from './carteiras.service';
 export * as lembretesService from './lembretes.service';
 export type { PushPayload, PushSender } from './lembretes.service';

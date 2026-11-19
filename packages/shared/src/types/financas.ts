@@ -243,3 +243,25 @@ export const LEMBRETE_TEXTOS = {
   'D-1': { title: 'Já foi pago?', body: '<descricao> vence amanhã. Toque para marcar como paga.' },
   D0: { title: 'Tá tudo certo?', body: '<descricao> vence hoje. Já pagou?' },
 } as const;
+
+/** 014: o Cofrinho só muda por ação explícita; saldo = soma de `valor` (com sinal). */
+export type TipoMovimentoCofrinho = 'inicial' | 'guardar' | 'tirar' | 'corrigir' | 'sobra';
+
+export interface MovimentoCofrinho {
+  id: UUID;
+  user_id: UUID;
+  tipo: TipoMovimentoCofrinho;
+  valor: number;
+  competencia: Competencia | null;
+  chave: UUID | null;
+  valor_informado: number | null;
+  created_at: string;
+}
+
+export interface FechamentoCofrinho {
+  user_id: UUID;
+  competencia: Competencia;
+  decisao: 'guardou' | 'agora_nao';
+  valor: number | null;
+  created_at: string;
+}

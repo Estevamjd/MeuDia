@@ -169,3 +169,4 @@ export {
   useRegistrarRefeicao,
   useExcluirRegistroRefeicao,
 } from './useRegistros';
+export { useMoverCofrinho, useCorrigirCofrinho, useFecharMesCofrinho, type FecharMesInput } from './useCofrinho';

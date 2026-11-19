@@ -6,6 +6,7 @@ import {
   useContas,
   useContasMes,
   useCriarRenda,
+  useFecharMesCofrinho,
   usePainelSaldo,
   useReceberRenda,
   useRendas,
@@ -13,7 +14,7 @@ import {
   useTransacoesMes,
 } from '../../../hooks';
 import { useToast } from '../../ui';
-import { partesCompetencia } from '../../../lib/financas-ui';
+import { formatBRL, partesCompetencia } from '../../../lib/financas-ui';
 import { usePagamentoAcoes } from '../usePagamentoAcoes';
 import type { FinancasHomeViewProps } from './FinancasHomeView';
 import { montarHome } from './montarHome';
@@ -37,6 +38,9 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, onGas
   const { pagarConta, contaOcupada } = usePagamentoAcoes();
   const painel = usePainelSaldo(hojeISO);
   const receber = useReceberRenda();
+  const fecharMes = useFecharMesCofrinho();
+  // "X"/fundo fecha sem responder: só nesta visita (a pergunta volta no próximo acesso).
+  const [fechamentoAdiado, setFechamentoAdiado] = useState<string | null>(null);
   const [recebendo, setRecebendo] = useState<RendaAReceberItem | null>(null);
   const [escondido, setEscondido] = useState(false);
   useEffect(() => setEscondido(lerEsconderValores()), []);
@@ -132,6 +136,31 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, onGas
           onRecebi: (r) => {
             receber.reset();
             setRecebendo(r);
+          },
+          fechamentoSheet: {
+            pergunta: dados.fechamento,
+            aberto: !!dados.fechamento && fechamentoAdiado !== dados.fechamento.competencia,
+            salvando: fecharMes.isPending,
+            onClose: () => setFechamentoAdiado(dados.fechamento?.competencia ?? null),
+            onAgoraNao: () => {
+              const p = dados.fechamento;
+              if (!p) return;
+              fecharMes.mutate(
+                { competencia: p.competencia, guardar: false },
+                { onError: () => toast.error('Não foi possível salvar. Tente de novo.') },
+              );
+            },
+            onGuardar: (valor) => {
+              const p = dados.fechamento;
+              if (!p) return;
+              fecharMes.mutate(
+                { competencia: p.competencia, guardar: true, valor },
+                {
+                  onSuccess: () => toast.success(`Guardado no Cofrinho: ${formatBRL(valor)}`),
+                  onError: () => toast.error('Não foi possível guardar. Tente de novo.'),
+                },
+              );
+            },
           },
           recebiSheet: {
             renda: recebendo,

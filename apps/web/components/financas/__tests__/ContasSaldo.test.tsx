@@ -127,6 +127,8 @@ describe('CardSobraMes (decisão final do Estevam)', () => {
     rendasAReceber: [{ id: 'r', descricao: 'Salário', valor: 2200, data: '2026-10-01' }],
     despesasLancadas: 0, contasAPagar: [{ id: 'net', descricao: 'Internet', categoria: 'Internet', valor: 110, vencimento: '2026-10-05' }],
     despesas: 110, valor: 2090,
+    previsao: true, totalContasFixas: 110, totalContasPagas: 0, gastosExtras: 0,
+    contasFixas: [{ id: 'net', descricao: 'Internet', categoria: 'Internet', valor: 110, vencimento: '2026-10-05', paga: false, pagoEm: null }],
   };
   const linha = (id: string) => screen.getByTestId(id).textContent?.replace(/\s/g, ' ');
 

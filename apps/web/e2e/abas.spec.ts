@@ -102,9 +102,10 @@ test('design v2: Início, Treino, Dieta e Relatório (menu no ☰); Ver todos, C
   await expect(ultimos.getByTestId('lancamento')).toHaveCount(4);
   await expect(ultimos.locator('[data-origem="manual"]')).toHaveCount(4);
   await expect(page.getByRole('region', { name: 'Para onde foi' })).toContainText('Mercado');
-  await expect(page.getByTestId('saldo-hoje-valor')).toHaveText(brl('1.280,00'));
+  await expect(page.getByTestId('linha-cofrinho-valor')).toHaveText(brl('1.280,00'));
   await expect(page.getByRole('region', { name: 'Contas a vencer' }).locator('[data-conta]')).toHaveCount(2);
-  await expect(page.getByText('Sobra do mês', { exact: true })).toHaveCount(1);
+  await expect(page.getByRole('region', { name: 'Resumo de outubro' })).toHaveCount(1);
+  await expect(page.getByText('Sobra do mês', { exact: true })).toHaveCount(0);
   const caixaNav = (await nav.boundingBox())!;
 
   // ── Banner "Instalar MeuDia" visível (iOS, após 2s) não cobre o "Gastei" (revisão Codex 2) ──
@@ -124,7 +125,7 @@ test('design v2: Início, Treino, Dieta e Relatório (menu no ☰); Ver todos, C
   await expect(page.getByRole('dialog', { name: 'Gastei' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  // Fechado o banner, a reserva some. A Início v2 rola (Sobra, Para onde foi, Últimos lançamentos, Cofrinho), sem rolagem lateral.
+  // Fechado o banner, a reserva some. A Início rola (Resumo do mês, Cofrinho, Contas, Para onde foi, Últimos lançamentos), sem rolagem lateral.
   await banner.getByRole('button', { name: 'Fechar' }).click();
   await expect(banner).toBeHidden();
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -195,7 +196,8 @@ test('design v2: Início, Treino, Dieta e Relatório (menu no ☰); Ver todos, C
 
   // ── Filtros (URL), lista e total ───────────────────────────────────────────
   const total = page.getByTestId('total-gastos');
-  const lista = page.getByRole('region', { name: 'Últimas despesas' });
+  // Só a lista por dia (o card "Contas fixas" também tem itens).
+  const lista = page.getByRole('region', { name: 'Últimas despesas' }).locator('section[aria-label^="Despesas de"]');
   await expect(total).toHaveText(brl('164,30'));
   await expect(lista.getByRole('listitem').first()).toContainText('Mercado do bairro');
   await expect(lista.getByRole('listitem').first()).toContainText(/Mercado · 18\/10 · Nubank/);

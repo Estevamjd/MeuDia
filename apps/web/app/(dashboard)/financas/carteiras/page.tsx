@@ -10,6 +10,7 @@ import { useAtualizarCarteira, useCorrigirSaldo, useCriarCarteira, useExcluirCar
 import { Button, ConfirmDialog, EmptyState, Input, Modal, Select, SkeletonList, useToast } from '../../../../components/ui';
 import { IconeCarteira } from '../../../../components/financas/SeletorCarteira';
 import { ConfirmarExclusao } from '../../../../components/financas/ConfirmarExclusao';
+import { CardCofrinho } from '../../../../components/financas/cofrinho/CardCofrinho';
 import { TIPO_CARTEIRA_LABEL, comSinal, detalheExclusaoCarteira, detalheExclusaoTransferencia, rotuloTransferencia } from '../../../../lib/carteiras-ui';
 import { formatBRL, formatBRLSinal, formatDiaMes, mascaraBRL } from '../../../../lib/financas-ui';
 
@@ -132,8 +133,9 @@ function CarteirasConteudo() {
         />
       ) : (
         <>
-          <p className="text-[15px] text-muted">
-            Cofrinho: <span className="font-semibold tabular-nums text-text">{formatBRLSinal(painel.data!.saldoHoje)}</span>
+          {painel.data!.cofrinho && <CardCofrinho saldo={painel.data!.cofrinho.saldo} />}
+          <p className="text-[15px] text-muted" data-testid="total-bancos">
+            Total nos bancos: <span className="font-semibold tabular-nums text-text">{formatBRLSinal(painel.data!.saldoHoje)}</span>
             {ativas.some((s) => !s.carteira.incluir_no_total) ? ' (sem contar o que está fora do total)' : ''}.
           </p>
           {avisoEscolher && (

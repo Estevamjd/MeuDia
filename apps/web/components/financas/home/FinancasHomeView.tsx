@@ -5,6 +5,9 @@ import { ProximasContas, type ContaProxima } from './ProximasContas';
 import { RendaSheet, type RendaSheetProps } from './RendaSheet';
 import { CardSaldoHoje } from './CardSaldoHoje';
 import { HeroiSobra } from '../resumo/HeroiSobra';
+import { ResumoMesConta } from '../resumo/ResumoMesConta';
+import { LinhaCofrinho } from './LinhaCofrinho';
+import { FechamentoMesSheet, type FechamentoMesSheetProps } from '../cofrinho/FechamentoMesSheet';
 import { ParaOndeFoi } from '../resumo/ParaOndeFoi';
 import { UltimosLancamentos } from '../resumo/UltimosLancamentos';
 import type { ResumoMes } from '../resumo/montarResumoMes';
@@ -18,6 +21,7 @@ export interface DashboardHome extends DadosDashboard {
   onAlternarOlho: () => void;
   onRecebi: (renda: RendaAReceberItem) => void;
   recebiSheet: RecebiSheetProps;
+  fechamentoSheet: FechamentoMesSheetProps;
 }
 
 export interface FinancasHomeViewProps {
@@ -44,8 +48,8 @@ export interface FinancasHomeViewProps {
 }
 
 /**
- * Início (design v2 Astro G, aprovado em 18/11/2026): Sobra do mês (com Entrou/Saiu) → Contas a vencer (com "A receber")
- * → Para onde foi → Últimos lançamentos com selo Manual/WhatsApp e o "Gastei".
+ * Início: Resumo do mês "conta explícita" (aprovado em 19/11/2026: Você recebe − Contas fixas − Gastos do mês = Deve
+ * sobrar) → linha do Cofrinho (abre Bancos) → Contas a vencer (com "A receber") → Para onde foi → Últimos lançamentos.
  */
 export function FinancasHomeView({
   estado,
@@ -100,7 +104,13 @@ export function FinancasHomeView({
       {/* Usuária nova sem banco: só o convite (sem cards vazios nem "R$ 0,00"). */}
       {soConvite && d && <CardSaldoHoje {...d.saldo} escondido={d.escondido} onAlternarOlho={d.onAlternarOlho} compacto />}
 
-      {!soConvite && resumo && <HeroiSobra resumo={resumo} escondido={escondido} sobra={d?.sobraMes ?? null} />}
+      {!soConvite && d?.sobraMes ? (
+        <ResumoMesConta sobra={d.sobraMes} escondido={escondido} />
+      ) : (
+        // Painel indisponível ou outro mês: o resumo pelos lançamentos, como antes.
+        !soConvite && resumo && <HeroiSobra resumo={resumo} escondido={escondido} sobra={null} />
+      )}
+      {!soConvite && d && <LinhaCofrinho saldo={d.cofrinho} escondido={escondido} />}
 
       {contas && (
         <ProximasContas
@@ -117,11 +127,9 @@ export function FinancasHomeView({
       {!soConvite && resumo && <ParaOndeFoi categorias={resumo.categorias} escondido={escondido} />}
       {!soConvite && <UltimosLancamentos lancamentos={resumo?.ultimos ?? []} escondido={escondido} onGastei={onGastei} />}
 
-      {/* Cofrinho (saldo por banco) segue na Início, depois do resumo do mês; o olho fica no cabeçalho da página. */}
-      {!soConvite && d && <CardSaldoHoje {...d.saldo} escondido={escondido} onAlternarOlho={d.onAlternarOlho} compacto semOlho />}
-
       <RendaSheet {...rendaSheet} />
       {d && <RecebiSheet {...d.recebiSheet} />}
+      {d && <FechamentoMesSheet {...d.fechamentoSheet} />}
     </div>
   );
 }

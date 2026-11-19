@@ -14,3 +14,4 @@ export * from './peso';
 export * from './nutricao';
 export * from './creatina';
 export * from './registros';
+export * from './cofrinho';

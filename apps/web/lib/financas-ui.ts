@@ -249,3 +249,8 @@ export function parseValorNaoNegativo(texto: string): number | null {
   if (!Number.isFinite(valor) || valor < 0 || valor > 99999999.99) return null;
   return centavos(valor) + 0; // `+ 0` normaliza -0 (ex.: "-0")
 }
+
+/** "novembro" para `2026-11`. */
+export function nomeMes(competencia: Competencia): string {
+  return MESES[partesCompetencia(competencia).mes - 1]!.toLowerCase();
+}

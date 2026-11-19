@@ -37,6 +37,8 @@ describe('montarResumoMes', () => {
       rendasAReceber: [{ id: 'r', descricao: 'Freela', valor: 200, data: '2026-11-25' }], despesasLancadas: 2048.4,
       contasAPagar: [{ id: 'c', descricao: 'Academia', categoria: 'Saúde', valor: 129.9, vencimento: '2026-11-20' }],
       despesas: 2178.3, valor: 2821.7,
+      previsao: true, totalContasFixas: 129.9, totalContasPagas: 0, gastosExtras: 2048.4,
+      contasFixas: [{ id: 'c', descricao: 'Academia', categoria: 'Saúde', valor: 129.9, vencimento: '2026-11-20', paga: false, pagoEm: null }],
     };
     const r = montarResumoMes('2026-11', transacoes, sobra);
     expect(r.aReceber).toBe(200);

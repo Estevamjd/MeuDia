@@ -62,6 +62,9 @@ export type {
   RecebimentoRenda,
   Meta,
   MetaInsert,
+  TipoMovimentoCofrinho,
+  MovimentoCofrinho,
+  FechamentoCofrinho,
 } from './financas';
 
 export type {

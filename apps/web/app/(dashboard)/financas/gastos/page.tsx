@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { clsx } from 'clsx';
 import { ChevronDown, Plus } from 'lucide-react';
-import { hojeSP, ultimasDespesas, type Transacao } from '@meudia/shared';
-import { usePainelSaldo, useResumoFinanceiroMes, useTransacoesMes } from '../../../../hooks';
+import { hojeSP, ultimasDespesas, type OcorrenciaConta, type Transacao } from '@meudia/shared';
+import { useContasMes, usePainelSaldo, useResumoFinanceiroMes, useTransacoesMes } from '../../../../hooks';
 import { Button, SkeletonList } from '../../../../components/ui';
 import { ConfirmarExclusao } from '../../../../components/financas/ConfirmarExclusao';
 import { LancamentoRapidoSheet } from '../../../../components/financas/LancamentoRapidoSheet';
@@ -16,6 +16,9 @@ import { SeletorMes } from '../../../../components/financas/SeletorMes';
 import { useExclusaoLancamento } from '../../../../components/financas/useExclusaoLancamento';
 import { AnaliseMes } from '../../../../components/financas/gastos/AnaliseMes';
 import { montarAnalise } from '../../../../components/financas/gastos/montarAnalise';
+import { ContasFixasMes } from '../../../../components/financas/gastos/ContasFixasMes';
+import { contasFixasDoMes } from '../../../../components/financas/gastos/contasFixasDoMes';
+import { usePagamentoAcoes } from '../../../../components/financas/usePagamentoAcoes';
 import { montarDashboard } from '../../../../components/financas/home/montarDashboard';
 import { lerEsconderValores } from '../../../../lib/carteiras-ui';
 import { deslocarCompetencia, formatBRL, formatDiaMes, partesCompetencia } from '../../../../lib/financas-ui';
@@ -43,6 +46,7 @@ function Gastos() {
   const ir = (mudanca: Parameters<typeof hrefGastos>[1]) => router.replace(hrefGastos(filtros, mudanca, hojeISO), { scroll: false });
   const { ano, mes } = partesCompetencia(filtros.mes);
   const transacoes = useTransacoesMes(ano, mes);
+  const ocorrencias = useContasMes(filtros.mes);
   const lista = useMemo(() => transacoes.data ?? [], [transacoes.data]);
   const exclusao = useExclusaoLancamento(lista.map((t) => t.id));
   const lancamento = useLancamentoModais();
@@ -80,6 +84,7 @@ function Gastos() {
       ) : (
         <UltimasDespesas
           transacoes={lista}
+          ocorrencias={ocorrencias.data ?? []}
           carregando={transacoes.isLoading}
           erro={transacoes.isError}
           mes={filtros.mes}
@@ -110,6 +115,7 @@ type Acoes = { bloqueadas: boolean; onEditar: (t: Transacao) => void; onExcluir:
 
 interface UltimasDespesasProps {
   transacoes: Transacao[];
+  ocorrencias: OcorrenciaConta[];
   carregando: boolean;
   erro: boolean;
   mes: string;
@@ -121,8 +127,12 @@ interface UltimasDespesasProps {
   acoes: Acoes;
 }
 
-function UltimasDespesas({ transacoes, carregando, erro, mes, categoria, onCategoria, onGastei, onNovo, vinculos, acoes }: UltimasDespesasProps) {
-  const r = useMemo(() => ultimasDespesas(transacoes, { mes, categoria }), [transacoes, mes, categoria]);
+function UltimasDespesas({ transacoes, ocorrencias, carregando, erro, mes, categoria, onCategoria, onGastei, onNovo, vinculos, acoes }: UltimasDespesasProps) {
+  // "Paguei" é a conta fixa (vai no card de contas), não gasto do dia a dia: assim o total bate com a Início.
+  const extras = useMemo(() => transacoes.filter((t) => vinculos[t.id] !== 'pagamento'), [transacoes, vinculos]);
+  const r = useMemo(() => ultimasDespesas(extras, { mes, categoria }), [extras, mes, categoria]);
+  const contas = useMemo(() => contasFixasDoMes(ocorrencias, transacoes, categoria), [ocorrencias, transacoes, categoria]);
+  const { desfazerPagamento, contaOcupada } = usePagamentoAcoes();
   // Categoria da URL sem despesa no mês continua no select (senão o filtro some da tela).
   const categorias = categoria && !r.categorias.includes(categoria) ? [...r.categorias, categoria] : r.categorias;
   return (
@@ -149,8 +159,15 @@ function UltimasDespesas({ transacoes, carregando, erro, mes, categoria, onCateg
         </Button>
       </div>
 
+      <ContasFixasMes
+        mes={mes}
+        contas={contas}
+        ocupada={contaOcupada}
+        onDesfazer={(c) => desfazerPagamento({ contaId: c.id, competencia: mes, descricao: c.descricao })}
+      />
+
       <p className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-[15px]">
-        <span className="text-muted">Total{categoria ? ` em ${categoria}` : ''}</span>
+        <span className="text-muted">Gastos do mês{categoria ? ` em ${categoria}` : ''} <span className="text-[12px]">(fora as contas fixas)</span></span>
         <span data-testid="total-gastos" className="font-semibold tabular-nums text-red">{formatBRL(r.total)}</span>
       </p>
 
@@ -159,7 +176,7 @@ function UltimasDespesas({ transacoes, carregando, erro, mes, categoria, onCateg
       ) : erro ? (
         <p role="alert" className="rounded-card border border-red/40 bg-card p-4 text-[15px] text-text">Não foi possível carregar os gastos.</p>
       ) : r.dias.length === 0 ? (
-        <p className="rounded-card border border-border bg-card p-4 text-[15px] text-muted">Nenhuma despesa neste filtro.</p>
+        <p className="rounded-card border border-border bg-card p-4 text-[15px] text-muted">Nenhum gasto fora das contas fixas neste filtro.</p>
       ) : (
         r.dias.map((dia) => (
           <section key={dia.data} aria-label={`Despesas de ${formatDiaMes(dia.data)}`} className="space-y-1">
