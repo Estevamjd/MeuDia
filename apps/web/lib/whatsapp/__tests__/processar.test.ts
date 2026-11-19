@@ -10,28 +10,42 @@ const msg = (body: string, extra: Record<string, unknown> = {}) => ({
   payload: { id: 'false_5511988887777@c.us_ABC', from: '5511988887777@c.us', fromMe: false, body, hasMedia: false, ...extra },
 });
 const agora = new Date('2026-11-19T15:00:00Z'); // 12h em SP
+const vinculado = { ok: true, vinculado: true, etapa: 'concluido', tentativas: 0, nome: 'Estevam Juliano', metas: [], estilo_tamanho: 'curto', estilo_emoji: true, msgs_hoje: 1, limite_excedido: false };
 
 describe('processarEvento', () => {
   const registrar = vi.fn();
   const enviar = vi.fn();
   const interpretarIA = vi.fn();
-  const deps = () => ({ registrar, enviar, interpretarIA, agora });
+  const extrairIA = vi.fn();
+  const conversarIA = vi.fn();
+  const contato = vi.fn();
+  const onboarding = vi.fn();
+  const deps = () => ({ registrar, enviar, interpretarIA, extrairIA, conversarIA, contato, onboarding, agora });
 
   beforeEach(() => {
     vi.stubEnv('WHATSAPP_NUMEROS_PERMITIDOS', '5511988887777');
-    registrar.mockReset().mockResolvedValue({ ok: true, nome: 'Estevam Juliano' });
+    vi.stubEnv('WHATSAPP_ONBOARDING_ABERTO', '');
+    vi.stubEnv('WHATSAPP_LIMITE_DIA', '');
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://app.teste');
+    registrar.mockReset().mockResolvedValue({ ok: true, nome: 'Estevam Juliano', extras: {} });
     enviar.mockReset().mockResolvedValue(true);
     interpretarIA.mockReset().mockResolvedValue(null);
+    extrairIA.mockReset().mockResolvedValue(null);
+    conversarIA.mockReset().mockResolvedValue(null);
+    contato.mockReset().mockResolvedValue(vinculado);
+    onboarding.mockReset().mockResolvedValue({ ok: true });
   });
   afterEach(() => vi.unstubAllEnvs());
 
-  it('gasto: grava com origem WhatsApp (RPC) e confirma curto', async () => {
+  it('conta ligada: gasto grava (RPC) e confirma com a dica proativa', async () => {
+    registrar.mockResolvedValue({ ok: true, nome: 'Estevam Juliano', extras: { categoria: 'Mercado', planejado: 500, gasto_mes: 45.9 } });
     const r = await processarEvento(msg('gastei 45,90 no mercado'), deps());
+    expect(contato).toHaveBeenCalledWith('5511988887777', 30);
     expect(registrar).toHaveBeenCalledWith('5511988887777', 'false_5511988887777@c.us_ABC', { tipo: 'gasto', valor: 45.9, descricao: 'Mercado', categoria: 'Mercado' });
-    expect(enviar).toHaveBeenCalledWith('5511988887777@c.us', expect.stringContaining('gasto de R$'));
     expect(r).toMatchObject({ status: 'respondido', intencao: 'gasto' });
-    expect(enviar.mock.calls[0]![1]).toContain('Estevam');
+    expect(String(enviar.mock.calls[0]![1]).replace(/\u00a0/g, ' ')).toMatch(/^✅ Anotado, Estevam: gasto de R\$.*\nAinda tem R\$ 454,10 do orçamento de Mercado/);
     expect(interpretarIA).not.toHaveBeenCalled();
+    expect(onboarding).not.toHaveBeenCalled();
   });
 
   it('treino e refeição', async () => {
@@ -41,11 +55,41 @@ describe('processarEvento', () => {
     expect(registrar.mock.calls[1]![2]).toEqual({ tipo: 'refeicao', refeicao: 'almoco', descricao: 'Arroz, feijão, frango' });
   });
 
-  it('lista vazia: ninguém escreve e o bot não responde', async () => {
+  it('portão fechado (lista vazia e onboarding fechado): ninguém passa, nada é consultado', async () => {
     vi.stubEnv('WHATSAPP_NUMEROS_PERMITIDOS', '');
-    expect(await processarEvento(msg('gastei 10'), deps())).toEqual({ status: 'ignorado', motivo: 'fora_da_lista' });
-    expect(registrar).not.toHaveBeenCalled();
+    expect(await processarEvento(msg('oi'), deps())).toEqual({ status: 'ignorado', motivo: 'fora_da_lista' });
+    expect(contato).not.toHaveBeenCalled();
     expect(enviar).not.toHaveBeenCalled();
+  });
+
+  it('WHATSAPP_ONBOARDING_ABERTO=true deixa número novo entrar no onboarding', async () => {
+    vi.stubEnv('WHATSAPP_NUMEROS_PERMITIDOS', '');
+    vi.stubEnv('WHATSAPP_ONBOARDING_ABERTO', 'true');
+    contato.mockResolvedValue({ ...vinculado, vinculado: false, etapa: 'inicio', nome: null });
+    const r = await processarEvento(msg('oi'), deps());
+    expect(onboarding).toHaveBeenCalledWith('5511988887777', { etapa: 'nome', tentativas: 0 }, false);
+    expect(r).toMatchObject({ status: 'respondido', intencao: 'onboarding' });
+    expect(enviar.mock.calls[0]![1]).toMatch(/^Oi, tudo bem\? 😊 Eu sou o MeuDia/);
+  });
+
+  it('fim do onboarding: troca {LINK} pelo link de uso único', async () => {
+    contato.mockResolvedValue({ ...vinculado, vinculado: false, etapa: 'estilo', nome: 'Lia' });
+    onboarding.mockResolvedValue({ ok: true, token: 'a'.repeat(64) });
+    await processarEvento(msg('curtas'), deps());
+    expect(onboarding).toHaveBeenCalledWith('5511988887777', { estilo_tamanho: 'curto', etapa: 'link', tentativas: 0 }, true);
+    expect(enviar.mock.calls[0]![1]).toContain(`https://app.teste/whatsapp?t=${'a'.repeat(64)}`);
+    expect(enviar.mock.calls[0]![1]).not.toContain('{LINK}');
+  });
+
+  it('limite diário: avisa uma vez e depois fica quieto', async () => {
+    vi.stubEnv('WHATSAPP_LIMITE_DIA', '3');
+    contato.mockResolvedValue({ ...vinculado, msgs_hoje: 4, limite_excedido: true });
+    expect(await processarEvento(msg('gastei 10'), deps())).toMatchObject({ status: 'respondido', intencao: 'limite' });
+    expect(contato).toHaveBeenCalledWith('5511988887777', 3);
+    contato.mockResolvedValue({ ...vinculado, msgs_hoje: 5, limite_excedido: true });
+    expect(await processarEvento(msg('gastei 10'), deps())).toEqual({ status: 'ignorado', motivo: 'limite' });
+    expect(enviar).toHaveBeenCalledTimes(1);
+    expect(registrar).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -59,29 +103,32 @@ describe('processarEvento', () => {
     expect(enviar).not.toHaveBeenCalled();
   });
 
-  it('duplicada (reentrega do WAHA): não grava de novo nem responde', async () => {
+  it('duplicada (reentrega do WAHA): não responde', async () => {
     registrar.mockResolvedValue({ ok: true, duplicada: true });
     expect(await processarEvento(msg('gastei 10'), deps())).toEqual({ status: 'ignorado', motivo: 'duplicada' });
     expect(enviar).not.toHaveBeenCalled();
   });
 
-  it('regras não entendem → IA; IA sem chave/sem resposta → mensagem de ajuda curta', async () => {
+  it('não é registro: IA interpreta; se não, a persona conversa; sem IA, ajuda curta', async () => {
     await processarEvento(msg('hoje foi puxado'), deps());
     expect(interpretarIA).toHaveBeenCalledWith('hoje foi puxado', '2026-11-19');
-    expect(registrar).not.toHaveBeenCalled();
+    expect(conversarIA).toHaveBeenCalled();
     expect(enviar.mock.calls[0]![1]).toMatch(/Não entendi/);
+    conversarIA.mockResolvedValue('Dia puxado pede descanso 😊 Quer anotar o treino de hoje? Ex.: "treinei pernas 40min"');
+    const r = await processarEvento(msg('hoje foi puxado'), deps());
+    expect(r).toMatchObject({ intencao: 'conversa' });
   });
 
   it('usa a interpretação da IA quando ela entende', async () => {
-    interpretarIA.mockResolvedValue({ tipo: 'gasto', valor: 18, descricao: 'pão', categoria: 'Comida' });
-    await processarEvento(msg('passei na padoca, 18 conto de pão'.replace(/\d+/, 'dezoito')), deps());
-    expect(registrar.mock.calls[0]![2]).toMatchObject({ tipo: 'gasto', valor: 18 });
+    interpretarIA.mockResolvedValue({ tipo: 'gasto', valor: 320, descricao: 'Fatura do Nubank', categoria: 'Contas', data: '2026-11-12' });
+    await processarEvento(msg('passei o cartão da fatura do nubank, trezentos e vinte'), deps());
+    expect(registrar.mock.calls[0]![2]).toMatchObject({ tipo: 'gasto', valor: 320 });
   });
 
-  it('erro do banco vira resposta amigável', async () => {
-    registrar.mockResolvedValue({ ok: false, erro: 'numero_sem_conta' });
+  it('falha do banco ao buscar contato vira resposta amigável', async () => {
+    contato.mockResolvedValue({ ok: false, erro: 'rede' });
     await processarEvento(msg('gastei 10'), deps());
-    expect(enviar.mock.calls[0]![1]).toMatch(/Configurações → Seu WhatsApp/);
+    expect(enviar.mock.calls[0]![1]).toMatch(/Não consegui anotar agora/);
   });
 });
 

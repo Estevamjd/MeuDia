@@ -15,6 +15,7 @@ import { handleOfflineAction } from '../../lib/offline-handlers';
 import { AgentFAB } from '../../components/agent/AgentFAB';
 import { AgentPanel } from '../../components/agent/AgentPanel';
 import { BottomNav } from '../../components/layout/BottomNav';
+import { VinculoPendente } from '../../components/whatsapp/VinculoPendente';
 import { useAppMode } from '../../components/AppModeProvider';
 import { deveRedirecionarOnboarding, precisaOnboarding } from '../../lib/onboarding';
 import { clsx } from 'clsx';
@@ -77,6 +78,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <ToastProvider>
+      <VinculoPendente />
       <div className="astrog-ceu bg-glow-orbs flex min-h-screen">
         {/* Sidebar desktop */}
         <div className="hidden md:block">

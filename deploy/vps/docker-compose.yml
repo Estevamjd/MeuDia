@@ -16,7 +16,7 @@ services:
     mem_limit: 1g
     memswap_limit: 1g
     ports:
-      - "3000"
+      - "127.0.0.1::3000" # só loopback: o acesso público é pelo Traefik (HTTPS)
     env_file:
       - .env
     environment:

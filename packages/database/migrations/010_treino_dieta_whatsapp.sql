@@ -134,7 +134,7 @@ BEGIN
     INSERT INTO public.transacoes (user_id, tipo, categoria, descricao, valor, data, carteira_id, origem)
     VALUES (v_user, CASE WHEN p_tipo = 'gasto' THEN 'despesa' ELSE 'receita' END,
             pg_catalog.left(COALESCE(NULLIF(p_dados->>'categoria', ''), CASE WHEN p_tipo = 'gasto' THEN 'Outros' ELSE 'Extra' END), 40),
-            NULLIF(v_desc, ''), pg_catalog.round(v_valor, 2), v_data, v_carteira, 'whatsapp');
+            COALESCE(NULLIF(v_desc, ''), pg_catalog.left(COALESCE(NULLIF(p_dados->>'categoria', ''), 'Outros'), 40)), pg_catalog.round(v_valor, 2), v_data, v_carteira, 'whatsapp');
   ELSIF p_tipo = 'treino' THEN
     IF v_desc = '' THEN RETURN jsonb_build_object('ok', false, 'erro', 'descricao_vazia'); END IF;
     v_min := NULLIF(p_dados->>'duracao_min', '')::INTEGER;

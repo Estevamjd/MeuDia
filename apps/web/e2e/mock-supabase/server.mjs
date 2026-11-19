@@ -726,6 +726,13 @@ function handleRpc(req, res, fn, args = {}, uid) {
   if (!uid) throw new PgError(401, '42501', `permission denied for function ${fn}`);
   if (fn === 'corrigir_saldo') return send(res, 200, corrigirSaldo({ uid, args, rowsOf, carteiraAtivaDe, PgError, hojeSP, defaults: DEFAULTS.transacoes }));
   if (fn === 'pagar_conta') return send(res, 200, pagarConta(uid, args));
+  if (fn === 'whatsapp_vincular') {
+    // 011 simplificado: token hex64 terminado em "0" é inválido/expirado; o resto liga um número de teste.
+    if (!/^[0-9a-f]{64}$/.test(args.p_token ?? '') || args.p_token.endsWith('0')) return send(res, 200, { ok: false, erro: 'token_invalido' });
+    const perfil = rowsOf('profiles').find((p) => p.id === uid);
+    if (perfil) perfil.whatsapp = '5500000000001';
+    return send(res, 200, { ok: true, telefone: '5500000000001' });
+  }
   if (fn === 'pagar_conta_v2') {
     // 006: valida a carteira, delega à pagar_conta e vincula a despesa.
     const carteira = args.p_carteira_id ? carteiraAtivaDe(uid, args.p_carteira_id) : null;
