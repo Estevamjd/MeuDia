@@ -61,7 +61,7 @@ export default function SaudeDietaPage() {
         />
       ) : (
         <>
-          <section className="border-b border-white/[0.07] px-5 pb-2 pt-1">
+          <section className="border-b border-text/[0.07] px-5 pb-2 pt-1">
             <LinhaTempo entradas={r.entradas} onPonto={r.onPonto} ocupado={r.ocupado} comKcal acoes={acoes} />
           </section>
           <Secao rotulo="Total do dia">

@@ -28,15 +28,15 @@ export function BarChart({
   return (
     <ResponsiveContainer width="100%" height={height}>
       <RechartsBarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(120,135,160,0.16)" vertical={false} />
         <XAxis
           dataKey={xAxisKey}
-          tick={{ fill: '#65657a', fontSize: 11 }}
-          axisLine={{ stroke: 'rgba(255,255,255,0.07)' }}
+          tick={{ fill: '#7a8599', fontSize: 11 }}
+          axisLine={{ stroke: 'rgba(120,135,160,0.16)' }}
           tickLine={false}
         />
         <YAxis
-          tick={{ fill: '#65657a', fontSize: 11 }}
+          tick={{ fill: '#7a8599', fontSize: 11 }}
           axisLine={false}
           tickLine={false}
         />
@@ -48,7 +48,7 @@ export function BarChart({
             fontSize: '12px',
             color: 'var(--grafico-texto)',
           }}
-          cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+          cursor={{ fill: 'rgba(120,135,160,0.16)' }}
         />
         <Bar dataKey={dataKey} fill={color} radius={[4, 4, 0, 0]} />
       </RechartsBarChart>

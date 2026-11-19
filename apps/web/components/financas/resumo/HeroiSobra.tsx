@@ -12,7 +12,7 @@ import type { ResumoMes, SituacaoMes } from './montarResumoMes';
 const SITUACAO: Record<SituacaoMes, { texto: string; classe: string }> = {
   'no-controle': { texto: 'No controle', classe: 'border-[color-mix(in_oklch,var(--lap-h-positivo)_28%,transparent)] bg-[color-mix(in_oklch,var(--lap-h-positivo)_16%,transparent)] text-[var(--lap-h-positivo)]' },
   atencao: { texto: 'Atenção', classe: 'border-yellow/30 bg-yellow/[0.12] text-yellow' },
-  passou: { texto: 'Passou da renda', classe: 'border-red/30 bg-red/[0.14] text-[#fca5a5]' },
+  passou: { texto: 'Passou da renda', classe: 'border-red/30 bg-red/[0.14] text-[var(--lap-h-alerta)]' },
 };
 
 export interface HeroiSobraProps {
@@ -47,7 +47,7 @@ export function HeroiSobra({ resumo, escondido = false, compacto = false, sobra 
         data-testid="sobra-ate-agora-valor"
         className={clsx(
           'mt-2.5 whitespace-nowrap text-[clamp(2rem,9vw,2.5rem)] font-light leading-[1.1] tracking-[-0.035em] tabular-nums',
-          resumo.sobra < 0 && !escondido && 'text-[#fca5a5]',
+          resumo.sobra < 0 && !escondido && 'text-[var(--lap-h-alerta)]',
         )}
       >
         {escondido ? VALOR_OCULTO : <NumeroAnimado valor={resumo.sobra} formatar={formatBRLSinal} />}
@@ -84,7 +84,7 @@ export function HeroiSobra({ resumo, escondido = false, compacto = false, sobra 
       {!compacto && (
         <>
           <div
-            className="mt-3.5 h-1.5 overflow-hidden rounded-full bg-white/10"
+            className="mt-3.5 h-1.5 overflow-hidden rounded-full bg-text/10"
             role="progressbar"
             aria-label="Renda do mês usada"
             aria-valuenow={pctBarra}
@@ -125,7 +125,7 @@ export function EntrouSaiu({ resumo, escondido = false, className, vidro = false
       </div>
       <div className={celula}>
         <p className={clsx('lap-rotulo', rotulo)}>Saiu</p>
-        <p data-testid="saiu-valor" className="mt-1 whitespace-nowrap text-base font-medium tracking-[-0.02em] text-[#f8b4b4] tabular-nums">
+        <p data-testid="saiu-valor" className="mt-1 whitespace-nowrap text-base font-medium tracking-[-0.02em] text-[var(--lap-h-negativo)] tabular-nums">
           {escondido ? VALOR_OCULTO : formatBRL(resumo.saiu)}
         </p>
       </div>

@@ -276,7 +276,7 @@ function CampoSomarNoTotal({ value, onChange, id }: { value: boolean; onChange: 
   return (
     <label htmlFor={id} className="flex min-h-[44px] cursor-pointer items-center justify-between gap-3 rounded-lg border border-border bg-card2 px-3">
       <span className="text-sm text-text">Somar no total</span>
-      <input id={id} type="checkbox" role="switch" checked={value} onChange={(e) => onChange(e.target.checked)} className="h-5 w-5 accent-[#00e5ff]" />
+      <input id={id} type="checkbox" role="switch" checked={value} onChange={(e) => onChange(e.target.checked)} className="h-5 w-5 accent-accent" />
     </label>
   );
 }
@@ -322,7 +322,7 @@ function FormNova({ ordem, onFeito }: { ordem: number; onFeito: () => void }) {
         onChange={(e) => setDigitos(mascaraBRL(e.target.value).digitos)}
       />
       <label className="flex min-h-[44px] items-center gap-2 text-sm text-muted">
-        <input type="checkbox" checked={negativo} onChange={(e) => setNegativo(e.target.checked)} className="h-5 w-5 accent-[#f87171]" />
+        <input type="checkbox" checked={negativo} onChange={(e) => setNegativo(e.target.checked)} className="h-5 w-5 accent-red" />
         Está negativo (cheque especial)
       </label>
       <CampoSomarNoTotal id="carteira-total" value={noTotal} onChange={setNoTotal} />
@@ -407,7 +407,7 @@ function FormCorrigir({ carteira, saldo, hojeISO, onFeito }: { carteira: Carteir
         onChange={(e) => setDigitos(mascaraBRL(e.target.value).digitos)}
       />
       <label className="flex min-h-[44px] items-center gap-2 text-sm text-muted">
-        <input type="checkbox" checked={negativo} onChange={(e) => setNegativo(e.target.checked)} className="h-5 w-5 accent-[#f87171]" />
+        <input type="checkbox" checked={negativo} onChange={(e) => setNegativo(e.target.checked)} className="h-5 w-5 accent-red" />
         Está negativo
       </label>
       {digitos && diferenca !== 0 && (

@@ -102,7 +102,7 @@ export function EditarRefeicao({
           {modo === 'registrar' && ' Salvar marca a refeição como feita.'}
         </p>
         {linhas.map((l, i) => (
-          <fieldset key={i} className="border-b border-white/[0.07] pb-3">
+          <fieldset key={i} className="border-b border-text/[0.07] pb-3">
             <legend className="sr-only">Item {i + 1}</legend>
             <div className="flex items-center justify-between">
               <label className="block text-[10.5px] uppercase tracking-[1.6px] text-muted-text" htmlFor={`item-nome-${i}`}>
@@ -120,7 +120,7 @@ export function EditarRefeicao({
               onChange={(e) => mudar(i, 'nome', e.target.value)}
               placeholder="Ex.: arroz"
               maxLength={120}
-              className="h-11 w-full border-b border-white/25 bg-transparent text-[15px] text-text placeholder:text-muted-text focus:border-accent3 focus:outline-none"
+              className="h-11 w-full border-b border-text/25 bg-transparent text-[15px] text-text placeholder:text-muted-text focus:border-accent3 focus:outline-none"
             />
             <div className="mt-2 grid grid-cols-3 gap-3">
               {(
@@ -139,7 +139,7 @@ export function EditarRefeicao({
                       value={l[campo]}
                       onChange={(e) => mudar(i, campo, e.target.value)}
                       placeholder="—"
-                      className="h-11 w-full border-b border-white/25 bg-transparent text-[15px] font-bold text-text tabular-nums placeholder:font-normal placeholder:text-muted-text focus:border-accent3 focus:outline-none"
+                      className="h-11 w-full border-b border-text/25 bg-transparent text-[15px] font-bold text-text tabular-nums placeholder:font-normal placeholder:text-muted-text focus:border-accent3 focus:outline-none"
                     />
                     <span className="text-[12px]">{unidade}</span>
                   </span>

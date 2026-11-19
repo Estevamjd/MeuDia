@@ -210,7 +210,7 @@ export default function TreinosPage() {
     );
   } else if (descansoDoDia) {
     conteudo = (
-      <section className="border-b border-white/[0.07] px-5 py-[18px]">
+      <section className="border-b border-text/[0.07] px-5 py-[18px]">
         <p className="text-[10.5px] uppercase tracking-[1.6px] text-muted-text">{nomeDia}</p>
         <h2 className="mt-1 font-syne text-[22px] font-bold text-text">{descansoDoDia.nome}</h2>
         <p className="mt-1 text-[14.5px] text-muted-text">Sem musculação programada.</p>
@@ -254,7 +254,7 @@ export default function TreinosPage() {
             onExcluir={() => setExcluindo(e)}
           />
         ))}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.07] px-5 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-text/[0.07] px-5 py-3">
           <LinkAcao onClick={() => setAdicionando(true)}>+ exercício</LinkAcao>
           {sessaoAtiva && (
             <button
@@ -276,7 +276,7 @@ export default function TreinosPage() {
       <Cabecalho titulo="Plano de treino" contexto={contexto} />
       <Subabas />
 
-      <div className="border-b border-white/[0.07] px-5 py-4">
+      <div className="border-b border-text/[0.07] px-5 py-4">
         <SeletorDias dias={dias} selecionado={dia} hoje={hoje} onSelecionar={setDia} />
       </div>
 

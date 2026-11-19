@@ -38,7 +38,7 @@ export function SeletorDias({ dias, selecionado, hoje, onSelecionar }: SeletorDi
             className={clsx(
               'relative flex h-11 items-center justify-center rounded font-syne text-[15px] font-bold',
               'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent3',
-              ativo ? 'bg-accent3 text-[#04201a]' : dia.descanso ? 'text-muted-text line-through' : 'text-text',
+              ativo ? 'bg-accent3 text-accent-fg' : dia.descanso ? 'text-muted-text line-through' : 'text-text',
             )}
           >
             {dia.letra}

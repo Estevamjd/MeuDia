@@ -50,7 +50,7 @@ export function LinhaTempo({
               />
             </button>
           </span>
-          <div className={clsx('min-w-0 py-[13px]', i < entradas.length - 1 && 'border-b border-white/[0.07]')}>
+          <div className={clsx('min-w-0 py-[13px]', i < entradas.length - 1 && 'border-b border-text/[0.07]')}>
             <div className="flex items-baseline justify-between gap-3">
               <p className="min-w-0 text-[15px] text-text">
                 <span className="font-bold">{e.nome}</span>

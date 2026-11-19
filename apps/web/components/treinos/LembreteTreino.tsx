@@ -14,7 +14,7 @@ export function LembreteTreino({ ligado, salvando, onAlterar }: LembreteTreinoPr
   const indisponivel = ligado === null;
   const marcado = ligado === true;
   return (
-    <section className="border-b border-white/[0.07] px-5 py-[18px]" aria-labelledby="lembrete-treino-titulo">
+    <section className="border-b border-text/[0.07] px-5 py-[18px]" aria-labelledby="lembrete-treino-titulo">
       <p className="text-[10.5px] uppercase tracking-[1.6px] text-muted-text">Lembrete</p>
       <div className="mt-2 flex items-center justify-between gap-4">
         <div className="min-w-0">

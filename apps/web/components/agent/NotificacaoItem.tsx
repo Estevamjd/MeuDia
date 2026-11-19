@@ -58,7 +58,7 @@ export function NotificacaoItem({
       className={clsx(
         'relative rounded-lg border-l-[3px] p-3 transition-all',
         tipoStyles[notificacao.tipo],
-        !notificacao.lida && 'ring-1 ring-white/5',
+        !notificacao.lida && 'ring-1 ring-text/5',
       )}
       onClick={() => {
         if (!notificacao.lida) onMarcarLida(notificacao.id);
@@ -111,7 +111,7 @@ export function NotificacaoItem({
                 'rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors',
                 i === 0
                   ? 'bg-accent/20 text-accent hover:bg-accent/30'
-                  : 'text-muted hover:text-text hover:bg-white/5',
+                  : 'text-muted hover:text-text hover:bg-text/5',
               )}
             >
               {acao.label}

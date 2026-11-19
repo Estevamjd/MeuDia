@@ -77,7 +77,7 @@ export function ExercicioCaderno({
     setDigitado((atual) => ({ ...atual, [n]: { ...atual[n], [campo]: valor } }));
 
   return (
-    <section className="border-b border-white/[0.07] px-5 py-[18px]" aria-labelledby={`nome-${exercicio.id}`}>
+    <section className="border-b border-text/[0.07] px-5 py-[18px]" aria-labelledby={`nome-${exercicio.id}`}>
       <div className="flex items-start justify-between gap-3">
         <button
           type="button"
@@ -113,7 +113,7 @@ export function ExercicioCaderno({
               <col className="w-[44px]" />
             </colgroup>
             <thead>
-              <tr className="border-b border-white/[0.14] text-left text-[10px] uppercase tracking-[1.4px] text-muted-text">
+              <tr className="border-b border-text/[0.14] text-left text-[10px] uppercase tracking-[1.4px] text-muted-text">
                 <th scope="col" className="pb-2 font-normal">Série</th>
                 <th scope="col" className="pb-2 font-normal">Anterior</th>
                 <th scope="col" className="pb-2 font-normal">Kg</th>
@@ -131,7 +131,7 @@ export function ExercicioCaderno({
                 const textoAnterior = formatarSerieAnterior(anterior);
                 const concluida = !!feita?.concluido;
                 return (
-                  <tr key={n} className="border-b border-white/[0.07]">
+                  <tr key={n} className="border-b border-text/[0.07]">
                     <th scope="row" className="py-1 text-left font-syne font-bold text-text">{n}</th>
                     <td className="py-1">
                       {anterior ? (
@@ -160,7 +160,7 @@ export function ExercicioCaderno({
                         value={kg}
                         placeholder="—"
                         onChange={(e) => digitar(n, 'kg', e.target.value)}
-                        className="h-11 w-full border-b border-white/25 bg-transparent font-bold text-text placeholder:text-muted-text focus:border-accent3 focus:outline-none"
+                        className="h-11 w-full border-b border-text/25 bg-transparent font-bold text-text placeholder:text-muted-text focus:border-accent3 focus:outline-none"
                       />
                     </td>
                     <td className="py-1 pr-2">
@@ -171,7 +171,7 @@ export function ExercicioCaderno({
                         value={reps}
                         placeholder="—"
                         onChange={(e) => digitar(n, 'reps', e.target.value)}
-                        className="h-11 w-full border-b border-white/25 bg-transparent font-bold text-text placeholder:text-muted-text focus:border-accent3 focus:outline-none"
+                        className="h-11 w-full border-b border-text/25 bg-transparent font-bold text-text placeholder:text-muted-text focus:border-accent3 focus:outline-none"
                       />
                     </td>
                     <td className="py-1 text-center">
@@ -196,7 +196,7 @@ export function ExercicioCaderno({
                           aria-hidden="true"
                           className={clsx(
                             'flex h-5 w-5 items-center justify-center rounded-[3px] text-[13px] font-bold',
-                            concluida ? 'bg-accent3 text-[#04201a]' : 'border-[1.5px] border-muted',
+                            concluida ? 'bg-accent3 text-accent-fg' : 'border-[1.5px] border-muted',
                           )}
                         >
                           {concluida ? '✓' : ''}

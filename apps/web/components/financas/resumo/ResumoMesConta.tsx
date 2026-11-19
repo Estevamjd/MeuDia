@@ -12,7 +12,7 @@ import { situacaoDo, type SituacaoMes } from './montarResumoMes';
 const SITUACAO: Record<SituacaoMes, { texto: string; classe: string }> = {
   'no-controle': { texto: 'No controle', classe: 'border-[color-mix(in_oklch,var(--lap-h-positivo)_28%,transparent)] bg-[color-mix(in_oklch,var(--lap-h-positivo)_16%,transparent)] text-[var(--lap-h-positivo)]' },
   atencao: { texto: 'Atenção', classe: 'border-yellow/30 bg-yellow/[0.12] text-yellow' },
-  passou: { texto: 'Passou da renda', classe: 'border-red/30 bg-red/[0.14] text-[#fca5a5]' },
+  passou: { texto: 'Passou da renda', classe: 'border-red/30 bg-red/[0.14] text-[var(--lap-h-alerta)]' },
 };
 
 export interface ResumoMesContaProps {
@@ -57,7 +57,7 @@ export function ResumoMesConta({ sobra, escondido = false }: ResumoMesContaProps
           <dt className="lap-texto-2 flex items-center gap-2">
             Você recebe
             {sobra.previsao && (
-              <span data-testid="renda-previsao" className="lap-texto-3 rounded-full border border-white/15 px-1.5 text-[11px] leading-[18px]">
+              <span data-testid="renda-previsao" className="lap-texto-3 rounded-full border border-text/15 px-1.5 text-[11px] leading-[18px]">
                 previsão
               </span>
             )}
@@ -79,7 +79,7 @@ export function ResumoMesConta({ sobra, escondido = false }: ResumoMesContaProps
                 <ChevronDown size={16} aria-hidden="true" className={clsx('transition-transform', contasAbertas && 'rotate-180')} />
                 <span className="sr-only">{contasAbertas ? '(esconder lista)' : '(ver lista)'}</span>
               </span>
-              <span data-testid="resumo-contas-fixas" className="whitespace-nowrap font-medium tabular-nums text-[#f8b4b4]">
+              <span data-testid="resumo-contas-fixas" className="whitespace-nowrap font-medium tabular-nums text-[var(--lap-h-negativo)]">
                 {escondido ? VALOR_OCULTO : `− ${formatBRL(sobra.totalContasFixas)}`}
               </span>
             </button>
@@ -91,7 +91,7 @@ export function ResumoMesConta({ sobra, escondido = false }: ResumoMesContaProps
           </dd>
           {contasAbertas && (
             <dd>
-              <ul id={listaId} aria-label={`Contas fixas de ${mes}`} className="lap-vidro mt-2 divide-y divide-white/10 px-3">
+              <ul id={listaId} aria-label={`Contas fixas de ${mes}`} className="lap-vidro mt-2 divide-y divide-text/10 px-3">
                 {sobra.contasFixas.map((c) => (
                   <li key={c.id} className="flex items-center justify-between gap-2 py-2 text-[13px]">
                     <span className="min-w-0">
@@ -122,19 +122,19 @@ export function ResumoMesConta({ sobra, escondido = false }: ResumoMesContaProps
           <dt className="lap-texto-2">
             Gastos do mês <span className="lap-texto-3 text-[12px]">(fora as contas)</span>
           </dt>
-          <dd data-testid="resumo-gastos" className="whitespace-nowrap font-medium tabular-nums text-[#f8b4b4]">
+          <dd data-testid="resumo-gastos" className="whitespace-nowrap font-medium tabular-nums text-[var(--lap-h-negativo)]">
             {escondido ? VALOR_OCULTO : `− ${formatBRL(sobra.gastosExtras)}`}
           </dd>
         </div>
       </dl>
 
-      <div className="mt-2 flex items-end justify-between gap-2 border-t border-white/10 pt-3">
+      <div className="mt-2 flex items-end justify-between gap-2 border-t border-text/10 pt-3">
         <p className="lap-rotulo lap-texto-3 pb-1.5 tracking-[0.08em]">Deve sobrar</p>
         <p
           data-testid="previsao-fim-mes-valor"
           className={clsx(
             'whitespace-nowrap text-[clamp(1.75rem,8vw,2.25rem)] font-light leading-[1.1] tracking-[-0.035em] tabular-nums',
-            sobra.valor < 0 && !escondido ? 'text-[#fca5a5]' : 'text-[var(--lap-h-positivo)]',
+            sobra.valor < 0 && !escondido ? 'text-[var(--lap-h-alerta)]' : 'text-[var(--lap-h-positivo)]',
           )}
         >
           {escondido ? VALOR_OCULTO : <NumeroAnimado valor={sobra.valor} formatar={formatBRLSinal} />}
@@ -142,7 +142,7 @@ export function ResumoMesConta({ sobra, escondido = false }: ResumoMesContaProps
       </div>
 
       <div
-        className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10"
+        className="mt-3 h-1.5 overflow-hidden rounded-full bg-text/10"
         role="progressbar"
         aria-label="Renda do mês comprometida"
         aria-valuenow={pctBarra}

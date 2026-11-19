@@ -28,15 +28,15 @@ export function LineChart({
   return (
     <ResponsiveContainer width="100%" height={height}>
       <RechartsLineChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(120,135,160,0.16)" />
         <XAxis
           dataKey={xAxisKey}
-          tick={{ fill: '#65657a', fontSize: 11 }}
-          axisLine={{ stroke: 'rgba(255,255,255,0.07)' }}
+          tick={{ fill: '#7a8599', fontSize: 11 }}
+          axisLine={{ stroke: 'rgba(120,135,160,0.16)' }}
           tickLine={false}
         />
         <YAxis
-          tick={{ fill: '#65657a', fontSize: 11 }}
+          tick={{ fill: '#7a8599', fontSize: 11 }}
           axisLine={false}
           tickLine={false}
         />

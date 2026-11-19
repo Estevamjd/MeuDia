@@ -121,7 +121,7 @@ export function OnboardingSaude({ inicial, metasAnteriores, salvando, erro, onCo
                 role="radio"
                 aria-checked={ativo}
                 onClick={() => setNivel(n.valor)}
-                className="flex min-h-11 w-full items-center justify-between gap-3 border-b border-white/[0.07] py-[13px] text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent3"
+                className="flex min-h-11 w-full items-center justify-between gap-3 border-b border-text/[0.07] py-[13px] text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent3"
               >
                 <span className="text-[14.5px] text-muted-text">
                   <span className={clsx('text-[16px] font-bold', ativo ? 'text-accent3' : 'text-text')}>{n.nome}</span>
@@ -131,7 +131,7 @@ export function OnboardingSaude({ inicial, metasAnteriores, salvando, erro, onCo
                   aria-hidden="true"
                   className={clsx(
                     'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[12px] font-bold',
-                    ativo ? 'bg-accent3 text-[#04201a]' : 'border-[1.5px] border-muted',
+                    ativo ? 'bg-accent3 text-accent-fg' : 'border-[1.5px] border-muted',
                   )}
                 >
                   {ativo ? '✓' : ''}
@@ -251,7 +251,7 @@ function CampoLinha({
       <label htmlFor={id} className="block text-[10.5px] uppercase tracking-[1.6px] text-muted-text">
         {rotulo}
       </label>
-      <div className={clsx('mt-1 flex items-baseline gap-2 border-b', erro ? 'border-red border-b-2' : 'border-white/25 focus-within:border-accent3')}>
+      <div className={clsx('mt-1 flex items-baseline gap-2 border-b', erro ? 'border-red border-b-2' : 'border-text/25 focus-within:border-accent3')}>
         <input
           id={id}
           inputMode={inputMode}
@@ -279,7 +279,7 @@ function MetaEditavel({
   const [erro, setErro] = useState<string | null>(null);
   const idCampo = `meta-${rotulo.split(' ')[0]!.toLowerCase()}`;
   return (
-    <section className="border-b border-white/[0.07] px-5 py-[18px]">
+    <section className="border-b border-text/[0.07] px-5 py-[18px]">
       <Rotulo>{rotulo}</Rotulo>
       {editando ? (
         <form

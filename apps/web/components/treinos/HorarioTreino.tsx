@@ -25,7 +25,7 @@ export function HorarioTreino({ horario, salvando, onSalvar }: HorarioTreinoProp
   };
 
   return (
-    <section className="border-b border-white/[0.07] px-5 py-[18px]">
+    <section className="border-b border-text/[0.07] px-5 py-[18px]">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <label htmlFor="horario-treino" className="text-[14.5px] font-medium text-text">
@@ -46,7 +46,7 @@ export function HorarioTreino({ horario, salvando, onSalvar }: HorarioTreinoProp
           onKeyDown={(e) => {
             if (e.key === 'Enter') salvar();
           }}
-          className="h-11 shrink-0 rounded-md border border-white/[0.12] bg-transparent px-3 font-syne text-[15px] text-text tabular-nums disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent3"
+          className="h-11 shrink-0 rounded-md border border-text/[0.12] bg-transparent px-3 font-syne text-[15px] text-text tabular-nums disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent3"
         />
       </div>
     </section>

@@ -8,7 +8,7 @@ import { Rotulo } from '../caderno';
  */
 export function LembreteIndisponivel({ id, titulo }: { id: string; titulo: string }) {
   return (
-    <section className="border-b border-white/[0.07] px-5 py-[18px]" aria-labelledby={id}>
+    <section className="border-b border-text/[0.07] px-5 py-[18px]" aria-labelledby={id}>
       <Rotulo>Lembrete</Rotulo>
       <div className="mt-2 flex items-center justify-between gap-4">
         <div className="min-w-0">

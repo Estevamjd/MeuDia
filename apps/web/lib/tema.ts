@@ -11,7 +11,7 @@ export const TEMA_PADRAO: PreferenciaTema = 'escuro';
 export const PREFERENCIAS_TEMA: readonly PreferenciaTema[] = ['claro', 'escuro', 'sistema'];
 
 /** Cor da barra do navegador/PWA em cada modo (= fundo da página). */
-export const COR_BARRA: Record<ModoTema, string> = { dark: '#050a16', light: '#f4f6fa' };
+export const COR_BARRA: Record<ModoTema, string> = { dark: '#050a16', light: '#f6f8fb' };
 
 export function lerPreferencia(valor: unknown): PreferenciaTema | null {
   return typeof valor === 'string' && (PREFERENCIAS_TEMA as readonly string[]).includes(valor) ? (valor as PreferenciaTema) : null;

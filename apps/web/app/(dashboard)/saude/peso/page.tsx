@@ -270,7 +270,7 @@ function FormCampos({
           <label htmlFor={c.id} className="block text-[10.5px] uppercase tracking-[1.6px] text-muted-text">
             {c.rotulo}
           </label>
-          <div className="mt-1 flex items-baseline gap-2 border-b border-white/25 focus-within:border-accent3">
+          <div className="mt-1 flex items-baseline gap-2 border-b border-text/25 focus-within:border-accent3">
             <input
               id={c.id}
               type={c.tipo ?? 'text'}

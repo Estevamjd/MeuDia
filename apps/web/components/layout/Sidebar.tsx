@@ -85,9 +85,9 @@ export function Sidebar({ onSignOut, onNavigate, onOpenAgent, userName }: Sideba
                     };
                   }
                   return {
-                    background: 'rgba(0,229,255,0.12)',
+                    background: 'rgb(var(--c-brilho)/0.12)',
                     color: 'var(--accent)',
-                    borderColor: 'rgba(0,229,255,0.22)',
+                    borderColor: 'rgb(var(--c-brilho)/0.22)',
                   };
                 })();
 

@@ -24,6 +24,8 @@
   --c-muted: 148 163 184;
   --c-muted-text: 168 180 199;
   --c-trilho: 21 31 49;
+  /* Brilho do accent (sombras e halos): ciano no escuro, azul-petróleo no claro. */
+  --c-brilho: 0 229 255;
   --barra-fundo: rgb(4 8 19 / 0.88);
   --topo-fundo: rgba(5, 10, 22, 0.82);
   --grafico-tooltip: #16161f;
@@ -64,6 +66,9 @@
   --lap-h-texto-2: oklch(0.95 0.03 205 / 0.84);
   --lap-h-texto-3: oklch(0.9 0.04 205 / 0.62);
   --lap-h-positivo: oklch(0.9 0.15 200);
+  /* Saída e alerta em números do bloco principal e dos cartões ao lado (rosa no escuro, vermelho no claro). */
+  --lap-h-negativo: #f8b4b4;
+  --lap-h-alerta: #fca5a5;
   --lap-luz-aresta: oklch(1 0 0 / 0.06);
   --lap-luz-topo: oklch(1 0 0 / 0.025);
   --lap-borda-fina: oklch(1 0 0 / 0.07);
@@ -206,7 +211,7 @@
   display: flex; justify-content: space-between;
   font-size: 11px; color: var(--muted); margin-bottom: 5px;
 }
-.pbar  { height: 5px; background: rgba(255,255,255,0.07); border-radius: 10px; overflow: hidden; }
+.pbar  { height: 5px; background: rgb(var(--c-text) / 0.07); border-radius: 10px; overflow: hidden; }
 .pfill { height: 100%; border-radius: 10px; transition: width 1s ease; }
 
 /* Section title */
@@ -216,11 +221,11 @@
 .alist { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .aitem {
   display: flex; align-items: center; gap: 11px;
-  padding: 9px 11px; background: rgba(255,255,255,0.025);
+  padding: 9px 11px; background: rgb(var(--c-text) / 0.025);
   border-radius: 10px; border-left: 3px solid transparent;
   transition: background 0.15s;
 }
-.aitem:hover  { background: rgba(255,255,255,0.05); }
+.aitem:hover  { background: rgb(var(--c-text) / 0.05); }
 .aitem.ur { border-left-color: var(--red); }
 .aitem.td { border-left-color: var(--accent); }
 .aitem.dn { border-left-color: var(--green); opacity: .55; }
@@ -236,7 +241,7 @@
 .hitem {
   aspect-ratio: 1; border-radius: 11px;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 4px; background: rgba(255,255,255,0.035); border: 1px solid var(--border);
+  gap: 4px; background: rgb(var(--c-text) / 0.035); border: 1px solid var(--border);
   cursor: pointer; transition: all 0.18s; font-size: 20px;
 }
 .hitem.done { background: rgba(74,222,128,0.12); border-color: rgba(74,222,128,0.3); }
@@ -245,14 +250,14 @@
 
 /* Meds */
 .mlist { display: flex; flex-direction: column; gap: 7px; margin-top: 10px; }
-.mitem { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 9px; background: rgba(255,255,255,0.025); }
+.mitem { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 9px; background: rgb(var(--c-text) / 0.025); }
 .mdot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .mname { flex: 1; font-size: 13px; }
 .mtime { font-size: 10.5px; color: var(--muted); }
 
 /* Assinaturas */
 .slist { display: flex; flex-direction: column; gap: 7px; margin-top: 10px; }
-.sitem { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 9px; background: rgba(255,255,255,0.025); }
+.sitem { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 9px; background: rgb(var(--c-text) / 0.025); }
 .sico  { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
 .sinf  { flex: 1; }
 .snm   { font-size: 13px; font-weight: 500; }
@@ -388,69 +393,123 @@
 }
 
 /* ══════════════════════════════════════════════════════════════
-   Tema claro (Configurações › Aparência). O bloco principal (.lap-heroi) continua um bloco escuro em azul-petróleo,
-   com texto branco, nos dois temas; o resto da página fica claro.
+   Tema claro (Configurações › Aparência), na mesma linguagem do Astro G claro do Mestres CRM:
+   - o bloco principal (.lap-heroi) continua o MESMO material azul-noite com luz ciano, anéis e grão;
+   - a página fica num branco frio com o brilho ciano do topo; os cartões ficam brancos com aresta de luz
+     no topo e sombra suave puxada para o azul (nada de cartão chapado);
+   - o ciano vira azul-petróleo (#0e7490) onde é texto ou botão sobre branco (contraste ≥ 4,5:1).
    ══════════════════════════════════════════════════════════════ */
 html[data-mode='light'] {
-  --c-bg: 244 246 250;
+  --c-bg: 246 248 251;
   --c-bg-deep: 255 255 255;
   --c-surface: 255 255 255;
   --c-card: 255 255 255;
-  --c-card2: 238 242 247;
-  --c-border: 220 227 236;
-  --c-campo: 255 255 255;
+  --c-card2: 241 245 249;
+  --c-border: 226 232 240;
+  --c-campo: 248 250 252;
   --c-accent: 14 116 144;
   --c-accent-fg: 255 255 255;
   --c-accent2: 4 120 87;
-  --c-accent3: 8 145 178;
+  /* accent3 = hover/realce: mais fundo que o accent no claro (texto branco ≥ 7:1). */
+  --c-accent3: 21 94 117;
   --c-orange: 180 83 9;
   --c-green: 4 120 87;
   --c-green-dark: 21 128 61;
   --c-yellow: 161 98 7;
   --c-red: 220 38 38;
   --c-text: 11 18 32;
-  --c-muted: 82 96 117;
+  --c-muted: 91 103 122;
   --c-muted-text: 71 85 105;
-  --c-trilho: 230 235 242;
-  --barra-fundo: rgb(255 255 255 / 0.92);
-  --topo-fundo: rgba(244, 246, 250, 0.86);
+  --c-trilho: 232 237 243;
+  --c-brilho: 8 145 178;
+  --barra-fundo: rgb(255 255 255 / 0.9);
+  --topo-fundo: rgba(246, 248, 251, 0.86);
   --grafico-tooltip: #ffffff;
   --grafico-borda: rgba(15, 23, 42, 0.12);
   --grafico-texto: #0b1220;
   color-scheme: light;
 
-  --bg: #f4f6fa;
+  --bg: #f6f8fb;
   --bg-deep: #ffffff;
   --surface: #ffffff;
   --card: #ffffff;
-  --card2: #eef2f7;
-  --border: #dce3ec;
+  --card2: #f1f5f9;
+  --border: #e2e8f0;
   --accent: #0e7490;
   --accent-fg: #ffffff;
-  --accent-soft: rgba(14, 116, 144, 0.1);
-  --accent-soft-2: rgba(14, 116, 144, 0.22);
+  --accent-soft: rgba(8, 145, 178, 0.1);
+  --accent-soft-2: rgba(8, 145, 178, 0.18);
   --accent2: #047857;
-  --accent3: #0891b2;
+  --accent3: #155e75;
   --text: #0b1220;
-  --muted: #526075;
+  --muted: #5b677a;
   --muted-text: #475569;
-  --trilho: #e6ebf2;
+  --trilho: #e8edf3;
   --green: #047857;
   --yellow: #a16207;
   --red: #dc2626;
   --orange: #b45309;
 
-  /* Bloco principal em azul-petróleo (texto branco 5:1 ou mais). */
-  --lap-m-fundo: oklch(0.36 0.07 222);
-  --lap-m-vizinho: oklch(0.3 0.06 230);
-  --lap-m-meio: oklch(0.48 0.09 215);
-  --lap-m-luz: oklch(0.6 0.11 205);
-  --lap-luz-aresta: rgba(255, 255, 255, 0.7);
-  --lap-luz-topo: transparent;
-  --lap-borda-fina: rgba(15, 23, 42, 0.08);
-  --lap-sombra-cartao: 0 1px 2px rgba(15, 23, 42, 0.06), 0 10px 24px -16px rgba(15, 23, 42, 0.18);
+  /* Superfícies: aresta de luz branca no topo + sombra física suave, tingida de azul (Mestres CRM claro). */
+  --lap-luz-aresta: oklch(1 0 0 / 0.9);
+  --lap-luz-topo: oklch(1 0 0 / 0);
+  --lap-borda-fina: oklch(0.25 0.03 235 / 0.1);
+  --lap-sombra-cartao: inset 0 1px 0 var(--lap-luz-aresta), 0 1px 2px oklch(0.3 0.04 235 / 0.07), 0 16px 32px -20px oklch(0.3 0.06 230 / 0.18);
+  --lap-h-positivo: #0e7490;
+  --lap-h-negativo: #c43232;
+  --lap-h-alerta: #c43232;
+  /* Sem estrelas no claro: só o brilho ciano do topo. */
   --astrog-ceu: none;
 }
-html[data-mode='light'] .lap-heroi { background-color: #164e63; box-shadow: 0 30px 60px -36px rgba(8, 145, 178, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.2); }
+html[data-mode='light'] .astrog-ceu {
+  background-image: radial-gradient(90% 50% at 50% -10%, rgba(8, 145, 178, 0.12), transparent 64%),
+    radial-gradient(60% 40% at 100% 0%, rgba(0, 229, 255, 0.08), transparent 70%);
+}
+html[data-mode='light'] .bg-glow-orbs::before {
+  background: radial-gradient(80% 60% at 50% -12%, rgba(8, 145, 178, 0.1), transparent 62%);
+}
+/* Cartões do app (bg-card com borda) ganham a mesma aresta + sombra dos .lap-cartao. */
+html[data-mode='light'] .bg-card.border,
+html[data-mode='light'] .bg-card.rounded-card,
+html[data-mode='light'] .bg-card.rounded-xl,
+html[data-mode='light'] .bg-card.rounded-2xl {
+  border-color: var(--lap-borda-fina);
+  box-shadow: var(--lap-sombra-cartao);
+}
+html[data-mode='light'] .lap-cartao-alerta {
+  box-shadow: var(--lap-sombra-cartao), inset 0 0 0 1px rgba(180, 83, 9, 0.35);
+}
+/* O bloco principal é um "pedaço do escuro" dentro do claro: devolve os tokens escuros para o que mora dentro dele. */
+html[data-mode='light'] .lap-heroi {
+  --c-text: 245 246 248;
+  --c-muted: 148 163 184;
+  --c-muted-text: 168 180 199;
+  --c-accent: 0 229 255;
+  --c-accent-fg: 6 16 28;
+  --c-border: 28 38 56;
+  --c-card: 11 18 32;
+  --c-card2: 16 24 39;
+  --c-trilho: 21 31 49;
+  --c-red: 248 113 113;
+  --c-green: 52 211 153;
+  --c-yellow: 250 178 25;
+  --c-orange: 250 178 25;
+  --c-brilho: 0 229 255;
+  --lap-h-positivo: oklch(0.9 0.15 200);
+  --lap-h-negativo: #f8b4b4;
+  --lap-h-alerta: #fca5a5;
+  --text: #f5f6f8;
+  --muted: #94a3b8;
+  --accent: #00e5ff;
+  --border: #1c2638;
+  --card: #0b1220;
+  --trilho: #151f31;
+  /* Mesma sombra-halo do escuro, um pouco mais leve sobre o branco. */
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.22),
+    inset 0 0 0 1px oklch(1 0 0 / 0.07),
+    0 36px 64px -36px oklch(0.55 0.13 215 / 0.55),
+    0 2px 6px oklch(0.25 0.05 235 / 0.18);
+}
 html[data-mode='light'] ::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.15); }
 html[data-trocando-tema] *, html[data-trocando-tema] *::before, html[data-trocando-tema] *::after { transition: none !important; }

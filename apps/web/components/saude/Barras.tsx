@@ -32,7 +32,7 @@ export function BarraCalorias({ consumido, meta, itensSemValor = 0 }: { consumid
         )}
       </div>
       <div
-        className="mt-3 flex h-[3px] w-full overflow-hidden bg-white/10"
+        className="mt-3 flex h-[3px] w-full overflow-hidden bg-text/10"
         role="progressbar"
         aria-label="Calorias do dia"
         aria-valuemin={0}
@@ -81,7 +81,7 @@ export function BarraProteina({ consumido, min, max }: { consumido: number; min:
         </p>
         {naFaixa && <p className="shrink-0 text-[13px] text-green">{min === max ? 'na meta' : 'na faixa'}</p>}
       </div>
-      <div className="relative mt-3 h-[3px] w-full bg-white/10" aria-hidden="true">
+      <div className="relative mt-3 h-[3px] w-full bg-text/10" aria-hidden="true">
         <span className="absolute inset-y-0 left-0 bg-[#9a9ab0]" style={{ width: `${pctPreenchido * 100}%` }} />
         {temMeta && (
           <span className="absolute inset-y-0 bg-green/60" style={{ left: `${inicioFaixa * 100}%`, width: `${larguraFaixa * 100}%` }} />

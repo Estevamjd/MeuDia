@@ -63,7 +63,7 @@ export default function RelatorioPage() {
         </div>
       ) : resumo.vazio ? (
         <section className="lap-cartao flex flex-col items-center gap-3 px-6 py-10 text-center">
-          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-trilho text-accent shadow-[0_0_24px_-8px_rgba(0,229,255,0.6)]">
+          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-trilho text-accent shadow-[0_0_24px_-8px_rgb(var(--c-brilho)/0.6)]">
             <FileText size={22} aria-hidden="true" />
           </span>
           <h2 className="text-base font-medium text-text">Nada em {nomeMes} ainda</h2>

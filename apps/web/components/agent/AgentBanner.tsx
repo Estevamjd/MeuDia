@@ -83,7 +83,7 @@ export function AgentBanner({ contexto, className, onDismiss }: AgentBannerProps
                 'flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors',
                 i === 0
                   ? 'bg-accent/20 text-accent hover:bg-accent/30'
-                  : 'text-muted hover:text-text hover:bg-white/5',
+                  : 'text-muted hover:text-text hover:bg-text/5',
               )}
             >
               {acao.label}

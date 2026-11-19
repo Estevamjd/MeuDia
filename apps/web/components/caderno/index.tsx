@@ -44,7 +44,7 @@ export const SUBABAS_SAUDE = [
 export function Subabas() {
   const pathname = usePathname() ?? '';
   return (
-    <nav aria-label="Saúde e treino" className="border-b border-white/[0.07] px-5">
+    <nav aria-label="Saúde e treino" className="border-b border-text/[0.07] px-5">
       <ul className="flex gap-7">
         {SUBABAS_SAUDE.map((aba) => {
           const ativa = pathname === aba.href;
@@ -80,7 +80,7 @@ export function Rotulo({ children, id, className }: { children: ReactNode; id?: 
 
 export function Secao({ children, rotulo, className }: { children: ReactNode; rotulo?: ReactNode; className?: string }) {
   return (
-    <section className={clsx('border-b border-white/[0.07] px-5 py-[18px]', className)}>
+    <section className={clsx('border-b border-text/[0.07] px-5 py-[18px]', className)}>
       {rotulo !== undefined && <Rotulo className="mb-2">{rotulo}</Rotulo>}
       {children}
     </section>
@@ -116,7 +116,7 @@ export function LinkAcao({
 }
 
 export const classeBotaoCheio =
-  'inline-flex min-h-11 w-full items-center justify-center rounded bg-accent3 px-5 py-[13px] font-dm text-[14px] font-bold tracking-normal text-[#04201a] disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent3';
+  'inline-flex min-h-11 w-full items-center justify-center rounded bg-accent3 px-5 py-[13px] font-dm text-[14px] font-bold tracking-normal text-accent-fg disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent3';
 
 export const classeBotaoContorno =
   'inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded border-[1.5px] border-accent3 px-4 font-dm text-[14px] font-bold tracking-normal text-accent3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent3';
@@ -130,7 +130,7 @@ export function Chip({ ativo, onClick, children }: { ativo: boolean; onClick: ()
       onClick={onClick}
       className={clsx(
         'min-h-11 whitespace-nowrap rounded border px-4 font-dm text-[14px] tracking-normal focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent3',
-        ativo ? 'border-[1.5px] border-accent3 font-bold text-accent3' : 'border-white/[0.14] text-text',
+        ativo ? 'border-[1.5px] border-accent3 font-bold text-accent3' : 'border-text/[0.14] text-text',
       )}
     >
       {children}
@@ -158,7 +158,7 @@ export function VazioCaderno({
   onAcao?: () => void;
 }) {
   return (
-    <section className="border-b border-white/[0.07] px-5 pb-7 pt-8" data-vazio-caderno="">
+    <section className="border-b border-text/[0.07] px-5 pb-7 pt-8" data-vazio-caderno="">
       <Rotulo>{rotulo}</Rotulo>
       <h2 className="mt-1.5 font-syne text-[22px] font-bold leading-tight text-text">{titulo}</h2>
       <p className="mt-1.5 text-[14.5px] text-muted-text">{explicacao}</p>

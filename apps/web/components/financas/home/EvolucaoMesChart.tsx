@@ -58,7 +58,7 @@ export default function EvolucaoMesChart({ pontos }: { pontos: PontoEvolucao[] }
               <CartesianGrid stroke={GRADE} vertical={false} />
               <XAxis {...eixoX} />
               <YAxis {...eixoY} allowDecimals={false} />
-              <Tooltip {...tooltip} cursor={{ fill: 'rgba(255,255,255,0.04)' }} formatter={(v: number) => [formatBRL(v), 'Gasto']} labelFormatter={(d) => `Dia ${d}`} />
+              <Tooltip {...tooltip} cursor={{ fill: 'rgba(120,135,160,0.16)' }} formatter={(v: number) => [formatBRL(v), 'Gasto']} labelFormatter={(d) => `Dia ${d}`} />
               <Bar dataKey="gasto" fill={COR_GASTO} radius={[4, 4, 0, 0]} maxBarSize={14} isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>

@@ -341,7 +341,7 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
           data-testid="agente-alca"
         >
           <div className="flex justify-center pb-1 pt-2 md:hidden" aria-hidden="true">
-            <span className="h-1.5 w-10 rounded-full bg-white/20" />
+            <span className="h-1.5 w-10 rounded-full bg-text/20" />
           </div>
           <div className="flex items-center justify-between border-b border-border py-1 pl-4 pr-2 md:py-2">
             <div className="flex items-center gap-2.5">

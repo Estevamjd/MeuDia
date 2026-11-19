@@ -58,8 +58,8 @@ test('Aparência: Claro vale na hora, sem piscar ao recarregar, e segue a conta 
   await foto(page, 'config-escuro');
   await grupo.getByRole('radio', { name: 'Claro' }).click();
   expect(await modo(page)).toBe('light');
-  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(244, 246, 250)');
-  await expect(page.locator('meta[name="theme-color"]').first()).toHaveAttribute('content', '#f4f6fa');
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(246, 248, 251)');
+  await expect(page.locator('meta[name="theme-color"]').first()).toHaveAttribute('content', '#f6f8fb');
   await foto(page, 'config-claro');
 
   // Recarregar: já nasce claro (antes da hidratação).

@@ -59,7 +59,7 @@ function BottomNavFinancas() {
               aria-current={ativo ? 'page' : undefined}
               className={clsx(ABA, ativo ? 'text-accent' : 'text-muted hover:text-text')}
             >
-              <Icone size={20} aria-hidden="true" className={ativo ? 'drop-shadow-[0_0_8px_rgba(0,229,255,0.55)]' : undefined} />
+              <Icone size={20} aria-hidden="true" className={ativo ? 'drop-shadow-[0_0_8px_rgb(var(--c-brilho)/0.55)]' : undefined} />
               <span>{item.label}</span>
             </Link>
           );
@@ -88,7 +88,7 @@ function BottomNavPadrao() {
       {/* Menu Mais expandido */}
       {maisAberto && (
         <div
-          className="fixed bottom-16 left-0 right-0 z-modal mx-4 mb-2 rounded-2xl border border-white/10 bg-card p-3 shadow-2xl md:hidden"
+          className="fixed bottom-16 left-0 right-0 z-modal mx-4 mb-2 rounded-2xl border border-text/10 bg-card p-3 shadow-2xl md:hidden"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           <div className="grid grid-cols-3 gap-2">
@@ -113,7 +113,7 @@ function BottomNavPadrao() {
 
       {/* Bottom Navigation Bar */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-nav border-t border-white/10 bg-card/95 backdrop-blur-xl md:hidden"
+        className="fixed bottom-0 left-0 right-0 z-nav border-t border-text/10 bg-card/95 backdrop-blur-xl md:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div className="flex items-center justify-around px-2 py-1">

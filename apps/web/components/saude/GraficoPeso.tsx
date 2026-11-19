@@ -20,7 +20,7 @@ export function GraficoPeso({ pontos, metaKg }: { pontos: readonly PontoGraficoP
       <div className="h-[190px] w-full" role="img" aria-label={`Peso dos últimos ${pontos.length} dias${metaKg ? `, meta ${fmtKg(metaKg)} kg` : ''}`}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={dados} margin={{ top: 22, right: 6, bottom: 0, left: 6 }}>
-            <CartesianGrid stroke="rgba(255,255,255,0.04)" vertical={false} />
+            <CartesianGrid stroke="rgba(120,135,160,0.16)" vertical={false} />
             <XAxis dataKey="data" hide />
             <YAxis domain={[min, max]} hide />
             {metaKg && (
