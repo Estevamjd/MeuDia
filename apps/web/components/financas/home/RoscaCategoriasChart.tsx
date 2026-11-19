@@ -11,9 +11,9 @@ export interface FatiaRosca {
 }
 
 /** Só o SVG (carregado com next/dynamic, ssr:false). A legenda com valores fica fora, em HTML. */
-export default function RoscaCategoriasChart({ fatias, total }: { fatias: FatiaRosca[]; total: number }) {
+export default function RoscaCategoriasChart({ fatias, total, className = 'h-44 w-44' }: { fatias: FatiaRosca[]; total: number; className?: string }) {
   return (
-    <div className="relative h-44 w-44 shrink-0" role="img" aria-label={`Gastos do mês por categoria, total ${formatBRL(total)}`}>
+    <div className={`relative shrink-0 ${className}`} role="img" aria-label={`Gastos do mês por categoria, total ${formatBRL(total)}`}>
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie

@@ -45,6 +45,7 @@ vi.mock('../../../../hooks', () => ({
   useContasMes: () => q.contas,
   useTransacoesMes: () => q.transacoes,
   useRendas: () => q.rendas,
+  useMetas: () => ({ data: [] }),
   useCriarRenda: () => m.criarRenda,
   usePainelSaldo: () => m.painel,
   useReceberRenda: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false }),

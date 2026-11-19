@@ -1,0 +1,154 @@
+import path from 'node:path';
+import type { Page } from '@playwright/test';
+import { test, expect } from './mock-guard';
+import { pastaEvidencias } from './evidencias';
+
+/**
+ * Início v4 (cartão deslizante: Resumo · A conta · Meta só se houver meta) e Relatório → Painel, iPhone 13 contra o
+ * mock do Supabase, no claro e no escuro. Relógio fixo em 18/10/2026 12:00 (SP); dados semeados por POST /__mock/seed.
+ */
+
+const MOCK_URL = 'http://127.0.0.1:54329';
+const AGORA = '2026-10-18T15:00:00.000Z';
+const SENHA = 'senhaForte123';
+const run = Date.now().toString(36);
+const brl = (valor: string) => new RegExp(`^R\\$\\s${valor.replace('.', '\\.')}$`);
+const pasta = pastaEvidencias('cartao-painel');
+
+test.describe.configure({ mode: 'serial' });
+const relogio = (now: string | null) =>
+  fetch(`${MOCK_URL}/__mock/clock`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ now }) });
+test.beforeAll(() => relogio(AGORA));
+test.afterAll(() => relogio(null));
+
+async function cadastrar(page: Page, nome: string) {
+  const email = `${nome.toLowerCase().replace(/\s/g, '.')}.${run}@example.test`;
+  await page.clock.setFixedTime(new Date(AGORA));
+  await page.goto('/registro');
+  await page.getByLabel('Nome').fill(nome);
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Senha', { exact: true }).fill(SENHA);
+  await page.getByLabel('Confirmar senha').fill(SENHA);
+  await page.getByRole('button', { name: 'Criar conta' }).click();
+  await page.waitForURL(/\/onboarding/);
+  await page.getByRole('button', { name: 'Continuar' }).click();
+  await page.getByLabel('Banco ou carteira 1').fill('Nubank');
+  await page.getByLabel('Quanto tem hoje (1)').fill('30000');
+  await page.getByRole('button', { name: 'Concluir' }).click();
+  await page.waitForURL(/\/financas$/);
+  await expect(page.getByText('Instalar MeuDia')).toBeVisible();
+  return email;
+}
+
+async function semear(email: string, tables: Record<string, Record<string, unknown>[]>) {
+  const res = await fetch(`${MOCK_URL}/__mock/seed`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email, tables }) });
+  expect(res.status, await res.clone().text()).toBe(200);
+}
+
+/** O banner "Instalar MeuDia" aparece ~2s após a carga; espera e fecha (depois de fechado, não volta). */
+async function fecharBanner(page: Page) {
+  const banner = page.getByText('Instalar MeuDia').locator('xpath=ancestor::div[contains(@class,"fixed")][1]');
+  await banner.waitFor({ timeout: 5000 }).catch(() => {});
+  if (await banner.isVisible().catch(() => false)) await banner.getByRole('button', { name: 'Fechar' }).click();
+}
+
+async function escolherModo(page: Page, nome: 'Claro' | 'Escuro') {
+  await page.goto('/configuracoes');
+  await page.getByRole('radiogroup', { name: 'Aparência' }).getByRole('radio', { name: nome }).click();
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.mode)).toBe(nome === 'Claro' ? 'light' : 'dark');
+}
+
+/** A página do cartão está "na vez": inteira na largura da tela (a última encosta à direita, com a anterior espiando). */
+const naVez = (page: Page, testid: string) =>
+  expect
+    .poll(async () => {
+      const b = await page.getByTestId(testid).boundingBox();
+      const largura = page.viewportSize()!.width;
+      return !!b && b.x >= 0 && b.x + b.width <= largura + 0.5;
+    }, { message: `${testid} na vez` })
+    .toBe(true);
+const foraDaVez = async (page: Page, testid: string) =>
+  expect(Math.round((await page.getByTestId(testid).boundingBox())!.x)).toBeGreaterThan(300);
+
+const semRolagemLateral = async (page: Page) =>
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+
+test('cartão deslizante: 2 páginas sem meta, 3 com meta; botões, setas e anúncio; Painel com os 4 blocos; claro e escuro', async ({ page }) => {
+  const erros: string[] = [];
+  page.on('pageerror', (err) => erros.push(`${err.name}: ${err.message}`));
+  page.on('response', (res) => { if (res.status() >= 400) erros.push(`${res.request().method()} ${res.url()} → ${res.status()}`); });
+
+  const email = await cadastrar(page, 'Lia Cartao');
+  await semear(email, {
+    rendas: [{ descricao: 'Salário', valor: 943, dia_recebimento: 5 }],
+    contas_pagar: [
+      { descricao: 'Curso', categoria: 'Educação', valor: 620, recorrencia: 'mensal', dia_vencimento: 5 },
+      { descricao: 'Celular', categoria: 'Outros', valor: 124, recorrencia: 'mensal', dia_vencimento: 25 },
+    ],
+    transacoes: [{ tipo: 'despesa', descricao: 'Mercado', categoria: 'Mercado', valor: 59.9, data: '2026-10-12', created_at: '2026-10-12T12:00:00.000Z' }],
+  });
+  await page.reload();
+  await fecharBanner(page);
+
+  // ── Sem meta: 2 páginas (Resumo, A conta); a conta continua com os mesmos testids ──
+  const cartao = page.getByTestId('cartao-resumo');
+  await expect(cartao).toHaveAttribute('data-paginas', '2');
+  await expect(page.getByTestId('cartao-pagina-meta')).toHaveCount(0);
+  await expect(page.getByTestId('cartao-sobra-valor')).toHaveText(brl('139,10'));
+  await expect(page.getByTestId('previsao-fim-mes-valor')).toHaveText(brl('139,10'));
+  await expect(page.getByTestId('linha-cofrinho')).toBeVisible();
+  await naVez(page, 'cartao-pagina-resumo');
+  await foraDaVez(page, 'cartao-pagina-conta');
+  await semRolagemLateral(page);
+  await page.getByRole('button', { name: 'Ver a conta' }).click();
+  await naVez(page, 'cartao-pagina-conta');
+  await expect(cartao.locator('[aria-live="polite"]')).toHaveText('Página 2 de 2: A conta');
+  await expect(cartao.getByRole('button', { name: 'Resumo' })).toBeVisible();
+  await page.screenshot({ path: path.join(pasta, '01-sem-meta-p2-escuro.png'), animations: 'disabled' });
+
+  // ── Com meta: 3 páginas; linha da meta na página 1 e página Meta com os números ──
+  await semear(email, {
+    metas: [{ nome: 'Celular novo', icone: 'smartphone', valor_alvo: 2000, valor_guardado: 840, data_limite: '2027-03-31', criado_em: '2026-09-01T12:00:00.000Z' }],
+  });
+  for (const modo of ['Escuro', 'Claro'] as const) {
+    const sufixo = modo === 'Claro' ? 'claro' : 'escuro';
+    await escolherModo(page, modo);
+    await page.goto('/financas');
+    await fecharBanner(page);
+    await expect(cartao).toHaveAttribute('data-paginas', '3');
+    await expect(page.getByTestId('cartao-meta-mini')).toContainText('Celular novo');
+    await semRolagemLateral(page);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: path.join(pasta, `02-inicio-p1-${sufixo}.png`), animations: 'disabled' });
+
+    await page.getByRole('button', { name: 'Ver a conta' }).click();
+    await naVez(page, 'cartao-pagina-conta');
+    await expect(page.getByTestId('cartao-bancos-hoje')).toContainText('Nubank');
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: path.join(pasta, `03-inicio-p2-${sufixo}.png`), animations: 'disabled' });
+
+    // Setas do teclado no trilho levam à página Meta.
+    await page.getByLabel('Páginas do resumo do mês. Deslize ou use as setas.').focus();
+    await page.keyboard.press('ArrowRight');
+    await naVez(page, 'cartao-pagina-meta');
+    await expect(cartao.locator('[aria-live="polite"]')).toHaveText('Página 3 de 3: Meta');
+    await expect(page.getByTestId('cartao-meta-pct')).toContainText('42');
+    await expect(page.getByTestId('cartao-meta-valores')).toHaveText(/R\$\s840,00 guardados de R\$\s2\.000,00/);
+    await expect(page.getByRole('progressbar', { name: 'Meta Celular novo' })).toHaveAttribute('aria-valuenow', '42');
+    await expect(cartao.getByRole('link', { name: 'Guardar', exact: true })).toHaveAttribute('href', '/financas/metas');
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: path.join(pasta, `04-inicio-p3-${sufixo}.png`), animations: 'disabled' });
+
+    // ── Painel (antigo Relatório) ──
+    await page.getByRole('navigation', { name: 'Navegação principal' }).getByRole('link', { name: 'Relatório' }).click();
+    await page.waitForURL(/\/financas\/relatorio$/);
+    await expect(page.getByRole('heading', { level: 1 }).first()).toHaveText('Painel');
+    await expect(page.getByTestId('painel-sobra-valor')).toHaveText(brl('139,10'));
+    for (const nome of ['Para onde vai o salário', 'Para onde foi seu dinheiro', 'Seu mês dia a dia']) await expect(page.getByRole('region', { name: nome })).toBeVisible();
+    await page.getByTestId('painel-dia-a-dia').locator('svg').first().waitFor();
+    await semRolagemLateral(page);
+    await page.screenshot({ path: path.join(pasta, `05-painel-${sufixo}.png`), fullPage: true, animations: 'disabled' });
+  }
+
+  expect(erros, 'erros na página ou respostas HTTP ≥ 400').toEqual([]);
+});

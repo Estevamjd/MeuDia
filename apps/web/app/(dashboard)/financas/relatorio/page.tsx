@@ -1,24 +1,30 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQueries } from '@tanstack/react-query';
+import { financasService } from '@meudia/api';
 import Link from 'next/link';
 import { FileText } from 'lucide-react';
 import { competenciaDe, hojeSP } from '@meudia/shared';
 import { Button, SkeletonCard } from '../../../../components/ui';
 import { SeletorMes } from '../../../../components/financas/SeletorMes';
 import { CabecalhoPagina, primeiroNome } from '../../../../components/financas/resumo/CabecalhoPagina';
-import { EntrouSaiu, HeroiSobra } from '../../../../components/financas/resumo/HeroiSobra';
-import { ParaOndeFoi } from '../../../../components/financas/resumo/ParaOndeFoi';
+import { PainelView } from '../../../../components/financas/painel/PainelView';
+import { gastoAcumulado, numerosPainel, sobraPorMes, ultimosMeses } from '../../../../components/financas/painel/montarPainel';
 import { montarResumoMes } from '../../../../components/financas/resumo/montarResumoMes';
 import { montarDashboard } from '../../../../components/financas/home/montarDashboard';
 import { usePainelSaldo, useTransacoesMes } from '../../../../hooks';
 import { useProfile } from '../../../../hooks/useProfile';
+import { useAuth } from '../../../../hooks/useAuth';
 import { deslocarCompetencia, partesCompetencia } from '../../../../lib/financas-ui';
 import { lerEsconderValores } from '../../../../lib/carteiras-ui';
 
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
-/** Relatório mensal (design v2): o mesmo cartão que o assistente vai mandar no WhatsApp, com dados reais do mês. */
+/**
+ * Painel (aba Relatório; v4 aprovado em 19/11/2026): seu dinheiro em gráficos, com dados reais do mês. Os 5 meses
+ * anteriores só alimentam "Quanto sobrou por mês" (mesma chave de cache de `useTransacoesMes`).
+ */
 export default function RelatorioPage() {
   const hojeISO = useMemo(() => hojeSP(), []);
   const [competencia, setCompetencia] = useState(() => competenciaDe(hojeISO));
@@ -32,19 +38,47 @@ export default function RelatorioPage() {
   const [escondido, setEscondido] = useState(false);
   useEffect(() => setEscondido(lerEsconderValores()), []);
 
-  const resumo = useMemo(() => {
+  const { user } = useAuth();
+  const competencias = useMemo(() => ultimosMeses(competencia, 6), [competencia]);
+  const anteriores = useQueries({
+    queries: competencias.slice(0, -1).map((c) => {
+      const p = partesCompetencia(c);
+      return {
+        queryKey: ['transacoes-mes', user?.id, p.ano, p.mes],
+        queryFn: () => financasService.transacoesDoMes(user!.id, p.ano, p.mes),
+        enabled: !!user?.id,
+        staleTime: 5 * 60_000,
+      };
+    }),
+  });
+
+  const painelMes = useMemo(() => {
     if (!transacoes.data) return null;
-    const sobra = painel.data ? montarDashboard(competencia, hojeISO, painel.data, transacoes.data).sobraMes : null;
-    return montarResumoMes(competencia, transacoes.data, sobra);
+    const dash = painel.data ? montarDashboard(competencia, hojeISO, painel.data, transacoes.data) : null;
+    const resumo = montarResumoMes(competencia, transacoes.data, dash?.sobraMes ?? null);
+    const numeros = dash?.sobraMes ? numerosPainel(dash.sobraMes) : null;
+    return { resumo, numeros, acumulado: dash ? gastoAcumulado(dash.evolucao, competencia, numeros?.faltaPagar ?? 0) : [] };
   }, [competencia, hojeISO, painel.data, transacoes.data]);
+  const resumo = painelMes?.resumo ?? null;
+
+  const dadosAnteriores = anteriores.map((q) => q.data);
+  const meses = useMemo(
+    () =>
+      sobraPorMes(
+        competencias.map((c, i) => ({ competencia: c, transacoes: i < competencias.length - 1 ? dadosAnteriores[i] : transacoes.data })),
+        painelMes?.numeros ? { competencia, valor: painelMes.numeros.sobra } : null,
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [competencias, competencia, painelMes, transacoes.data, ...dadosAnteriores],
+  );
 
   const pelaApp = resumo ? resumo.quantidade.total - resumo.quantidade.whatsapp : 0;
 
   return (
     <div className="mx-auto w-full max-w-2xl animate-fadeSlide space-y-3 md:space-y-4">
       <CabecalhoPagina
-        marca="MeuDia"
-        titulo={`Seu ${nomeMes}${nome ? `, ${nome}` : ''}`}
+        marca={nome ? `Seu ${nomeMes}, ${nome}` : `Seu ${nomeMes}`}
+        titulo="Painel"
         contexto={<SeletorMes competencia={competencia} onMudar={mudarMes} discreto />}
         className="mb-2"
       />
@@ -56,7 +90,7 @@ export default function RelatorioPage() {
         </div>
       ) : transacoes.isError || !resumo ? (
         <div role="alert" className="lap-cartao flex items-center justify-between gap-3 p-4 text-[15px] text-text">
-          <span>Não foi possível carregar o relatório.</span>
+          <span>Não foi possível carregar o painel.</span>
           <Button variant="ghost" onClick={() => void transacoes.refetch()}>
             Tentar de novo
           </Button>
@@ -76,9 +110,7 @@ export default function RelatorioPage() {
         </section>
       ) : (
         <>
-          <HeroiSobra resumo={resumo} escondido={escondido} compacto />
-          <EntrouSaiu resumo={resumo} escondido={escondido} />
-          <ParaOndeFoi categorias={resumo.categorias} escondido={escondido} />
+          <PainelView nomeMes={nomeMes} numeros={painelMes!.numeros} resumo={resumo} acumulado={painelMes!.acumulado} meses={meses} escondido={escondido} />
           <p className="pt-1 text-xs text-muted">
             {resumo.quantidade.total === 1 ? '1 lançamento' : `${resumo.quantidade.total} lançamentos`}
             {' · '}

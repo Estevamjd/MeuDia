@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { clsx } from 'clsx';
 import { ChevronDown } from 'lucide-react';
 import type { SobraDoMes } from '@meudia/shared';
@@ -9,7 +9,7 @@ import { VALOR_OCULTO } from '../../../lib/carteiras-ui';
 import { NumeroAnimado } from '../../ui/NumeroAnimado';
 import { situacaoDo, type SituacaoMes } from './montarResumoMes';
 
-const SITUACAO: Record<SituacaoMes, { texto: string; classe: string }> = {
+export const SITUACAO: Record<SituacaoMes, { texto: string; classe: string }> = {
   'no-controle': { texto: 'No controle', classe: 'border-[color-mix(in_oklch,var(--lap-h-positivo)_28%,transparent)] bg-[color-mix(in_oklch,var(--lap-h-positivo)_16%,transparent)] text-[var(--lap-h-positivo)]' },
   atencao: { texto: 'Atenção', classe: 'border-yellow/30 bg-yellow/[0.12] text-yellow' },
   passou: { texto: 'Passou da renda', classe: 'border-red/30 bg-red/[0.14] text-[var(--lap-h-alerta)]' },
@@ -18,6 +18,9 @@ const SITUACAO: Record<SituacaoMes, { texto: string; classe: string }> = {
 export interface ResumoMesContaProps {
   sobra: SobraDoMes;
   escondido?: boolean;
+  className?: string;
+  /** Conteúdo extra no fim do bloco (ex.: os bancos no cartão deslizante). */
+  children?: ReactNode;
 }
 
 /** % da renda já comprometida (contas fixas + gastos do mês); `null` sem renda. */
@@ -29,7 +32,7 @@ export function pctComprometida(sobra: Pick<SobraDoMes, 'renda' | 'despesas'>): 
  * Início, variante B "conta explícita" (aprovada): Você recebe − Contas fixas − Gastos do mês = Deve sobrar.
  * Contas fixas contam todas (pagas ou não); o "Paguei" não entra de novo em Gastos do mês.
  */
-export function ResumoMesConta({ sobra, escondido = false }: ResumoMesContaProps) {
+export function ResumoMesConta({ sobra, escondido = false, className, children }: ResumoMesContaProps) {
   const [contasAbertas, setContasAbertas] = useState(false);
   const listaId = useId();
   const v = (n: number) => (escondido ? VALOR_OCULTO : formatBRL(n));
@@ -40,7 +43,7 @@ export function ResumoMesConta({ sobra, escondido = false }: ResumoMesContaProps
   const aPagar = sobra.contasFixas.length - pagas;
   const mes = nomeMes(sobra.competencia);
   return (
-    <section aria-labelledby="resumo-mes" className="lap-heroi px-5 pb-[18px] pt-5" data-testid="resumo-mes-conta">
+    <section aria-labelledby="resumo-mes" className={clsx('lap-heroi px-5 pb-[18px] pt-5', className)} data-testid="resumo-mes-conta">
       <div className="flex min-h-6 items-center justify-between gap-2">
         <h2 id="resumo-mes" className="lap-rotulo lap-texto-3 font-normal tracking-[0.08em]">
           Resumo de {mes}
@@ -162,6 +165,7 @@ export function ResumoMesConta({ sobra, escondido = false }: ResumoMesContaProps
           ? 'A renda ainda é previsão: toque em Recebi quando o salário cair. Gastos baixam a sobra, nunca o Cofrinho.'
           : 'Gastos baixam a sobra, nunca o Cofrinho. No fim do mês, você escolhe se guarda o que sobrou.'}
       </p>
+      {children}
     </section>
   );
 }

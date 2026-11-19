@@ -140,7 +140,7 @@ test('design v2: Início, Treino, Dieta e Relatório (menu no ☰); Ver todos, C
     { nome: 'Início', url: /\/financas$/, titulo: 'Olá, Lia' },
     { nome: 'Treino', url: /\/treinos$/, titulo: 'Treino' },
     { nome: 'Dieta', url: /\/refeicoes$/, titulo: 'Dieta' },
-    { nome: 'Relatório', url: /\/financas\/relatorio$/, titulo: 'Seu outubro, Lia' },
+    { nome: 'Relatório', url: /\/financas\/relatorio$/, titulo: 'Painel' },
   ];
   await expect(nav.getByRole('link')).toHaveText(abas.map((a) => a.nome));
   await expect(nav.getByRole('button')).toHaveCount(0);

@@ -5,8 +5,8 @@ import { ProximasContas, type ContaProxima } from './ProximasContas';
 import { RendaSheet, type RendaSheetProps } from './RendaSheet';
 import { CardSaldoHoje } from './CardSaldoHoje';
 import { HeroiSobra } from '../resumo/HeroiSobra';
-import { ResumoMesConta } from '../resumo/ResumoMesConta';
 import { LinhaCofrinho } from './LinhaCofrinho';
+import { CardResumoDeslizante, type MetaDoCartao } from './CardResumoDeslizante';
 import { FechamentoMesSheet, type FechamentoMesSheetProps } from '../cofrinho/FechamentoMesSheet';
 import { ParaOndeFoi } from '../resumo/ParaOndeFoi';
 import { UltimosLancamentos } from '../resumo/UltimosLancamentos';
@@ -45,6 +45,8 @@ export interface FinancasHomeViewProps {
   escondido?: boolean;
   /** Olho do cabeçalho (esconde os valores); usado pela página. */
   onAlternarOlho?: () => void;
+  /** Metas de compra; com alguma, o cartão ganha a página "Meta". */
+  metas?: readonly MetaDoCartao[];
 }
 
 /**
@@ -66,6 +68,7 @@ export function FinancasHomeView({
   dashboard = null,
   resumo = null,
   escondido = false,
+  metas = [],
 }: FinancasHomeViewProps) {
   if (estado === 'carregando') {
     return (
@@ -105,12 +108,20 @@ export function FinancasHomeView({
       {soConvite && d && <CardSaldoHoje {...d.saldo} escondido={d.escondido} onAlternarOlho={d.onAlternarOlho} compacto />}
 
       {!soConvite && d?.sobraMes ? (
-        <ResumoMesConta sobra={d.sobraMes} escondido={escondido} />
+        // Cartão deslizante (v4): Resumo · A conta · Meta (só com meta). O Cofrinho mora na página 1.
+        <CardResumoDeslizante
+          sobra={d.sobraMes}
+          cofrinho={d.cofrinho}
+          carteiras={d.saldo.carteiras}
+          metas={metas}
+          hojeISO={hojeISO}
+          escondido={escondido}
+        />
       ) : (
         // Painel indisponível ou outro mês: o resumo pelos lançamentos, como antes.
         !soConvite && resumo && <HeroiSobra resumo={resumo} escondido={escondido} sobra={null} />
       )}
-      {!soConvite && d && <LinhaCofrinho saldo={d.cofrinho} escondido={escondido} />}
+      {!soConvite && d && !d.sobraMes && <LinhaCofrinho saldo={d.cofrinho} escondido={escondido} />}
 
       {contas && (
         <ProximasContas

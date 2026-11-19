@@ -6,6 +6,7 @@ import {
   useContas,
   useContasMes,
   useCriarRenda,
+  useMetas,
   useFecharMesCofrinho,
   usePainelSaldo,
   useReceberRenda,
@@ -33,6 +34,8 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, onGas
   const contas = useContasMes(competencia);
   const transacoes = useTransacoesMes(ano, mes);
   const rendas = useRendas();
+  // Metas de compra: com alguma, o cartão da Início ganha a página "Meta" (falha = cartão sem a página).
+  const metas = useMetas();
   const contasCadastradas = useContas();
   const criarRenda = useCriarRenda();
   const { pagarConta, contaOcupada } = usePagamentoAcoes();
@@ -189,6 +192,7 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, onGas
         }
       : null,
     onGastei,
+    metas: metas.data ?? [],
     resumo: resumoMes,
     escondido,
     onAlternarOlho: () =>

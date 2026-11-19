@@ -513,3 +513,7 @@ html[data-mode='light'] .lap-heroi {
 }
 html[data-mode='light'] ::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.15); }
 html[data-trocando-tema] *, html[data-trocando-tema] *::before, html[data-trocando-tema] *::after { transition: none !important; }
+
+/* Carrossel do cartão da Início: rola com o dedo, sem barra visível. */
+.sem-barra { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.sem-barra::-webkit-scrollbar { display: none; }

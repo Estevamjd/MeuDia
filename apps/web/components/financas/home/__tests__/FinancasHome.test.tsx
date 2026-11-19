@@ -201,11 +201,11 @@ describe('montarHome (Início resumida)', () => {
 });
 
 describe('FinancasHomeView (Início, design v2)', () => {
-  const regioes = () => screen.getAllByRole('region').map((r) => r.getAttribute('aria-labelledby') && document.getElementById(r.getAttribute('aria-labelledby')!)?.textContent);
+  const regioes = () => screen.getAllByRole('region').map((r) => (r.getAttribute('aria-labelledby') ? document.getElementById(r.getAttribute('aria-labelledby')!)?.textContent : r.getAttribute('aria-label')));
 
-  it('Resumo de outubro (conta explícita) → Contas a vencer → Para onde foi → Últimos lançamentos; Cofrinho é só uma linha', () => {
+  it('cartão deslizante (Resumo → Resumo de outubro, a conta explícita) → Contas a vencer → Para onde foi → Últimos lançamentos; Cofrinho é uma linha do cartão', () => {
     render(<FinancasHomeView {...viewProps()} />);
-    expect(regioes()).toEqual(['Resumo de outubro', 'Contas a vencer', 'Para onde foi', 'Últimos lançamentos']);
+    expect(regioes()).toEqual(['Resumo do mês', 'Resumo de outubro', 'Contas a vencer', 'Para onde foi', 'Últimos lançamentos']);
     const linha = screen.getByTestId('linha-cofrinho');
     expect(linha.getAttribute('href')).toBe('/financas/carteiras');
     expect(texto(linha)).toContain('Cofrinho: R$ 150,00');
