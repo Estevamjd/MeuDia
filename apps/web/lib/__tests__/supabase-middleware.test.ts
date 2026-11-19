@@ -66,3 +66,19 @@ it.each(['/treinos', '/treinos?dia=1', '/saude', '/saude/dieta', '/saude/peso'])
   const response = await updateSession(new NextRequest(`https://example.invalid${path}`));
   expect(response.headers.get('location')).toBeNull();
 });
+
+it.each([
+  ['/esqueci-senha', null],
+  ['/nova-senha', null],
+  ['/esqueci-senha', { id: 'u' }],
+  ['/nova-senha', { id: 'u' }],
+] as const)('%s é público e não redireciona (user=%o): o link de recuperação entra logado em /nova-senha', async (path, user) => {
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://example.invalid');
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'fixture');
+  vi.stubEnv('APP_MODE', 'financas');
+  vi.mocked(createServerClient).mockImplementation(() => ({
+    auth: { getUser: async () => ({ data: { user } }) },
+  }) as never);
+  const response = await updateSession(new NextRequest(`https://example.invalid${path}`));
+  expect(response.headers.get('location')).toBeNull();
+});

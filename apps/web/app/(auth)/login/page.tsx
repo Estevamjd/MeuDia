@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -16,6 +16,7 @@ import {
   getResendErrorMessage,
   isEmailNotConfirmedError,
 } from '../../../lib/auth/callback';
+import { destinoSeLinkDeRecuperacao } from '../../../lib/auth/recuperacao';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -45,6 +46,12 @@ function LoginContent() {
   const [emailNaoConfirmado, setEmailNaoConfirmado] = useState('');
   const [reenviando, setReenviando] = useState(false);
   const [reenvioSucesso, setReenvioSucesso] = useState('');
+
+  // Link de recuperação que caiu aqui (Site URL do Supabase sem a lista de redirects): segue para /nova-senha.
+  useEffect(() => {
+    const destino = destinoSeLinkDeRecuperacao(window.location.hash);
+    if (destino) window.location.replace(destino);
+  }, []);
 
   const {
     register,
@@ -164,6 +171,12 @@ function LoginContent() {
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+          </div>
+
+          <div className="mt-2 text-right">
+            <Link href="/esqueci-senha" className="text-sm text-accent transition-colors hover:text-accent2">
+              Esqueceu a senha?
+            </Link>
           </div>
 
           <Button type="submit" isLoading={isSubmitting} className="mt-6 w-full">

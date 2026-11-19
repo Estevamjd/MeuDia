@@ -289,6 +289,8 @@ async function readBody(req) {
 }
 
 // ─── Auth (GoTrue) ────────────────────────────────────────────────────────────
+const recoverRequests = [];
+
 function handleAuth(req, url, body) {
   const path = url.pathname.replace(/^\/auth\/v1/, '');
   if (path === '/health' || path === '/settings') {
@@ -356,7 +358,12 @@ function handleAuth(req, url, body) {
     }
     return { status: 204 };
   }
-  if (['/resend', '/recover', '/otp'].includes(path)) return { status: 200, body: {} };
+  if (path === '/recover' && req.method === 'POST') {
+    // Igual ao Supabase: 200 mesmo para e-mail sem conta (não revela se existe).
+    recoverRequests.push({ email: String(body?.email || ''), redirect_to: url.searchParams.get('redirect_to'), pkce: !!body?.code_challenge });
+    return { status: 200, body: {} };
+  }
+  if (['/resend', '/otp'].includes(path)) return { status: 200, body: {} };
   return authErr(404, 'not_found', `mock: rota de auth não implementada: ${req.method} ${path}`);
 }
 
@@ -850,6 +857,16 @@ const server = http.createServer(async (req, res) => {
       const rota = `${req.method} ${url.pathname}`;
       stats.rotas[rota] = (stats.rotas[rota] ?? 0) + 1;
       if (LATENCY_MS) await new Promise((r) => setTimeout(r, LATENCY_MS));
+    }
+    // Recuperação de senha: último pedido em /recover e um link de recuperação (fluxo implícito) para o teste.
+    if (url.pathname === '/__mock/recover') {
+      return send(res, 200, { pedidos: recoverRequests });
+    }
+    if (url.pathname === '/__mock/recovery-link') {
+      const u = users.get(String(url.searchParams.get('email') || '').trim().toLowerCase());
+      if (!u) return send(res, 404, { message: 'mock: usuário não existe' });
+      const sess = newSession(u);
+      return send(res, 200, { hash: `#access_token=${sess.access_token}&expires_in=3600&refresh_token=${sess.refresh_token}&token_type=bearer&type=recovery` });
     }
     if (url.pathname === '/__mock/state') {
       return send(res, 200, { users: [...users.values()].map(publicUser), tables });
