@@ -7,8 +7,8 @@ import { COR_GASTO, COR_SALDO, GRADE, SUPERFICIE, TINTA_MUTED } from './paletaGr
 
 const compacto = (v: number) => new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(v);
 const tooltip = {
-  contentStyle: { background: '#1c1c28', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#eeeef8' },
-  itemStyle: { color: '#eeeef8' },
+  contentStyle: { background: 'var(--grafico-tooltip)', border: '1px solid var(--grafico-borda)', borderRadius: 8, color: 'var(--grafico-texto)' },
+  itemStyle: { color: 'var(--grafico-texto)' },
   labelStyle: { color: TINTA_MUTED },
 };
 const eixoX = { dataKey: 'dia', tick: { fill: TINTA_MUTED, fontSize: 11 }, tickLine: false, axisLine: false, interval: 'preserveStartEnd' as const, minTickGap: 12 };

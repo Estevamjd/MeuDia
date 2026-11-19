@@ -41,7 +41,7 @@ function BottomNavFinancas() {
   return (
     <nav
       aria-label="Navegação principal"
-      className="fixed bottom-0 left-0 right-0 z-nav border-t border-border bg-[#040813]/[0.88] backdrop-blur-xl md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-nav border-t border-border bg-[var(--barra-fundo)] backdrop-blur-xl md:hidden"
       style={{
         paddingBottom: 'env(safe-area-inset-bottom)',
         paddingLeft: 'env(safe-area-inset-left)',
@@ -99,8 +99,8 @@ function BottomNavPadrao() {
                 onClick={() => setMaisAberto(false)}
                 className={`flex flex-col items-center gap-1 rounded-xl p-3 transition-colors ${
                   pathname === item.href || pathname.startsWith(item.href + '/')
-                    ? 'bg-accent/20 text-white'
-                    : 'text-gray-400 hover:bg-white/5'
+                    ? 'bg-accent/20 text-text'
+                    : 'text-muted hover:bg-text/5'
                 }`}
               >
                 <span className="text-xl">{item.emoji}</span>

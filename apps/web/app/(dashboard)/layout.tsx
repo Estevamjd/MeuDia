@@ -6,6 +6,7 @@ import { Sidebar } from '../../components/layout/Sidebar';
 import { Topbar } from '../../components/layout/Topbar';
 import { ToastProvider } from '../../components/ui/Toast';
 import { useAuth } from '../../hooks/useAuth';
+import { useSincronizarTema } from '../../hooks/useTema';
 import { useProfile } from '../../hooks/useProfile';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { InstallPrompt } from '../../components/ui/InstallPrompt';
@@ -22,6 +23,7 @@ import { clsx } from 'clsx';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, signOut } = useAuth();
+  useSincronizarTema();
   // Sempre rebusca ao montar: o cache pode estar com onboarding_feito=false de antes da conclusão.
   const {
     data: profile,

@@ -1,36 +1,52 @@
 import type { Config } from 'tailwindcss';
 import { zIndexTailwind } from './lib/camadas';
 
+/** Cor de tema: `rgb(var(--c-nome) / alfa)`. */
+const c = (nome: string) => `rgb(var(--c-${nome}) / <alpha-value>)`;
+
 const config: Config = {
   content: [
     './app/**/*.{ts,tsx}',
     './components/**/*.{ts,tsx}',
+    './lib/**/*.{ts,tsx}',
   ],
   theme: {
     extend: {
       // Astro G dark (Mestres CRM): azul-noite + ciano #00e5ff. Os nomes antigos seguem valendo em todo o app.
       colors: {
-        bg: '#050a16',
-        surface: '#060b17',
-        card: '#0b1220',
-        card2: '#101827',
-        border: '#1c2638',
-        accent: '#00e5ff',
-        // Texto sobre o ciano (botão primário, chips ativos): 13:1.
-        'accent-fg': '#06101c',
-        accent2: '#00ffa3',
-        accent3: '#5cefff',
-        orange: '#fab219',
-        green: '#34d399',
-        'green-dark': '#0ca30c',
-        yellow: '#fab219',
-        red: '#f87171',
-        text: '#f5f6f8',
-        // Texto secundário: 6,9:1 no card (#0b1220).
-        muted: '#94a3b8',
-        'muted-text': '#a8b4c7',
+        // Cada cor vem de uma variável RGB em globals.css (:root = escuro, [data-mode="light"] = claro), para o
+        // modificador de opacidade (bg-accent/20) seguir valendo nos dois temas.
+        bg: c('bg'),
+        'bg-deep': c('bg-deep'),
+        surface: c('surface'),
+        card: c('card'),
+        card2: c('card2'),
+        border: c('border'),
+        // Fundo dos campos de texto.
+        campo: c('campo'),
+        accent: c('accent'),
+        // Texto sobre o accent (botão primário, chips ativos): 13:1 no escuro, branco no claro.
+        'accent-fg': c('accent-fg'),
+        accent2: c('accent2'),
+        accent3: c('accent3'),
+        orange: c('orange'),
+        green: c('green'),
+        'green-dark': c('green-dark'),
+        yellow: c('yellow'),
+        red: c('red'),
+        text: c('text'),
+        // Texto secundário: 6,9:1 no card escuro; 6,3:1 no card claro.
+        muted: c('muted'),
+        'muted-text': c('muted-text'),
         // Trilhos e superfícies discretas (barras vazias, ícones de linha).
-        trilho: '#151f31',
+        trilho: c('trilho'),
+        // Cores das notas (iguais nos dois temas; cada uma distinta das outras e da cor de alerta).
+        'nota-ciano': '#22d3ee',
+        'nota-roxo': '#a78bfa',
+        'nota-verde': '#34d399',
+        'nota-laranja': '#fb923c',
+        'nota-vermelho': '#f87171',
+        'nota-amarelo': '#facc15',
       },
       fontFamily: {
         syne: ['var(--font-geist)', 'Geist', 'system-ui', 'sans-serif'],

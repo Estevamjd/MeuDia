@@ -3,6 +3,34 @@
 @tailwind utilities;
 
 :root {
+  /* Canais RGB das cores do Tailwind (tailwind.config.ts). Escuro = Astro G, o padrão. */
+  --c-bg: 5 10 22;
+  --c-bg-deep: 4 8 19;
+  --c-surface: 6 11 23;
+  --c-card: 11 18 32;
+  --c-card2: 16 24 39;
+  --c-border: 28 38 56;
+  --c-campo: 18 26 43;
+  --c-accent: 0 229 255;
+  --c-accent-fg: 6 16 28;
+  --c-accent2: 0 255 163;
+  --c-accent3: 92 239 255;
+  --c-orange: 250 178 25;
+  --c-green: 52 211 153;
+  --c-green-dark: 12 163 12;
+  --c-yellow: 250 178 25;
+  --c-red: 248 113 113;
+  --c-text: 245 246 248;
+  --c-muted: 148 163 184;
+  --c-muted-text: 168 180 199;
+  --c-trilho: 21 31 49;
+  --barra-fundo: rgb(4 8 19 / 0.88);
+  --topo-fundo: rgba(5, 10, 22, 0.82);
+  --grafico-tooltip: #16161f;
+  --grafico-borda: rgba(255, 255, 255, 0.07);
+  --grafico-texto: #eeeef8;
+  color-scheme: dark;
+
   /* Astro G dark (Mestres CRM: globals.css + lapidacao.css + themes.ts). */
   --bg:       #050a16;
   --bg-deep:  #040813;
@@ -358,3 +386,71 @@
 .bg-card.rounded-2xl {
   background-image: linear-gradient(180deg, var(--lap-luz-topo), transparent 96px);
 }
+
+/* ══════════════════════════════════════════════════════════════
+   Tema claro (Configurações › Aparência). O bloco principal (.lap-heroi) continua um bloco escuro em azul-petróleo,
+   com texto branco, nos dois temas; o resto da página fica claro.
+   ══════════════════════════════════════════════════════════════ */
+html[data-mode='light'] {
+  --c-bg: 244 246 250;
+  --c-bg-deep: 255 255 255;
+  --c-surface: 255 255 255;
+  --c-card: 255 255 255;
+  --c-card2: 238 242 247;
+  --c-border: 220 227 236;
+  --c-campo: 255 255 255;
+  --c-accent: 14 116 144;
+  --c-accent-fg: 255 255 255;
+  --c-accent2: 4 120 87;
+  --c-accent3: 8 145 178;
+  --c-orange: 180 83 9;
+  --c-green: 4 120 87;
+  --c-green-dark: 21 128 61;
+  --c-yellow: 161 98 7;
+  --c-red: 220 38 38;
+  --c-text: 11 18 32;
+  --c-muted: 82 96 117;
+  --c-muted-text: 71 85 105;
+  --c-trilho: 230 235 242;
+  --barra-fundo: rgb(255 255 255 / 0.92);
+  --topo-fundo: rgba(244, 246, 250, 0.86);
+  --grafico-tooltip: #ffffff;
+  --grafico-borda: rgba(15, 23, 42, 0.12);
+  --grafico-texto: #0b1220;
+  color-scheme: light;
+
+  --bg: #f4f6fa;
+  --bg-deep: #ffffff;
+  --surface: #ffffff;
+  --card: #ffffff;
+  --card2: #eef2f7;
+  --border: #dce3ec;
+  --accent: #0e7490;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(14, 116, 144, 0.1);
+  --accent-soft-2: rgba(14, 116, 144, 0.22);
+  --accent2: #047857;
+  --accent3: #0891b2;
+  --text: #0b1220;
+  --muted: #526075;
+  --muted-text: #475569;
+  --trilho: #e6ebf2;
+  --green: #047857;
+  --yellow: #a16207;
+  --red: #dc2626;
+  --orange: #b45309;
+
+  /* Bloco principal em azul-petróleo (texto branco 5:1 ou mais). */
+  --lap-m-fundo: oklch(0.36 0.07 222);
+  --lap-m-vizinho: oklch(0.3 0.06 230);
+  --lap-m-meio: oklch(0.48 0.09 215);
+  --lap-m-luz: oklch(0.6 0.11 205);
+  --lap-luz-aresta: rgba(255, 255, 255, 0.7);
+  --lap-luz-topo: transparent;
+  --lap-borda-fina: rgba(15, 23, 42, 0.08);
+  --lap-sombra-cartao: 0 1px 2px rgba(15, 23, 42, 0.06), 0 10px 24px -16px rgba(15, 23, 42, 0.18);
+  --astrog-ceu: none;
+}
+html[data-mode='light'] .lap-heroi { background-color: #164e63; box-shadow: 0 30px 60px -36px rgba(8, 145, 178, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.2); }
+html[data-mode='light'] ::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.15); }
+html[data-trocando-tema] *, html[data-trocando-tema] *::before, html[data-trocando-tema] *::after { transition: none !important; }

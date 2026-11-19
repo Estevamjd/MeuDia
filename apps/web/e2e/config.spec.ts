@@ -119,9 +119,9 @@ test('Config: seções, nome, dia do salário, Categorias → Orçamento, Baixar
   await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Configurações' }).click();
   await page.waitForURL(/\/configuracoes$/);
   await expect(page.getByRole('heading', { level: 1 }).first()).toHaveText('Configurações');
-  await expect(page.locator('[data-secao]')).toHaveCount(6);
+  await expect(page.locator('[data-secao]')).toHaveCount(7);
   expect(await page.locator('[data-secao]').evaluateAll((els) => els.map((e) => e.getAttribute('data-secao'))))
-    .toEqual(['perfil', 'categorias', 'notificacoes', 'privacidade', 'sair', 'perigo']);
+    .toEqual(['perfil', 'aparencia', 'categorias', 'notificacoes', 'privacidade', 'sair', 'perigo']);
   const perfil = page.getByRole('region', { name: 'Perfil' });
   await expect(perfil.getByRole('button', { name: /Nome/ })).toContainText('Bia Config');
   await expect(perfil.getByRole('button', { name: /Dia do salário/ })).toContainText('Dia 5 · Salário');

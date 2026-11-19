@@ -47,7 +47,7 @@ describe('Configurações (modo Finanças)', () => {
     const { container } = pagina();
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Configurações');
     const ordem = [...container.querySelectorAll('[data-secao]')].map((s) => s.getAttribute('data-secao'));
-    expect(ordem).toEqual(['perfil', 'categorias', 'notificacoes', 'privacidade', 'sair', 'perigo']);
+    expect(ordem).toEqual(['perfil', 'aparencia', 'categorias', 'notificacoes', 'privacidade', 'sair', 'perigo']);
   });
 
   it('Perfil: nome e dia do salário da renda "Salário" (não da mais antiga); salvar usa os services existentes', () => {

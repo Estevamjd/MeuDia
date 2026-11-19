@@ -37,6 +37,7 @@ import {
 } from '../../../components/ui';
 import { useNotas } from '../../../hooks/useNotas';
 import { useAuth } from '../../../hooks/useAuth';
+import { CORES_NOTA, corDaNota } from '../../../lib/notas-cores';
 
 // ── Types ──
 
@@ -48,14 +49,7 @@ interface ChecklistItem {
 
 // ── Constants ──
 
-const CORES: { value: string; label: string; bg: string; border: string }[] = [
-  { value: 'default', label: 'Padrão', bg: 'bg-card', border: 'border-border' },
-  { value: 'purple', label: 'Roxo', bg: 'bg-accent/[0.08]', border: 'border-accent/20' },
-  { value: 'green', label: 'Verde', bg: 'bg-green/[0.08]', border: 'border-green/20' },
-  { value: 'orange', label: 'Laranja', bg: 'bg-orange/[0.08]', border: 'border-orange/20' },
-  { value: 'red', label: 'Vermelho', bg: 'bg-red/[0.08]', border: 'border-red/20' },
-  { value: 'yellow', label: 'Amarelo', bg: 'bg-yellow/[0.08]', border: 'border-yellow/20' },
-];
+// Cores das notas: lib/notas-cores.ts (cada uma com tom próprio).
 
 const SUGESTOES_TAGS: Record<string, string[]> = {
   trabalho: ['reunião', 'deadline', 'projeto', 'apresentação', 'relatório', 'email', 'cliente'],
@@ -369,9 +363,7 @@ export default function NotasPage() {
 
   // ── Cor helpers ──
 
-  const getCorClasses = useCallback((cor: string) => {
-    return CORES.find((c) => c.value === cor) ?? CORES[0]!;
-  }, []);
+  const getCorClasses = useCallback((cor: string) => corDaNota(cor), []);
 
   // ── Stats ──
 
@@ -688,16 +680,18 @@ export default function NotasPage() {
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-muted">Cor</label>
             <div className="flex gap-2">
-              {CORES.map((cor) => (
+              {CORES_NOTA.map((cor) => (
                 <button
                   key={cor.value}
+                  type="button"
                   onClick={() => setFormCor(cor.value)}
                   className={clsx(
-                    'h-7 w-7 rounded-full border-2 transition-all',
-                    cor.bg,
-                    formCor === cor.value ? 'border-accent scale-110' : 'border-border hover:border-muted',
+                    'h-8 w-8 rounded-full border-2 transition-all',
+                    cor.swatch,
+                    formCor === cor.value ? 'scale-110 border-text ring-2 ring-accent ring-offset-2 ring-offset-card' : 'border-border hover:border-muted',
                   )}
                   aria-label={cor.label}
+                  aria-pressed={formCor === cor.value}
                   title={cor.label}
                 />
               ))}

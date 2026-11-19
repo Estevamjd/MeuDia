@@ -36,11 +36,11 @@ export function DonutChart({ data, centerLabel, centerValue, size = 180 }: Donut
           </Pie>
           <Tooltip
             contentStyle={{
-              background: '#16161f',
-              border: '1px solid rgba(255,255,255,0.07)',
+              background: 'var(--grafico-tooltip)',
+              border: '1px solid var(--grafico-borda)',
               borderRadius: '8px',
               fontSize: '12px',
-              color: '#eeeef8',
+              color: 'var(--grafico-texto)',
             }}
           />
         </PieChart>

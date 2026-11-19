@@ -62,7 +62,7 @@ export function Topbar({ onSignOut, onOpenChat, chatAberto = false }: TopbarProp
       <nav
         className={clsx('sticky top-0 z-header', comDrawer ? 'border-b border-transparent md:border-border' : 'border-b border-border')}
         style={{
-          background: 'rgba(5,10,22,0.82)',
+          background: 'var(--topo-fundo)',
           backdropFilter: 'blur(12px)',
           // Finanças no celular: mesma margem de 1rem do conteúdo (a Início precisa caber sem rolar).
           paddingLeft: comDrawer ? 'max(1rem, env(safe-area-inset-left))' : 'max(2rem, env(safe-area-inset-left))',

@@ -12,6 +12,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useAtualizarRenda, useProfile, useRendas, useUpdateProfile } from '../../../hooks';
 import { useAppMode } from '../../../components/AppModeProvider';
 import { LembretesPush } from '../../../components/financas/LembretesPush';
+import { AparenciaTema } from '../../../components/configuracoes/AparenciaTema';
 import { Button, Input, Modal, useToast } from '../../../components/ui';
 
 export default function ConfiguracoesPage() {
@@ -26,6 +27,8 @@ export default function ConfiguracoesPage() {
         <SecoesFinancas />
       ) : (
         <>
+          <AparenciaTema />
+
           {/* Info da conta */}
           <section className="rounded-card border border-border bg-card p-5">
             <h2 className="mb-3 text-sm font-semibold text-text">Conta</h2>
@@ -101,6 +104,8 @@ function SecoesFinancas() {
   return (
     <>
       <Perfil />
+
+      <AparenciaTema />
 
       <Secao id="categorias" titulo="Categorias">
         {/* Decisão 1: Orçamento (limites por categoria) mora em Config › Categorias; o menu lateral continua levando lá. */}

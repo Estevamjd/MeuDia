@@ -17,7 +17,7 @@ export function SemanaPontos({ dias, hoje, rotuloFeito }: { dias: boolean[]; hoj
             className={clsx(
               'h-3 w-3 rounded-full transition-colors',
               feito ? 'bg-accent shadow-[0_0_10px_rgba(0,229,255,0.65)]' : i > hoje ? 'bg-trilho/60' : 'bg-trilho',
-              i === hoje && 'ring-2 ring-accent/40 ring-offset-2 ring-offset-[#0b1220]',
+              i === hoje && 'ring-2 ring-accent/40 ring-offset-2 ring-offset-card',
             )}
           />
         </li>

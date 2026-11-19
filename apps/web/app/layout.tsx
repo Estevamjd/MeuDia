@@ -5,6 +5,7 @@ import './globals.css';
 import { Providers } from './providers';
 import { AppModeProvider } from '../components/AppModeProvider';
 import { getAppMode } from '../lib/app-mode';
+import { SCRIPT_TEMA } from '../lib/tema';
 
 // Geist / Geist Mono auto-hospedadas (OFL, app/fonts): mesma tipografia do Mestres CRM (Astro G), sem Google Fonts.
 // As variáveis antigas (--font-dm / --font-syne) apontam para a Geist para todas as classes existentes seguirem valendo.
@@ -72,8 +73,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // Força render por request: sem isso o layout é pré-renderizado no build e o APP_MODE congela no valor do build.
   noStore();
   return (
-    <html lang="pt-BR" className={`${geist.variable} ${geistMono.variable}`}>
+    // data-mode e color-scheme são postos pelo SCRIPT_TEMA antes da hidratação (por isso o suppressHydrationWarning).
+    <html lang="pt-BR" data-mode="dark" className={`${geist.variable} ${geistMono.variable}`} suppressHydrationWarning>
       <head>
+        {/* Tema antes da 1ª pintura: sem piscar o escuro para quem escolheu claro. */}
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_TEMA }} />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />

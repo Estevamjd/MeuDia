@@ -33,8 +33,8 @@ export default function RoscaCategoriasChart({ fatias, total }: { fatias: FatiaR
           </Pie>
           <Tooltip
             formatter={(v: number, nome: string) => [formatBRL(v), nome]}
-            contentStyle={{ background: '#1c1c28', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#eeeef8' }}
-            itemStyle={{ color: '#eeeef8' }}
+            contentStyle={{ background: 'var(--grafico-tooltip)', border: '1px solid var(--grafico-borda)', borderRadius: 8, color: 'var(--grafico-texto)' }}
+            itemStyle={{ color: 'var(--grafico-texto)' }}
           />
         </PieChart>
       </ResponsiveContainer>
