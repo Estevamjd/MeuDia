@@ -83,6 +83,36 @@ describe('CardSaldoHoje', () => {
     expect(texto()).not.toContain('R$');
     expect(screen.getByRole('link', { name: 'Adicionar banco ou carteira' }).getAttribute('href')).toBe('/financas/carteiras?nova=1');
   });
+  it('tocar no card abre Bancos; o olho continua um botão fora do link', () => {
+    const onAlternarOlho = vi.fn();
+    render(<CardSaldoHoje {...props} onAlternarOlho={onAlternarOlho} />);
+    const card = screen.getByTestId('saldo-hoje-link');
+    expect(card.getAttribute('href')).toBe('/financas/carteiras');
+    expect(card.className).toContain('min-h-[44px]');
+    expect(card.textContent).toContain('Abrir bancos e carteira');
+    expect(card.textContent).toMatch(/R\$\s800,00/);
+    const olho = screen.getByRole('button', { name: 'Esconder valores' });
+    expect(card.contains(olho)).toBe(false);
+    fireEvent.click(olho);
+    expect(onAlternarOlho).toHaveBeenCalledTimes(1);
+  });
+  it('"Corrigir" com vários bancos abre a lista para escolher', () => {
+    render(<CardSaldoHoje {...props} />);
+    const corrigir = screen.getByRole('link', { name: 'Corrigir saldo de um banco' });
+    expect(corrigir.getAttribute('href')).toBe('/financas/carteiras?corrigir=escolher');
+    expect(corrigir.className).toContain('h-11');
+    expect(corrigir.className).toContain('min-w-[44px]');
+    expect(corrigir.textContent).toContain('Corrigir');
+  });
+  it('"Corrigir" com um banco abre o Corrigir saldo dele; sem olho (Início com banco) o Corrigir segue lá', () => {
+    render(<CardSaldoHoje {...props} carteiras={[{ id: 'n 1', nome: 'Nubank', saldo: 650, noTotal: true }]} semOlho />);
+    expect(screen.getByRole('link', { name: 'Corrigir saldo de Nubank' }).getAttribute('href')).toBe('/financas/carteiras?corrigir=n%201');
+    expect(screen.queryByRole('button', { name: /valores/ })).toBeNull();
+  });
+  it('sem carteira: só o convite, sem Corrigir', () => {
+    render(<CardSaldoHoje {...props} carteiras={[]} total={0} comecouMes={null} />);
+    expect(screen.queryByRole('link', { name: /Corrigir/ })).toBeNull();
+  });
   it('negativo em vermelho com explicação', () => {
     render(<CardSaldoHoje {...props} total={-20} />);
     expect(screen.getByTestId('saldo-hoje-valor').className).toContain('text-red');

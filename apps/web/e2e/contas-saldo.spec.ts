@@ -150,6 +150,13 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   // Sobra do mês = renda 100 (entrada extra; sem renda fixa) − contas 220 = −120. Sem o card "Em 7 dias".
   await expect(page.getByText('Em 7 dias você terá')).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Cofrinho' })).toBeVisible();
+  // Cofrinho com 2 bancos: "Corrigir" abre Bancos pedindo para escolher o banco; voltar para a Início.
+  await tocar(page.getByRole('link', { name: 'Corrigir saldo de um banco' }));
+  await page.waitForURL(/\/financas\/carteiras$/);
+  await expect(page.getByText('no banco que está com o valor errado')).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Corrigir saldo', exact: true })).toHaveCount(0);
+  await bottomNav.getByRole('link', { name: 'Início' }).click();
+  await page.waitForURL(/\/financas$/);
   await expect(fimMes).toHaveText(/^−R\$\s120,00$/);
   // A conta do fim do mês fica no "por quê?" do bloco Sobra do mês (design v2): abre, confere e fecha.
   const porQue = page.getByRole('button', { name: 'por quê? No fim do mês sobra' });
@@ -353,6 +360,19 @@ test('previsão A: fim do mês = 2.090 e o card "Em 7 dias" não aparece', async
   await expect(page.getByTestId('saldo-hoje-valor')).toHaveText(brl('235,00'));
   await expect(page.getByRole('region', { name: 'Cofrinho' })).toBeVisible();
   await expect(page.getByTestId('previsao-fim-mes-valor')).toHaveText(brl('2.090,00'));
+  // Cofrinho com 1 banco: tocar no card abre Bancos; "Corrigir" já abre o "Corrigir saldo" do Nubank (sem lançar nada).
+  await page.getByTestId('saldo-hoje-link').click();
+  await page.waitForURL(/\/financas\/carteiras$/);
+  await page.goBack();
+  await page.waitForURL(/\/financas$/);
+  await page.getByRole('link', { name: 'Corrigir saldo de Nubank' }).click();
+  const correcao = page.getByRole('dialog', { name: 'Corrigir saldo', exact: true });
+  await expect(correcao.getByLabel('Quanto o banco mostra agora?')).toBeVisible();
+  await expect(page).toHaveURL(/\/financas\/carteiras$/);
+  await page.keyboard.press('Escape');
+  await expect(correcao).toBeHidden();
+  await page.goBack();
+  await page.waitForURL(/\/financas$/);
   await page.getByRole('button', { name: 'por quê? No fim do mês sobra' }).click();
   await expect(page.getByTestId('previsao-fim-mes-conta')).toHaveText(/^Renda R\$\s2\.200,00 − gastos lançados R\$\s0,00 − contas a pagar R\$\s110,00 = sobra R\$\s2\.090,00$/);
   await expect(page.getByText('Em 7 dias você terá')).toHaveCount(0);

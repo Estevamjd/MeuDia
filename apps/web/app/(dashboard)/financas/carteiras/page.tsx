@@ -50,6 +50,19 @@ function CarteirasConteudo() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pedeNova]);
 
+  // `?corrigir=<id>` (o "Corrigir" do Cofrinho com um banco) abre o "Corrigir saldo" dele quando o painel carrega;
+  // `?corrigir=escolher` (vários bancos) mostra o aviso para escolher. O param sai da URL.
+  const pedeCorrigir = searchParams.get('corrigir');
+  const [avisoEscolher, setAvisoEscolher] = useState(false);
+  useEffect(() => {
+    if (!pedeCorrigir || painel.isLoading) return;
+    const alvo = (painel.data?.carteiras ?? []).find((s) => s.carteira.id === pedeCorrigir);
+    if (alvo) setCorrigindo({ carteira: alvo.carteira, saldo: alvo.saldo });
+    else if (painel.data?.carteiras.length) setAvisoEscolher(true);
+    router.replace(pathname, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedeCorrigir, painel.isLoading, painel.data]);
+
   const confirmarArquivar = () => {
     if (!arquivando) return;
     atualizar.mutate(
@@ -123,6 +136,11 @@ function CarteirasConteudo() {
             Cofrinho: <span className="font-semibold tabular-nums text-text">{formatBRLSinal(painel.data!.saldoHoje)}</span>
             {ativas.some((s) => !s.carteira.incluir_no_total) ? ' (sem contar o que está fora do total)' : ''}.
           </p>
+          {avisoEscolher && (
+            <p role="status" className="rounded-card border border-accent/40 bg-accent/[0.08] px-4 py-3 text-[15px] text-text">
+              Toque em <span className="font-semibold">Corrigir saldo</span> no banco que está com o valor errado.
+            </p>
+          )}
           <ul className="space-y-2">
             {ativas.map(({ carteira, saldo }) => (
               <li key={carteira.id} className="flex flex-wrap items-center gap-3 rounded-card border border-border bg-card p-4">
@@ -140,7 +158,10 @@ function CarteirasConteudo() {
                   {formatBRLSinal(saldo)}
                 </span>
                 <div className="flex w-full justify-end gap-1 sm:w-auto">
-                  <Button variant="ghost" className="min-h-[44px]" onClick={() => setCorrigindo({ carteira, saldo })} aria-label={`Corrigir saldo de ${carteira.nome}`}>
+                  <Button variant="ghost" className="min-h-[44px]" onClick={() => {
+                    setAvisoEscolher(false);
+                    setCorrigindo({ carteira, saldo });
+                  }} aria-label={`Corrigir saldo de ${carteira.nome}`}>
                     <Scale size={16} aria-hidden="true" /> Corrigir saldo
                   </Button>
                   <Button variant="icon" className="min-h-[44px] min-w-[44px]" onClick={() => setEditando(carteira)} aria-label={`Editar ${carteira.nome}`}>
