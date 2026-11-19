@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { X, LogOut } from 'lucide-react';
 import { useAppMode } from '../AppModeProvider';
-import { isNavAtivo, itensDrawer } from '../../lib/navegacao';
+import { isNavAtivo, secoesDrawer } from '../../lib/navegacao';
 
 const FOCAVEIS = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 /** Breakpoint `md` do Tailwind. */
@@ -24,7 +24,7 @@ interface NavDrawerProps {
 /** Menu lateral mobile (modo Finanças): dialog modal com focus trap. */
 export function NavDrawer({ id, isOpen, onClose, onSignOut, returnFocusRef }: NavDrawerProps) {
   const pathname = usePathname();
-  const itens = itensDrawer(useAppMode());
+  const secoes = secoesDrawer(useAppMode());
   const painelRef = useRef<HTMLDivElement>(null);
   const pathnameAnterior = useRef(pathname);
 
@@ -136,29 +136,34 @@ export function NavDrawer({ id, isOpen, onClose, onSignOut, returnFocusRef }: Na
           </button>
         </div>
 
-        <nav aria-label="Menu" className="flex-1">
-          <ul className="flex flex-col gap-1">
-            {itens.map((item) => {
-              const ativo = isNavAtivo(pathname, item);
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    onClick={onClose}
-                    aria-current={ativo ? 'page' : undefined}
-                    className={`flex min-h-[44px] items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
-                      ativo ? 'bg-accent/15 text-accent' : 'text-muted hover:bg-card hover:text-text'
-                    }`}
-                  >
-                    <span className="w-6 text-center text-lg" aria-hidden="true">
-                      {item.emoji}
-                    </span>
-                    {item.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+        <nav aria-label="Menu" className="flex-1 space-y-5">
+          {secoes.map((secao) => (
+            <div key={secao.label}>
+              <p className="lap-rotulo mb-1.5 px-3 text-muted-text">{secao.label}</p>
+              <ul className="flex flex-col gap-1">
+                {secao.items.map((item) => {
+                  const ativo = isNavAtivo(pathname, item);
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        onClick={onClose}
+                        aria-current={ativo ? 'page' : undefined}
+                        className={`flex min-h-[44px] items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                          ativo ? 'bg-accent/15 text-accent' : 'text-muted hover:bg-card hover:text-text'
+                        }`}
+                      >
+                        <span className="w-6 text-center text-lg" aria-hidden="true">
+                          {item.emoji}
+                        </span>
+                        {item.label}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
         </nav>
 
         <button

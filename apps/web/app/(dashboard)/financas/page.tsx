@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
-import { Eye, EyeOff, Plus } from 'lucide-react';
+import Link from 'next/link';
+import { ChevronRight, CreditCard, Eye, EyeOff, Plus } from 'lucide-react';
 import { competenciaDe, hojeSP } from '@meudia/shared';
 import { Button } from '../../../components/ui';
 import { AgentBannerAuto } from '../../../components/agent';
@@ -60,6 +61,20 @@ export default function FinancasPage() {
       {mode !== 'financas' && <AgentBannerAuto />}
 
       <FinancasHomeView {...home} />
+
+      {/* Assinaturas saiu da barra (virou Treino/Dieta): atalho discreto aqui + no menu ☰. */}
+      {mode === 'financas' && home.estado === 'pronto' && (
+        <Link href="/assinaturas" className="lap-cartao mt-3 flex min-h-[56px] items-center justify-between gap-3 px-4 text-[15px] text-text">
+          <span className="flex items-center gap-3">
+            <CreditCard size={18} className="text-accent" aria-hidden="true" />
+            <span>
+              Assinaturas
+              <span className="block text-xs text-muted">Streaming, apps e o que renova todo mês</span>
+            </span>
+          </span>
+          <ChevronRight size={18} className="text-muted" aria-hidden="true" />
+        </Link>
+      )}
     </div>
   );
 }

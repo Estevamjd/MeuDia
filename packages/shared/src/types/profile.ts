@@ -12,6 +12,8 @@ export interface Profile {
   meta_agua: number;
   objetivo: Objetivo | null;
   onboarding_feito: boolean;
+  /** Número que fala com o assistente (só dígitos, com DDI). Ausente antes da 010. */
+  whatsapp?: string | null;
   created_at: string;
 }
 
@@ -25,4 +27,5 @@ export interface ProfileUpdate {
   meta_agua?: number;
   objetivo?: Objetivo | null;
   onboarding_feito?: boolean;
+  whatsapp?: string | null;
 }

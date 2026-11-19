@@ -115,7 +115,7 @@ test('Config: seções, nome, dia do salário, Categorias → Orçamento, Baixar
 
   // ── Config: h1 e seções na ordem ───────────────────────────────────────────
   const nav = page.getByRole('navigation', { name: 'Navegação principal' });
-  await nav.getByRole('button', { name: 'Mais opções' }).click();
+  await page.getByRole('button', { name: 'Abrir menu' }).click();
   await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Configurações' }).click();
   await page.waitForURL(/\/configuracoes$/);
   await expect(page.getByRole('heading', { level: 1 }).first()).toHaveText('Configurações');
@@ -194,7 +194,7 @@ test('Config: seções, nome, dia do salário, Categorias → Orçamento, Baixar
   await page.screenshot({ path: path.join(EVIDENCIAS, '04-orcamento-sem-sobra-prevista.png'), animations: 'disabled' });
 
   // ── Gastos: ícones de Comida (utensils), Unha (paintbrush) e Sobrancelha (eye) ──
-  await nav.getByRole('button', { name: 'Mais opções' }).click();
+  await page.getByRole('button', { name: 'Abrir menu' }).click();
   await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Gastos' }).click();
   await page.waitForURL(/\/financas\/gastos$/);
   const lista = page.getByRole('region', { name: 'Últimas despesas' });
@@ -209,7 +209,7 @@ test('Config: seções, nome, dia do salário, Categorias → Orçamento, Baixar
   await page.screenshot({ path: path.join(EVIDENCIAS, '03-gastos-icones-novos.png'), animations: 'disabled' });
 
   // ── Sair → /login ──────────────────────────────────────────────────────────
-  await nav.getByRole('button', { name: 'Mais opções' }).click();
+  await page.getByRole('button', { name: 'Abrir menu' }).click();
   await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Configurações' }).click();
   await page.waitForURL(/\/configuracoes$/);
   await page.locator('[data-secao="sair"]').getByRole('button', { name: 'Sair' }).click();

@@ -70,7 +70,7 @@ const despesa = (descricao: string, categoria: string, valor: number, data: stri
   tipo: 'despesa', descricao, categoria, valor, data, carteira_id, banco, created_at: `${data}T${hora}:00:00.000Z`,
 });
 
-test('design v2: Início, Assinaturas, Relatório e Mais; Ver todos, Chat no header, Gastei e filtros de Gastos', async ({ page }) => {
+test('design v2: Início, Treino, Dieta e Relatório (menu no ☰); Ver todos, Chat no header, Gastei e filtros de Gastos', async ({ page }) => {
   const erros = coletarErros(page);
   const EVIDENCIAS = pastaEvidencias('icones-abas');
   // Dados típicos: 2 bancos, 2 contas, 3 gastos (e 1 em setembro), salário já recebido.
@@ -132,15 +132,17 @@ test('design v2: Início, Assinaturas, Relatório e Mais; Ver todos, Chat no hea
   expect(larguras.scroll, 'rolagem lateral na Início').toBeLessThanOrEqual(larguras.cliente);
   await page.screenshot({ path: path.join(EVIDENCIAS, '10-inicio-resumida.png'), animations: 'disabled' });
 
-  // ── Barra: Início, Assinaturas, Relatório (links) + Mais (botão), ≥ 44px, safe-area, aria-current ──
+  // ── Barra: Início, Treino, Dieta, Relatório (sem "Mais": o ☰ abre o menu), ≥ 44px, safe-area, aria-current ──
   expect(await nav.getAttribute('style')).toContain('safe-area-inset-bottom');
   expect(caixaNav.y + caixaNav.height).toBeLessThanOrEqual(844);
   const abas = [
     { nome: 'Início', url: /\/financas$/, titulo: 'Olá, Lia' },
-    { nome: 'Assinaturas', url: /\/assinaturas$/, titulo: 'Assinaturas' },
+    { nome: 'Treino', url: /\/treinos$/, titulo: 'Treino' },
+    { nome: 'Dieta', url: /\/refeicoes$/, titulo: 'Dieta' },
     { nome: 'Relatório', url: /\/financas\/relatorio$/, titulo: 'Seu outubro, Lia' },
   ];
   await expect(nav.getByRole('link')).toHaveText(abas.map((a) => a.nome));
+  await expect(nav.getByRole('button')).toHaveCount(0);
   for (const aba of [...abas.slice(1), abas[0]!]) {
     const link = nav.getByRole('link', { name: aba.nome });
     await link.click();
@@ -152,18 +154,18 @@ test('design v2: Início, Assinaturas, Relatório e Mais; Ver todos, Chat no hea
     expect(caixa.height, `${aba.nome} < 44px`).toBeGreaterThanOrEqual(44);
     expect(caixa.width, `${aba.nome} < 44px`).toBeGreaterThanOrEqual(44);
   }
-  // "Mais" abre o menu lateral com Gastos, Metas, Bancos, Contas, Orçamento, Saúde, Treinos e Configurações.
-  const mais = nav.getByRole('button', { name: 'Mais opções' });
+  // O ☰ do topo abre o menu em seções: Finanças (Gastos, Contas, Assinaturas…), Saúde e Conta.
+  const mais = page.getByRole('button', { name: 'Abrir menu' });
   const caixaMais = (await mais.boundingBox())!;
   expect(caixaMais.height).toBeGreaterThanOrEqual(44);
   await mais.click();
   const menu = page.getByRole('dialog', { name: /MeuDia/ });
   await expect(menu).toBeVisible();
-  for (const nome of ['Gastos', 'Metas', 'Bancos e carteira', 'Contas', 'Orçamento', 'Configurações']) await expect(menu.getByRole('link', { name: nome, exact: true })).toBeVisible();
+  for (const nome of ['Gastos', 'Contas', 'Assinaturas', 'Orçamento', 'Metas', 'Bancos e carteira', 'Plano de treino', 'Calorias e peso', 'Configurações']) await expect(menu.getByRole('link', { name: nome, exact: true })).toBeVisible();
+  await page.screenshot({ path: path.join(EVIDENCIAS, '15-menu-secoes.png'), animations: 'disabled' });
   await menu.getByRole('link', { name: 'Metas' }).click();
   await page.waitForURL(/\/financas\/metas$/);
   await expect(nav.locator('[aria-current="page"]')).toHaveCount(0);
-  await expect(mais).toHaveClass(/text-accent/);
   await nav.getByRole('link', { name: 'Início' }).click();
   await page.waitForURL(/\/financas$/);
 
@@ -186,10 +188,10 @@ test('design v2: Início, Assinaturas, Relatório e Mais; Ver todos, Chat no hea
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
 
-  // ── "Ver todos" → Gastos (no menu Mais) ────────────────────────────────────
+  // ── "Ver todos" → Gastos (no menu ☰) ───────────────────────────────────────
   await ultimos.getByRole('link', { name: /Ver todos/ }).click();
   await page.waitForURL(/\/financas\/gastos$/);
-  await expect(mais).toHaveClass(/text-accent/);
+  await expect(nav.locator('[aria-current="page"]')).toHaveCount(0);
 
   // ── Filtros (URL), lista e total ───────────────────────────────────────────
   const total = page.getByTestId('total-gastos');

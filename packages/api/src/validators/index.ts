@@ -66,3 +66,5 @@ export {
   transferenciaInsertSchema,
 } from './carteiras.validator';
 export * from './metas.validator';
+
+export { registroTreinoInsertSchema, registroRefeicaoInsertSchema } from './registros.validator';

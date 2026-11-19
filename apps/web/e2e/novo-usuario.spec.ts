@@ -227,7 +227,7 @@ test('novo usuário: cadastro → onboarding → finanças → logout → login'
   await shot('limite-salvo');
 
   // ── 7. Novo lançamento (aba Gastos) ────────────────────────────────────────
-  await bottomNav.getByRole('button', { name: 'Mais opções' }).click();
+  await page.getByRole('button', { name: 'Abrir menu' }).click();
   await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Gastos' }).click();
   await page.waitForURL(/\/financas\/gastos$/);
   await tocar(page.getByRole('button', { name: 'Novo lançamento' }));
@@ -266,7 +266,7 @@ test('novo usuário: cadastro → onboarding → finanças → logout → login'
 
   // ── 9. Drawer: abrir e visitar cada item ───────────────────────────────────
   const itensDrawer: { label: string; url: RegExp; titulo: RegExp }[] = [
-    { label: 'Resumo do mês', url: /\/financas$/, titulo: /^Olá/ },
+    { label: 'Gastos', url: /\/financas\/gastos$/, titulo: /Gastos/ },
     { label: 'Bancos e carteira', url: /\/financas\/carteiras$/, titulo: /Bancos e carteira/ },
     { label: 'Contas', url: /\/financas\/contas$/, titulo: /Contas/ },
     { label: 'Orçamento', url: /\/financas\/orcamento$/, titulo: /Orçamento/ },

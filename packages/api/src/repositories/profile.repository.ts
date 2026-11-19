@@ -6,7 +6,7 @@ import { getSupabase } from './supabase';
 export async function findById(userId: string): Promise<Profile | null> {
   const { data, error } = await getSupabase()
     .from('profiles')
-    .select('id, nome, email, avatar_url, peso_atual, altura, meta_peso, meta_calorias, meta_agua, objetivo, onboarding_feito, created_at')
+    .select('id, nome, email, avatar_url, peso_atual, altura, meta_peso, meta_calorias, meta_agua, objetivo, onboarding_feito, whatsapp, created_at')
     .eq('id', userId)
     .maybeSingle();
 
@@ -19,7 +19,7 @@ export async function update(userId: string, data: ProfileUpdate): Promise<Profi
     .from('profiles')
     .update(data)
     .eq('id', userId)
-    .select('id, nome, email, avatar_url, peso_atual, altura, meta_peso, meta_calorias, meta_agua, objetivo, onboarding_feito, created_at')
+    .select('id, nome, email, avatar_url, peso_atual, altura, meta_peso, meta_calorias, meta_agua, objetivo, onboarding_feito, whatsapp, created_at')
     .single();
 
   if (error) throw new AppError(error.message, 'DB_ERROR');

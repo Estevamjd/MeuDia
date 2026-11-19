@@ -130,3 +130,12 @@ export type {
 } from './agente';
 
 export { SELO_LIMITES, LEMBRETE_TEXTOS } from './financas';
+
+export type {
+  OrigemRegistro,
+  TipoRefeicaoRapida,
+  RegistroTreino,
+  RegistroTreinoInsert,
+  RegistroRefeicao,
+  RegistroRefeicaoInsert,
+} from './registros';

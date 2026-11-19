@@ -4,17 +4,15 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
 import { clsx } from 'clsx';
-import { CreditCard, Ellipsis, FileText, House, type LucideIcon } from 'lucide-react';
+import { Dumbbell, FileText, House, Salad, type LucideIcon } from 'lucide-react';
 import { useAppMode } from '../AppModeProvider';
 import {
   BOTTOM_TABS_PADRAO,
   MENU_MAIS_PADRAO,
   isNavAtivo,
   itensBottomFinancas,
-  maisAtivo,
   type IconeAba,
 } from '../../lib/navegacao';
-import { useMenuLateral } from '../../lib/menu-lateral';
 
 const TABS_PRINCIPAIS = BOTTOM_TABS_PADRAO;
 const MENU_MAIS = MENU_MAIS_PADRAO;
@@ -26,19 +24,20 @@ export function BottomNav() {
 
 const ICONES: Record<IconeAba, LucideIcon> = {
   house: House,
-  'credit-card': CreditCard,
+  dumbbell: Dumbbell,
+  salad: Salad,
   'file-text': FileText,
 };
 
 const ABA =
   'relative flex min-h-[56px] min-w-[44px] flex-1 flex-col items-center justify-center gap-1 px-1 pb-1 pt-2 text-[11px] font-medium leading-tight transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
 
-/** Design v2: Início, Assinaturas, Relatório e "Mais" (abre o menu lateral). A ativa fica ciano com `aria-current="page"`. */
+/**
+ * Modo Finanças: Início · Treino · Dieta · Relatório (docs/ia-navegacao.md). Sem "Mais": o ☰ no topo já abre o menu.
+ * A ativa fica ciano, com `aria-current="page"`.
+ */
 function BottomNavFinancas() {
   const pathname = usePathname();
-  const abrirMenu = useMenuLateral((m) => m.abrir);
-  const menuAberto = useMenuLateral((m) => m.aberto);
-  const mais = maisAtivo(pathname);
   return (
     <nav
       aria-label="Navegação principal"
@@ -65,17 +64,6 @@ function BottomNavFinancas() {
             </Link>
           );
         })}
-        <button
-          type="button"
-          onClick={abrirMenu}
-          aria-haspopup="dialog"
-          aria-expanded={menuAberto}
-          aria-label="Mais opções"
-          className={clsx(ABA, mais || menuAberto ? 'text-accent' : 'text-muted hover:text-text')}
-        >
-          <Ellipsis size={20} aria-hidden="true" />
-          <span>Mais</span>
-        </button>
       </div>
     </nav>
   );

@@ -53,7 +53,8 @@ db() {
     "${q[@]}" -f tests/007_excluir_metas.sql >/dev/null
     "${q[@]}" -f tests/008_saude_treino.sql >/dev/null
     "${q[@]}" -f tests/009_origem_lancamento.sql >/dev/null
-    echo "ok: tests/005_financas.sql, tests/006_carteiras.sql, tests/007_excluir_metas.sql, tests/008_saude_treino.sql e tests/009_origem_lancamento.sql"
+    "${q[@]}" -f tests/010_treino_dieta_whatsapp.sql >/dev/null
+    echo "ok: tests/005_financas.sql, tests/006_carteiras.sql, tests/007_excluir_metas.sql, tests/008_saude_treino.sql tests/009_origem_lancamento.sql e tests/010_treino_dieta_whatsapp.sql"
     bash tests/006_corrigir_saldo_concorrencia.sh
   )
 }

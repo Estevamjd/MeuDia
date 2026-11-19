@@ -35,7 +35,7 @@ export function Cabecalho({ titulo, contexto }: { titulo: string; contexto?: Rea
 
 export const SUBABAS_SAUDE = [
   { href: '/saude', label: 'Hoje' },
-  { href: '/treinos', label: 'Treino' },
+  { href: '/treinos/plano', label: 'Treino' },
   { href: '/saude/dieta', label: 'Dieta' },
   { href: '/saude/peso', label: 'Peso' },
 ] as const;

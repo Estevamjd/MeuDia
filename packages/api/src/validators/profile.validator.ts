@@ -10,4 +10,5 @@ export const profileUpdateSchema = z.object({
   meta_agua: z.number().min(1).max(30).optional(),
   objetivo: z.enum(['saude_geral', 'emagrecer', 'ganhar_massa', 'condicionamento']).nullable().optional(),
   onboarding_feito: z.boolean().optional(),
+  whatsapp: z.string().regex(/^[0-9]{10,15}$/).nullable().optional(),
 });

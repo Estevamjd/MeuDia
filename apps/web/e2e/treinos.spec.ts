@@ -92,9 +92,9 @@ test('modo Finanças: /treinos aparece e mostra o treino do dia no Caderno B', a
 
   // Conta nova, sem treino: o dia mostra o estado vazio genérico.
   await page.getByRole('button', { name: 'Abrir menu' }).click();
-  await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Treinos' }).click();
-  await page.waitForURL(/\/treinos$/);
-  await expect(page.getByRole('heading', { name: 'Treino', level: 1 })).toBeVisible();
+  await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Plano de treino' }).click();
+  await page.waitForURL(/\/treinos\/plano$/);
+  await expect(page.getByRole('heading', { name: 'Plano de treino', level: 1 })).toBeVisible();
   await expect(page.getByText('Nenhum treino na segunda.')).toBeVisible();
   await expect(page.getByRole('switch', { name: 'Lembrete de treino' })).toHaveAttribute('aria-checked', 'false');
   await shot('treino-vazio-390.png');
@@ -140,7 +140,7 @@ test('modo Finanças: /treinos aparece e mostra o treino do dia no Caderno B', a
   await expect(page.getByText('Sem musculação programada.')).toBeVisible();
   await shot('treino-recuperacao-390.png');
 
-  // Desktop 1440×900: mesma tela, com o item Treinos no menu lateral (seção Saúde).
+  // Desktop 1440×900: mesma tela, com o item Plano de treino no menu lateral (seção Saúde).
   const desktop = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo', bypassCSP: true });
   // Mesma barreira do mock-guard no contexto novo: nada sai para um Supabase real.
   const reais: string[] = [];
@@ -151,9 +151,9 @@ test('modo Finanças: /treinos aparece e mostra o treino do dia no Caderno B', a
   const pc = await desktop.newPage();
   await pc.clock.setFixedTime(new Date(AGORA));
   await entrar(pc);
-  await pc.goto('/treinos');
+  await pc.goto('/treinos/plano');
   await expect(pc.getByText('01 / 06')).toBeVisible();
-  await expect(pc.getByRole('link', { name: /Treinos/ }).first()).toBeVisible();
+  await expect(pc.getByRole('link', { name: /Plano de treino/ }).first()).toBeVisible();
   await pc.screenshot({ path: path.join(pasta, 'treino-depois-1440.png'), animations: 'disabled' });
   await pc.screenshot({ path: path.join(pasta, 'treino-depois-1440-inteira.png'), fullPage: true, animations: 'disabled' });
   await desktop.close();

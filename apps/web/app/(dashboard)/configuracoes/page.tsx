@@ -3,11 +3,11 @@
 import { useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Trash2, AlertTriangle, Loader2, User, CalendarDays, Tags, Shield, FileText, Download, LogOut, ChevronRight,
+  Trash2, AlertTriangle, Loader2, User, CalendarDays, Tags, Shield, FileText, Download, LogOut, ChevronRight, MessageCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { clsx } from 'clsx';
-import { rendaPrincipal } from '@meudia/shared';
+import { formatarWhatsapp, normalizarWhatsapp, rendaPrincipal } from '@meudia/shared';
 import { useAuth } from '../../../hooks/useAuth';
 import { useAtualizarRenda, useProfile, useRendas, useUpdateProfile } from '../../../hooks';
 import { useAppMode } from '../../../components/AppModeProvider';
@@ -145,10 +145,11 @@ function Perfil() {
   const rendas = useRendas();
   const salvarNome = useUpdateProfile();
   const atualizarRenda = useAtualizarRenda();
-  const [editando, setEditando] = useState<'nome' | 'dia' | null>(null);
+  const [editando, setEditando] = useState<'nome' | 'dia' | 'whatsapp' | null>(null);
 
   const principal = rendas.data ? rendaPrincipal(rendas.data) : null;
   const nome = profile.data?.nome ?? '';
+  const whatsapp = profile.data?.whatsapp ?? null;
 
   const fechar = () => setEditando(null);
 
@@ -175,6 +176,50 @@ function Perfil() {
           <ConteudoLinha icone={<CalendarDays size={20} />} titulo="Dia do salário" detalhe="Cadastre sua renda" />
         </Link>
       )}
+
+      <button type="button" className={LINHA} onClick={() => setEditando('whatsapp')} disabled={!profile.data}>
+        <ConteudoLinha
+          icone={<MessageCircle size={20} />}
+          titulo="Seu WhatsApp"
+          detalhe={profile.data ? (whatsapp ? formatarWhatsapp(whatsapp) : 'Para lançar pelo assistente') : 'Carregando…'}
+        />
+      </button>
+
+      <Modal isOpen={editando === 'whatsapp'} onClose={fechar} title="Seu WhatsApp">
+        {editando === 'whatsapp' && (
+          <FormularioCampo<string | null>
+            id="config-whatsapp"
+            label="Número com DDD"
+            inicial={whatsapp ? formatarWhatsapp(whatsapp) : ''}
+            ajuda="Só mensagens deste número viram lançamentos na sua conta. Deixe vazio para desligar."
+            opcional
+            isLoading={salvarNome.isPending}
+            onCancel={fechar}
+            validar={(v) => {
+              const numero = normalizarWhatsapp(v);
+              if (numero === undefined) return { erro: 'Número inválido. Ex.: (11) 98888-7777' };
+              return { valor: numero };
+            }}
+            onSubmit={(valor) =>
+              salvarNome.mutate(
+                { whatsapp: valor },
+                {
+                  onSuccess: () => {
+                    toast.success(valor ? 'WhatsApp salvo!' : 'WhatsApp removido');
+                    fechar();
+                  },
+                  onError: (e) =>
+                    toast.error(
+                      /uq_profiles_whatsapp|duplicate|23505/i.test(e instanceof Error ? e.message : String(e))
+                        ? 'Este número já está ligado a outra conta.'
+                        : 'Não foi possível salvar. Tente de novo.',
+                    ),
+                },
+              )
+            }
+          />
+        )}
+      </Modal>
 
       <Modal isOpen={editando === 'nome'} onClose={fechar} title="Editar nome">
         {editando === 'nome' && (
@@ -245,13 +290,15 @@ interface FormularioCampoProps<T> {
   inicial: string;
   tipo?: 'text' | 'number';
   ajuda?: string;
+  /** Campo pode ficar vazio (ex.: WhatsApp = desligar). */
+  opcional?: boolean;
   isLoading: boolean;
   validar: (valor: string) => { erro: string } | { valor: T };
   onCancel: () => void;
   onSubmit: (valor: T) => void;
 }
 
-function FormularioCampo<T>({ id, label, inicial, tipo = 'text', ajuda, isLoading, validar, onCancel, onSubmit }: FormularioCampoProps<T>) {
+function FormularioCampo<T>({ id, label, inicial, tipo = 'text', ajuda, opcional, isLoading, validar, onCancel, onSubmit }: FormularioCampoProps<T>) {
   const [valor, setValor] = useState(inicial);
   const [erro, setErro] = useState<string | undefined>();
 
@@ -275,7 +322,7 @@ function FormularioCampo<T>({ id, label, inicial, tipo = 'text', ajuda, isLoadin
         maxLength={tipo === 'text' ? 80 : undefined}
         value={valor}
         onChange={(e) => setValor(e.target.value)}
-        required
+        required={!opcional}
       />
       {ajuda && <p className="text-xs text-muted">{ajuda}</p>}
       {erro && (

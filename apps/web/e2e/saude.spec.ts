@@ -83,7 +83,7 @@ test('modo Finanças: cadastro de saúde, Hoje, Dieta, Peso e o vazio do Caderno
   await fecharBanner(page);
 
   // Treino sem nada: vazio do Caderno (tela 08), sem o EmptyState de gradiente.
-  await page.goto('/treinos');
+  await page.goto('/treinos/plano');
   await expect(page.getByRole('heading', { name: 'Nenhum treino na segunda.' })).toBeVisible();
   const vazio = page.locator('[data-vazio-caderno]');
   await expect(vazio.getByRole('button', { name: 'Criar treino' })).toBeVisible();
@@ -92,7 +92,7 @@ test('modo Finanças: cadastro de saúde, Hoje, Dieta, Peso e o vazio do Caderno
 
   // Primeira visita a /saude pelo menu: cadastro de saúde.
   await page.getByRole('button', { name: 'Abrir menu' }).click();
-  await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Saúde' }).click();
+  await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Calorias e peso' }).click();
   await page.waitForURL(/\/saude$/);
   await expect(page.getByRole('heading', { name: 'Sobre você' })).toBeVisible();
   await page.getByLabel('Idade').fill('28');
@@ -127,7 +127,7 @@ test('modo Finanças: cadastro de saúde, Hoje, Dieta, Peso e o vazio do Caderno
 
   // Hoje: treino do dia, 930 / 3.102 = 30%, refeições 2 de 6.
   await expect(page.getByRole('heading', { name: 'Superior A' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Começar →' })).toHaveAttribute('href', '/treinos');
+  await expect(page.getByRole('link', { name: 'Começar →' })).toHaveAttribute('href', '/treinos/plano');
   await expect(page.getByText('930', { exact: true })).toBeVisible();
   await expect(page.getByText('/ 3.102')).toBeVisible();
   await expect(page.getByText('30%', { exact: true })).toBeVisible();
@@ -178,7 +178,7 @@ test('modo Finanças: cadastro de saúde, Hoje, Dieta, Peso e o vazio do Caderno
 
   // Treino: "editar" inteiro (QA R1). DM Sans do next/font, letter-spacing normal, uma linha só.
   await page.getByRole('navigation', { name: 'Saúde e treino' }).getByRole('link', { name: 'Treino' }).click();
-  await page.waitForURL(/\/treinos$/);
+  await page.waitForURL(/\/treinos\/plano$/);
   const editar = page.getByRole('button', { name: 'editar', exact: true }).first();
   await editar.scrollIntoViewIfNeeded();
   const medida = await editar.evaluate((el) => {

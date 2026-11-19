@@ -6,6 +6,7 @@ import type { SobraDoMes } from '@meudia/shared';
 import { ExplicacaoSobra } from '../home/CardPrevisao';
 import { formatBRL, formatBRLSinal, formatDiaMes } from '../../../lib/financas-ui';
 import { VALOR_OCULTO } from '../../../lib/carteiras-ui';
+import { NumeroAnimado } from '../../ui/NumeroAnimado';
 import type { ResumoMes, SituacaoMes } from './montarResumoMes';
 
 const SITUACAO: Record<SituacaoMes, { texto: string; classe: string }> = {
@@ -49,7 +50,7 @@ export function HeroiSobra({ resumo, escondido = false, compacto = false, sobra 
           resumo.sobra < 0 && !escondido && 'text-[#fca5a5]',
         )}
       >
-        {escondido ? VALOR_OCULTO : formatBRLSinal(resumo.sobra)}
+        {escondido ? VALOR_OCULTO : <NumeroAnimado valor={resumo.sobra} formatar={formatBRLSinal} />}
       </p>
       {resumo.prevista !== null && (
         <div className="lap-texto-2 mt-2 flex items-start justify-between gap-2 text-[13px] leading-[18px]">

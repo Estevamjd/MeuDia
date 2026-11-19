@@ -1,7 +1,7 @@
 import { filtrarPorModo, rotaInicial, type AppMode } from './app-mode';
 
 const ATALHOS = [
-  { name: 'Treinos', url: '/treinos', description: 'Ver treinos do dia' },
+  { name: 'Treino', url: '/treinos', description: 'Registrar o treino de hoje' },
   { name: 'Habitos', url: '/habitos', description: 'Marcar habitos de hoje' },
   { name: 'Notas', url: '/notas', description: 'Abrir bloco de notas' },
   { name: 'Financas', url: '/financas', description: 'Ver financas do mes' },

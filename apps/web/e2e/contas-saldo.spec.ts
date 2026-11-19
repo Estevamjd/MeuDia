@@ -72,7 +72,7 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   const irPara = async (aba: 'Início' | 'Gastos', url: RegExp) => {
     // Design v2: Gastos saiu da barra e fica no menu "Mais".
     if (aba === 'Gastos') {
-      await bottomNav.getByRole('button', { name: 'Mais opções' }).click();
+      await page.getByRole('button', { name: 'Abrir menu' }).click();
       await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Gastos' }).click();
     } else {
       await bottomNav.getByRole('link', { name: aba }).click();
@@ -174,8 +174,7 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
 
   // 5. Gastei R$ 25 em Comida no Nubank → Hoje 775, rosca Comida 25, fim do mês −145.
   folha = await abrirAcao(/Gastei/);
-  // No Chromium a folha abre antes de o refetch da transferência terminar e o form remonta: espera a rede assentar.
-  await page.waitForLoadState('networkidle');
+  // Regressão: a folha reabria com o form da última ação (Transferir) por um quadro e apagava o valor (corrigido 19/11).
   await folha.getByLabel('Valor').fill('2500');
   await tocar(folha.getByRole('radio', { name: 'Comida' }));
   const nubankGasto = folha.getByRole('radiogroup', { name: 'Saiu de' }).getByRole('radio', { name: 'Nubank' });

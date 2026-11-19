@@ -17,6 +17,7 @@ export const ROTAS_MODULOS = [
   '/saude',
   '/treinos',
   '/dieta',
+  '/refeicoes',
   '/medicamentos',
   '/configuracoes',
 ] as const;
@@ -25,7 +26,8 @@ export const MODULOS_VISIVEIS: Record<AppMode, readonly string[]> = {
   padrao: ROTAS_MODULOS,
   // Saúde e Treino aparece para todos (decisão do Estevam, 04/11/2026): /saude (Hoje, Dieta, Peso) e /treinos.
   // A /dieta antiga (água, lista simples) segue só no modo padrão.
-  financas: ['/financas', '/assinaturas', '/saude', '/treinos', '/configuracoes'],
+  // 19/11/2026: /refeicoes = aba Dieta (registro rápido, também pelo WhatsApp).
+  financas: ['/financas', '/assinaturas', '/saude', '/treinos', '/refeicoes', '/configuracoes'],
 };
 
 export function getAppMode(valor: string | undefined = process.env.APP_MODE): AppMode {

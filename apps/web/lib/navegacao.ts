@@ -40,28 +40,40 @@ const SECOES_PADRAO: NavSection[] = [
   },
 ];
 
-// Modo Finanças: só finanças (as subrotas ganham item próprio).
-const ITENS_FINANCAS: NavItem[] = [
-  { href: '/financas', label: 'Resumo do mês', emoji: '💸', exato: true },
-  { href: '/financas/relatorio', label: 'Relatório mensal', emoji: '📄' },
+// Modo Finanças (IA de navegação 19/11/2026, docs/ia-navegacao.md): a barra de baixo tem as 4 áreas do dia
+// (Início · Treino · Dieta · Relatório); o menu ☰ tem só o que NÃO está na barra, em grupos. Sem "Mais".
+const RESUMO_DO_MES: NavItem = { href: '/financas', label: 'Resumo do mês', emoji: '💸', exato: true };
+const RELATORIO: NavItem = { href: '/financas/relatorio', label: 'Relatório mensal', emoji: '📄' };
+const TREINO: NavItem = { href: '/treinos', label: 'Treino', emoji: '🏋️', exato: true };
+const DIETA: NavItem = { href: '/refeicoes', label: 'Dieta', emoji: '🥗' };
+
+const ITENS_FINANCAS_MENU: NavItem[] = [
   { href: '/financas/gastos', label: 'Gastos', emoji: '🧾' },
-  { href: '/financas/carteiras', label: 'Bancos e carteira', emoji: '🏦' },
-  { href: '/financas/contas', label: 'Contas', emoji: '🧾' },
+  { href: '/financas/contas', label: 'Contas', emoji: '📅' },
+  { href: '/assinaturas', label: 'Assinaturas', emoji: '💳' },
   { href: '/financas/orcamento', label: 'Orçamento', emoji: '📊' },
   { href: '/financas/metas', label: 'Metas', emoji: '🎯' },
-  { href: '/assinaturas', label: 'Assinaturas', emoji: '💳' },
+  { href: '/financas/carteiras', label: 'Bancos e carteira', emoji: '🏦' },
 ];
 
-// Saúde e Treino no modo Finanças (decisão do Estevam, 04/11): menu lateral e drawer. A BottomNav segue com 5 abas fixas.
-// Saúde = subabas Hoje · Treino · Dieta · Peso; Treinos segue com item próprio.
-const ITENS_SAUDE_FINANCAS: NavItem[] = [
-  { href: '/saude', label: 'Saúde', emoji: '🩺' },
-  { href: '/treinos', label: 'Treinos', emoji: '🏋️' },
+const ITENS_SAUDE_MENU: NavItem[] = [
+  { href: '/treinos/plano', label: 'Plano de treino', emoji: '🗓️' },
+  { href: '/saude', label: 'Calorias e peso', emoji: '⚖️' },
 ];
 
+const CONFIGURACOES: NavItem = { href: '/configuracoes', label: 'Configurações', emoji: '⚙️' };
+
+/** Desktop (sem barra de baixo): tudo, em seções. */
 const SECOES_FINANCAS: NavSection[] = [
-  { label: 'Finanças', items: ITENS_FINANCAS },
-  { label: 'Saúde', items: ITENS_SAUDE_FINANCAS },
+  { label: 'Finanças', items: [RESUMO_DO_MES, RELATORIO, ...ITENS_FINANCAS_MENU] },
+  { label: 'Saúde', items: [TREINO, DIETA, ...ITENS_SAUDE_MENU] },
+];
+
+/** Menu ☰ no celular: o que não está na barra de baixo (sem repetir destino). */
+const SECOES_DRAWER_FINANCAS: NavSection[] = [
+  { label: 'Finanças', items: ITENS_FINANCAS_MENU },
+  { label: 'Saúde', items: ITENS_SAUDE_MENU },
+  { label: 'Conta', items: [CONFIGURACOES] },
 ];
 
 export function secoesSidebar(mode: AppMode): NavSection[] {
@@ -71,12 +83,16 @@ export function secoesSidebar(mode: AppMode): NavSection[] {
     .filter((secao) => secao.items.length > 0);
 }
 
-/** Drawer mobile (modo Finanças): seções de finanças + Saúde + Configurações (que hoje também é a área da conta). */
+/** Menu ☰ mobile (modo Finanças), em seções. */
+export function secoesDrawer(mode: AppMode): NavSection[] {
+  return SECOES_DRAWER_FINANCAS
+    .map((secao) => ({ ...secao, items: filtrarPorModo(secao.items, mode) }))
+    .filter((secao) => secao.items.length > 0);
+}
+
+/** Lista plana do menu ☰ (mesma ordem das seções). */
 export function itensDrawer(mode: AppMode): NavItem[] {
-  return filtrarPorModo(
-    [...ITENS_FINANCAS, ...ITENS_SAUDE_FINANCAS, { href: '/configuracoes', label: 'Configurações', emoji: '⚙️' }],
-    mode,
-  );
+  return secoesDrawer(mode).flatMap((secao) => secao.items);
 }
 
 // --- BottomNav ---
@@ -105,22 +121,17 @@ export const MENU_MAIS_PADRAO: readonly NavItem[] = [
 export const HREF_NOVA_CONTA = '/financas/contas?nova=1';
 
 /** Nome do ícone lucide (kebab-case) de cada aba; o componente mapeia para o ícone. */
-export type IconeAba = 'house' | 'credit-card' | 'file-text';
+export type IconeAba = 'house' | 'dumbbell' | 'salad' | 'file-text';
 
 export type ItemBottomFinancas = NavItem & { icone: IconeAba };
 
-// Design v2 (Astro G, aprovado pelo Estevam em 18/11/2026): Início, Assinaturas, Relatório + "Mais" (abre o menu lateral
-// com Gastos, Metas, Bancos, Contas, Orçamento, Saúde, Treinos e Configurações). O "Gastei" fica no card da Início.
+// 19/11/2026: o "Mais" saiu (o ☰ já abre o menu, era repetido). Assinaturas foi para o ☰ e um atalho na Início.
 const BOTTOM_FINANCAS: ItemBottomFinancas[] = [
   { href: '/financas', label: 'Início', emoji: '🏠', icone: 'house', exato: true },
-  { href: '/assinaturas', label: 'Assinaturas', emoji: '💳', icone: 'credit-card' },
+  { href: '/treinos', label: 'Treino', emoji: '🏋️', icone: 'dumbbell', exato: true },
+  { href: '/refeicoes', label: 'Dieta', emoji: '🥗', icone: 'salad' },
   { href: '/financas/relatorio', label: 'Relatório', emoji: '📄', icone: 'file-text' },
 ];
-
-/** "Mais" acende quando a rota atual não é de nenhuma das abas fixas. */
-export function maisAtivo(pathname: string, mode: AppMode = 'financas'): boolean {
-  return !itensBottomFinancas(mode).some((item) => isNavAtivo(pathname, item));
-}
 
 export function itensBottomFinancas(mode: AppMode = 'financas'): ItemBottomFinancas[] {
   return filtrarPorModo(BOTTOM_FINANCAS, mode);

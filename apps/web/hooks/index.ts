@@ -160,3 +160,12 @@ export {
 export { useVinculosTransacoes } from './useFinancas';
 export { useMetas, useCriarMeta, useAtualizarMeta, useGuardarNaMeta, useExcluirMeta, useSobraDoMesCorrente } from './useMetas';
 export { usePesoRecente, useRegistrarPesoDoDia, usePerfilSaude, hojeLocal } from './useSaude';
+export {
+  registrosKeys,
+  useRegistrosTreino,
+  useRegistrosRefeicao,
+  useRegistrarTreino,
+  useExcluirRegistroTreino,
+  useRegistrarRefeicao,
+  useExcluirRegistroRefeicao,
+} from './useRegistros';

@@ -19,3 +19,4 @@ export { Skeleton, SkeletonCard, SkeletonList } from './Skeleton';
 export { EmptyState } from './EmptyState';
 export { ErrorBoundary } from './ErrorBoundary';
 export { OfflineIndicator } from './OfflineIndicator';
+export { NumeroAnimado } from './NumeroAnimado';

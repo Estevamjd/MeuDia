@@ -1,359 +1,181 @@
 'use client';
 
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
-import { getDay } from 'date-fns';
-import { AlertCircle } from 'lucide-react';
-import { DIAS_SEMANA } from '@meudia/shared';
-import type { Exercicio } from '@meudia/shared';
-import { calcularDescansoSugerido } from '@meudia/ai';
+import { useMemo, useState } from 'react';
+import Link from 'next/link';
+import { ChevronRight, Dumbbell, MessageCircle } from 'lucide-react';
+import { hojeSP, resumoSemana, somarDias, type RegistroTreino } from '@meudia/shared';
+import { useExcluirRegistroTreino, useRegistrarTreino, useRegistrosTreino } from '../../../hooks';
+import { Button, ConfirmDialog, Input, SkeletonCard, useToast } from '../../../components/ui';
+import { CabecalhoPagina } from '../../../components/financas/resumo/CabecalhoPagina';
+import { SemanaPontos } from '../../../components/registros/SemanaPontos';
+import { Sequencia } from '../../../components/registros/Sequencia';
+import { LinhaRegistro } from '../../../components/registros/LinhaRegistro';
+import { quando } from '../../../components/registros/datas';
 
-import {
-  useTreinos,
-  useSessoesSemana,
-  useIniciarSessao,
-  useFinalizarSessao,
-  useCriarTreino,
-  useAdicionarExercicio,
-  useAtualizarExercicio,
-  useExcluirExercicio,
-  useRegistrarSerie,
-  useAtualizarSerie,
-  useSeriesDaSessao,
-  useSeriesAnteriores,
-  useLembreteTreino,
-  useSalvarLembreteTreino,
-} from '../../../hooks';
-import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
-import { EmptyState } from '../../../components/ui/EmptyState';
-import { SkeletonList } from '../../../components/ui/Skeleton';
-import { Modal } from '../../../components/ui/Modal';
-import { Input } from '../../../components/ui/Input';
-import { Button } from '../../../components/ui/Button';
-import { useToast } from '../../../components/ui/Toast';
-import { TimerDescanso } from '../../../components/agent';
-import { AddExercicioModal, type ExercicioFormData } from '../../../components/modules/AddExercicioModal';
-import { SeletorDias, type DiaSeletor } from '../../../components/treinos/SeletorDias';
-import { ExercicioCaderno, type MarcarSerie } from '../../../components/treinos/ExercicioCaderno';
-import { Cabecalho, LinkAcao, Subabas, TelaCaderno, VazioCaderno, classeBotaoCheio } from '../../../components/caderno';
-import { LembreteTreino } from '../../../components/treinos/LembreteTreino';
+const SUGESTOES = ['Peito', 'Costas', 'Pernas', 'Ombro', 'Braço', 'Cardio', 'Corrida', 'Caminhada'];
 
-// Segunda primeiro (S T Q Q S S D); valores de `treinos.dia_semana` (0 = domingo).
-const ORDEM_SEMANA = [1, 2, 3, 4, 5, 6, 0] as const;
-const LETRAS: Record<number, string> = { 0: 'D', 1: 'S', 2: 'T', 3: 'Q', 4: 'Q', 5: 'S', 6: 'S' };
-
-interface Descanso {
-  aberto: boolean;
-  segundos: number;
-  serie: number;
-  total: number;
-  proxima?: { carga: number | null; reps: string };
-}
-
-export default function TreinosPage() {
+/** Aba Treino (Fase 2, v1): registrar em 2 toques, ver a semana e o histórico. O plano por dia fica em /treinos/plano. */
+export default function TreinoPage() {
+  const hojeISO = useMemo(() => hojeSP(), []);
+  const ontemISO = somarDias(hojeISO, -1);
+  // 8 semanas bastam para a sequência e o histórico curto (consulta pequena, plano grátis).
+  const desde = somarDias(hojeISO, -56);
+  const lista = useRegistrosTreino(desde);
+  const registrar = useRegistrarTreino();
+  const excluir = useExcluirRegistroTreino();
   const toast = useToast();
-  const hoje = useMemo(() => getDay(new Date()), []);
-  const [dia, setDia] = useState<number>(hoje);
-  const [abertos, setAbertos] = useState<Record<string, boolean>>({});
-  const [criandoTreino, setCriandoTreino] = useState(false);
-  const [nomeTreino, setNomeTreino] = useState('');
-  const [adicionando, setAdicionando] = useState(false);
-  const [editando, setEditando] = useState<Exercicio | null>(null);
-  const [excluindo, setExcluindo] = useState<Exercicio | null>(null);
-  const [descanso, setDescanso] = useState<Descanso>({ aberto: false, segundos: 60, serie: 1, total: 1 });
 
-  const treinosQ = useTreinos();
-  const sessoesQ = useSessoesSemana({ noModoFinancas: true });
-  const lembreteQ = useLembreteTreino();
-  const salvarLembrete = useSalvarLembreteTreino();
-  const iniciarSessao = useIniciarSessao();
-  const finalizarSessao = useFinalizarSessao();
-  const criarTreino = useCriarTreino();
-  const adicionarExercicio = useAdicionarExercicio();
-  const atualizarExercicio = useAtualizarExercicio();
-  const excluirExercicio = useExcluirExercicio();
-  const registrarSerie = useRegistrarSerie();
-  const atualizarSerie = useAtualizarSerie();
+  const [descricao, setDescricao] = useState('');
+  const [minutos, setMinutos] = useState('');
+  const [erro, setErro] = useState<string | null>(null);
+  const [excluindo, setExcluindo] = useState<RegistroTreino | null>(null);
 
-  const treinos = useMemo(() => treinosQ.data ?? [], [treinosQ.data]);
-  const treinosDoDia = treinos.filter((t) => t.dia_semana === dia);
-  const treino = treinosDoDia.find((t) => t.tipo !== 'descanso') ?? null;
-  const descansoDoDia = !treino ? treinosDoDia.find((t) => t.tipo === 'descanso') ?? null : null;
-  const exercicios = useMemo(() => treino?.exercicios ?? [], [treino]);
+  const registros = useMemo(() => lista.data ?? [], [lista.data]);
+  const semana = useMemo(() => resumoSemana(registros, hojeISO), [registros, hojeISO]);
 
-  const sessaoAtiva = (sessoesQ.data ?? []).find((s) => !s.concluido && (!treino || s.treino_id === treino.id)) ?? null;
-  const seriesQ = useSeriesDaSessao(sessaoAtiva?.id);
-  const anterioresQ = useSeriesAnteriores(exercicios.map((e) => e.id), sessaoAtiva?.id ?? null);
-
-  const dias: DiaSeletor[] = ORDEM_SEMANA.map((d) => {
-    const doDia = treinos.filter((t) => t.dia_semana === d);
-    const musculacao = doDia.find((t) => t.tipo !== 'descanso');
-    return {
-      diaSemana: d,
-      letra: LETRAS[d] ?? '',
-      nome: DIAS_SEMANA[d] ?? '',
-      descanso: !musculacao && doDia.some((t) => t.tipo === 'descanso'),
-      treino: musculacao?.nome ?? null,
-    };
-  });
-
-  // Primeiro exercício aberto por padrão; a pessoa abre e fecha os outros.
-  const estaAberto = (e: Exercicio, i: number) => abertos[e.id] ?? i === 0;
-
-  const marcar = useCallback(
-    async (serie: MarcarSerie) => {
-      if (!treino) return;
-      try {
-        let sessaoId = sessaoAtiva?.id;
-        if (!sessaoId) sessaoId = (await iniciarSessao.mutateAsync(treino.id)).id;
-        if (serie.id) {
-          await atualizarSerie.mutateAsync({
-            id: serie.id,
-            data: { carga_usada: serie.carga_usada, reps_feitas: serie.reps_feitas, concluido: serie.concluido },
-          });
-        } else {
-          await registrarSerie.mutateAsync({
-            sessao_id: sessaoId,
-            exercicio_id: serie.exercicio_id,
-            numero_serie: serie.numero_serie,
-            carga_usada: serie.carga_usada,
-            reps_feitas: serie.reps_feitas,
-            concluido: serie.concluido,
-          });
-        }
-        if (serie.concluido) {
-          const ex = exercicios.find((e) => e.id === serie.exercicio_id);
-          const total = ex?.series ?? 1;
-          setDescanso({
-            aberto: true,
-            segundos: calcularDescansoSugerido(ex?.tempo_descanso ?? null, serie.carga_usada, serie.numero_serie, total),
-            serie: serie.numero_serie,
-            total,
-            proxima: serie.numero_serie < total ? { carga: serie.carga_usada, reps: ex?.repeticoes ?? '' } : undefined,
-          });
-        }
-      } catch {
-        toast.error('Não deu para salvar a série. Tente de novo.');
-      }
-    },
-    [treino, sessaoAtiva, iniciarSessao, atualizarSerie, registrarSerie, exercicios, toast],
-  );
-
-  const concluirTreino = async () => {
-    if (!sessaoAtiva) return;
-    const minutos = Math.max(1, Math.round((Date.now() - new Date(sessaoAtiva.created_at).getTime()) / 60000));
-    try {
-      await finalizarSessao.mutateAsync({ sessaoId: sessaoAtiva.id, duracao: minutos });
-      toast.success(`Treino salvo: ${minutos} min.`);
-    } catch {
-      toast.error('Não deu para concluir o treino. Tente de novo.');
-    }
+  const enviar = (e: React.FormEvent) => {
+    e.preventDefault();
+    const texto = descricao.trim();
+    const min = minutos ? Number(minutos) : null;
+    if (!texto) return setErro('Diga o que treinou (ex.: Peito e tríceps).');
+    if (min !== null && (!Number.isInteger(min) || min < 1 || min > 600)) return setErro('Minutos entre 1 e 600.');
+    setErro(null);
+    registrar.mutate(
+      { descricao: texto, duracao_min: min, data: hojeISO },
+      {
+        onSuccess: () => {
+          toast.success('Treino registrado');
+          setDescricao('');
+          setMinutos('');
+        },
+        onError: () => toast.error('Não foi possível registrar. Tente de novo.'),
+      },
+    );
   };
-
-  const salvarTreinoNovo = async () => {
-    const nome = nomeTreino.trim();
-    if (!nome) return;
-    try {
-      await criarTreino.mutateAsync({ nome, dia_semana: dia as 0 | 1 | 2 | 3 | 4 | 5 | 6, tipo: 'musculacao' });
-      setCriandoTreino(false);
-      setNomeTreino('');
-    } catch {
-      toast.error('Não deu para criar o treino. Tente de novo.');
-    }
-  };
-
-  const salvarExercicio = async (data: ExercicioFormData) => {
-    try {
-      if (editando) {
-        await atualizarExercicio.mutateAsync({ id: editando.id, data });
-        setEditando(null);
-      } else if (treino) {
-        await adicionarExercicio.mutateAsync({ ...data, treino_id: treino.id, ordem: exercicios.length });
-        setAdicionando(false);
-      }
-    } catch {
-      toast.error('Não deu para salvar o exercício. Tente de novo.');
-    }
-  };
-
-  const confirmarExclusao = async () => {
-    if (!excluindo) return;
-    try {
-      await excluirExercicio.mutateAsync(excluindo.id);
-      setExcluindo(null);
-    } catch {
-      toast.error('Não deu para excluir o exercício. Tente de novo.');
-    }
-  };
-
-  const nomeDia = DIAS_SEMANA[dia] ?? '';
-  const contexto = treino?.nome ?? descansoDoDia?.nome ?? nomeDia;
-
-  let conteudo: ReactNode;
-  if (treinosQ.isLoading) {
-    conteudo = (
-      <div className="px-5 py-[18px]" aria-busy="true" aria-label="Carregando treino">
-        <SkeletonList count={3} />
-      </div>
-    );
-  } else if (treinosQ.isError) {
-    conteudo = (
-      <EmptyState
-        icon={<AlertCircle size={36} aria-hidden="true" />}
-        title="Não deu para carregar o treino."
-        description="Confira a conexão e tente de novo."
-        actionLabel="Tentar de novo"
-        onAction={() => void treinosQ.refetch()}
-      />
-    );
-  } else if (descansoDoDia) {
-    conteudo = (
-      <section className="border-b border-white/[0.07] px-5 py-[18px]">
-        <p className="text-[10.5px] uppercase tracking-[1.6px] text-muted-text">{nomeDia}</p>
-        <h2 className="mt-1 font-syne text-[22px] font-bold text-text">{descansoDoDia.nome}</h2>
-        <p className="mt-1 text-[14.5px] text-muted-text">Sem musculação programada.</p>
-      </section>
-    );
-  } else if (!treino) {
-    conteudo = (
-      <VazioCaderno
-        rotulo={nomeDia}
-        titulo={`Nenhum treino na ${nomeDia.toLowerCase()}.`}
-        explicacao="Crie o treino do dia e depois adicione os exercícios."
-        acao="Criar treino"
-        onAcao={() => setCriandoTreino(true)}
-      />
-    );
-  } else if (exercicios.length === 0) {
-    conteudo = (
-      <VazioCaderno
-        rotulo={treino.nome}
-        titulo="Nenhum exercício neste treino."
-        explicacao="Adicione o primeiro com séries, repetições e carga."
-        acao="Adicionar exercício"
-        onAcao={() => setAdicionando(true)}
-      />
-    );
-  } else {
-    conteudo = (
-      <>
-        {exercicios.map((e, i) => (
-          <ExercicioCaderno
-            key={e.id}
-            exercicio={e}
-            posicao={i + 1}
-            total={exercicios.length}
-            anteriores={anterioresQ.data?.[e.id]}
-            feitas={(seriesQ.data ?? []).filter((s) => s.exercicio_id === e.id)}
-            aberto={estaAberto(e, i)}
-            onAlternar={() => setAbertos((a) => ({ ...a, [e.id]: !estaAberto(e, i) }))}
-            onMarcar={(s) => void marcar(s)}
-            onEditar={() => setEditando(e)}
-            onExcluir={() => setExcluindo(e)}
-          />
-        ))}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.07] px-5 py-3">
-          <LinkAcao onClick={() => setAdicionando(true)}>+ exercício</LinkAcao>
-          {sessaoAtiva && (
-            <button
-              type="button"
-              onClick={() => void concluirTreino()}
-              disabled={finalizarSessao.isPending}
-              className={`${classeBotaoCheio} !w-auto`}
-            >
-              Concluir treino
-            </button>
-          )}
-        </div>
-      </>
-    );
-  }
 
   return (
-    <TelaCaderno>
-      <Cabecalho titulo="Treino" contexto={contexto} />
-      <Subabas />
+    <div className="mx-auto w-full max-w-2xl animate-fadeSlide space-y-4 md:space-y-5">
+      <CabecalhoPagina titulo="Treino" contexto="O que você fez e como foi a semana" />
 
-      <div className="border-b border-white/[0.07] px-5 py-4">
-        <SeletorDias dias={dias} selecionado={dia} hoje={hoje} onSelecionar={setDia} />
-      </div>
+      {lista.isLoading ? (
+        <div className="space-y-3" aria-busy="true" aria-label="Carregando treinos">
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+      ) : lista.isError ? (
+        <div role="alert" className="lap-cartao flex items-center justify-between gap-3 p-4 text-[15px] text-text">
+          <span>Não foi possível carregar seus treinos.</span>
+          <Button variant="ghost" onClick={() => void lista.refetch()}>Tentar de novo</Button>
+        </div>
+      ) : (
+        <>
+          <section aria-labelledby="treino-semana" className="lap-heroi p-5">
+            <div className="flex items-start justify-between gap-2">
+              <h2 id="treino-semana" className="lap-rotulo">Esta semana</h2>
+              <Sequencia semanas={semana.sequenciaSemanas} oQue="treinando" />
+            </div>
+            <p className="mt-2.5 text-[clamp(2rem,9vw,2.5rem)] font-light leading-[1.1] tracking-[-0.035em] tabular-nums" data-testid="treino-dias-semana">
+              {semana.diasAtivos} {semana.diasAtivos === 1 ? 'dia' : 'dias'}
+            </p>
+            <p className="lap-texto-2 mt-1 text-[13px]">
+              {semana.quantidade === 0
+                ? 'Nenhum treino ainda. O primeiro conta muito.'
+                : `${semana.quantidade} ${semana.quantidade === 1 ? 'treino' : 'treinos'}${semana.minutos ? ` · ${semana.minutos} min` : ''}`}
+            </p>
+            <div className="mt-4">
+              <SemanaPontos dias={semana.dias} hoje={semana.hoje} rotuloFeito="treinou" />
+            </div>
+          </section>
 
-      {conteudo}
+          <section aria-labelledby="treino-registrar" className="lap-cartao p-4">
+            <h2 id="treino-registrar" className="mb-3 text-[15px] font-medium text-text">Registrar treino de hoje</h2>
+            <form onSubmit={enviar} className="space-y-3" noValidate>
+              <Input
+                id="treino-descricao"
+                label="O que treinou?"
+                placeholder="Ex.: Peito e tríceps"
+                value={descricao}
+                maxLength={120}
+                onChange={(e) => setDescricao(e.target.value)}
+              />
+              <div className="-mt-1 flex flex-wrap gap-1.5" aria-label="Sugestões">
+                {SUGESTOES.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setDescricao((d) => (d.trim() ? `${d.trim()}, ${s.toLowerCase()}` : s))}
+                    className="min-h-[36px] rounded-full border border-border bg-card2 px-3 text-[13px] text-muted transition-colors hover:border-accent/40 hover:text-text"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+              <Input
+                id="treino-minutos"
+                label="Quanto tempo? (minutos, opcional)"
+                inputMode="numeric"
+                placeholder="40"
+                value={minutos}
+                onChange={(e) => setMinutos(e.target.value.replace(/\D/g, '').slice(0, 3))}
+              />
+              {erro && <p role="alert" className="text-xs text-red">{erro}</p>}
+              <Button type="submit" isLoading={registrar.isPending} className="min-h-[44px] w-full py-3 text-base">
+                <Dumbbell size={16} aria-hidden="true" /> Registrar treino
+              </Button>
+              <p className="flex items-center gap-1.5 text-xs text-muted">
+                <MessageCircle size={12} aria-hidden="true" /> Em breve pelo WhatsApp: “treinei peito 40min”.
+              </p>
+            </form>
+          </section>
 
-      <LembreteTreino
-        ligado={lembreteQ.isError ? null : lembreteQ.data}
-        salvando={salvarLembrete.isPending}
-        onAlterar={(ligado) =>
-          salvarLembrete.mutate(ligado, { onError: () => toast.error('Não deu para salvar o lembrete. Tente de novo.') })
-        }
-      />
+          <section aria-labelledby="treino-historico" className="lap-cartao px-4 pb-1 pt-4">
+            <h2 id="treino-historico" className="text-[15px] font-medium text-text">Últimos treinos</h2>
+            {registros.length === 0 ? (
+              <p className="py-4 text-[13px] text-muted">Seus treinos aparecem aqui, com a data e de onde vieram.</p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {registros.slice(0, 10).map((r) => (
+                  <LinhaRegistro
+                    key={r.id}
+                    titulo={r.descricao}
+                    meta={`${quando(r.data, hojeISO, ontemISO)}${r.duracao_min ? ` · ${r.duracao_min} min` : ''}`}
+                    origem={r.origem}
+                    onExcluir={() => setExcluindo(r)}
+                    rotuloExcluir={`Excluir treino ${r.descricao}`}
+                  />
+                ))}
+              </ul>
+            )}
+          </section>
 
-      <TimerDescanso
-        isOpen={descanso.aberto}
-        tempoInicial={descanso.segundos}
-        serieAtual={descanso.serie}
-        totalSeries={descanso.total}
-        proximaSerie={descanso.proxima}
-        onComplete={() => setDescanso((d) => ({ ...d, aberto: false }))}
-        onSkip={() => setDescanso((d) => ({ ...d, aberto: false }))}
-        onClose={() => setDescanso((d) => ({ ...d, aberto: false }))}
-      />
-
-      <Modal isOpen={criandoTreino} onClose={() => setCriandoTreino(false)} title={`Treino de ${nomeDia.toLowerCase()}`}>
-        <form
-          className="flex flex-col gap-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void salvarTreinoNovo();
-          }}
-        >
-          <Input
-            label="Nome do treino"
-            placeholder="Ex.: Superior A"
-            value={nomeTreino}
-            onChange={(e) => setNomeTreino(e.target.value)}
-            maxLength={100}
-            autoFocus
-          />
-          <div className="flex justify-end gap-3">
-            <Button variant="ghost" type="button" onClick={() => setCriandoTreino(false)}>Cancelar</Button>
-            <Button type="submit" isLoading={criarTreino.isPending} disabled={!nomeTreino.trim()}>Salvar</Button>
-          </div>
-        </form>
-      </Modal>
-
-      <AddExercicioModal
-        key={editando?.id ?? 'novo'}
-        isOpen={adicionando || !!editando}
-        onClose={() => {
-          setAdicionando(false);
-          setEditando(null);
-        }}
-        onSubmit={(data) => void salvarExercicio(data)}
-        isLoading={adicionarExercicio.isPending || atualizarExercicio.isPending}
-        title={editando ? 'Editar exercício' : 'Adicionar exercício'}
-        defaultValues={
-          editando
-            ? {
-                nome: editando.nome,
-                series: editando.series,
-                repeticoes: editando.repeticoes,
-                carga: editando.carga,
-                tempo_descanso: editando.tempo_descanso,
-                observacao: editando.observacao,
-              }
-            : undefined
-        }
-      />
+          <Link href="/treinos/plano" className="lap-cartao flex min-h-[56px] items-center justify-between gap-3 px-4 text-[15px] text-text">
+            <span>
+              Plano de treino
+              <span className="block text-xs text-muted">Exercícios, séries e cargas por dia da semana</span>
+            </span>
+            <ChevronRight size={18} className="text-muted" aria-hidden="true" />
+          </Link>
+        </>
+      )}
 
       <ConfirmDialog
-        isOpen={!!excluindo}
+        isOpen={excluindo !== null}
         onClose={() => setExcluindo(null)}
-        onConfirm={() => void confirmarExclusao()}
-        title="Excluir exercício"
-        message={`Excluir "${excluindo?.nome ?? ''}" e o histórico de cargas dele? Isso não pode ser desfeito.`}
+        onConfirm={() =>
+          excluindo &&
+          excluir.mutate(excluindo.id, {
+            onSuccess: () => {
+              toast.success('Treino excluído');
+              setExcluindo(null);
+            },
+            onError: () => toast.error('Não foi possível excluir.'),
+          })
+        }
+        title="Excluir treino?"
+        message={excluindo ? `“${excluindo.descricao}” sai do histórico.` : ''}
         confirmLabel="Excluir"
-        isLoading={excluirExercicio.isPending}
+        isLoading={excluir.isPending}
       />
-    </TelaCaderno>
+    </div>
   );
 }

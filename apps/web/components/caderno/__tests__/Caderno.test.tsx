@@ -62,7 +62,7 @@ describe('Subabas Hoje · Treino · Dieta · Peso', () => {
     render(<Subabas />);
     const links = screen.getAllByRole('link');
     expect(links.map((l) => [l.textContent, l.getAttribute('href')])).toEqual([
-      ['Hoje', '/saude'], ['Treino', '/treinos'], ['Dieta', '/saude/dieta'], ['Peso', '/saude/peso'],
+      ['Hoje', '/saude'], ['Treino', '/treinos/plano'], ['Dieta', '/saude/dieta'], ['Peso', '/saude/peso'],
     ]);
     expect(screen.getByRole('link', { name: 'Peso' }).getAttribute('aria-current')).toBe('page');
     expect(screen.getByRole('link', { name: 'Hoje' }).getAttribute('aria-current')).toBeNull();

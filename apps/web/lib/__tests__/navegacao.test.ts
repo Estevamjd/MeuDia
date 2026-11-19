@@ -7,7 +7,7 @@ import {
   isNavAtivo,
   itensBottomFinancas,
   itensDrawer,
-  maisAtivo,
+  secoesDrawer,
   secoesSidebar,
 } from '../navegacao';
 
@@ -25,35 +25,36 @@ describe('Sidebar por APP_MODE', () => {
     ]);
   });
 
-  it('modo finanças: rotas de finanças + seção Saúde com Saúde (Hoje/Dieta/Peso) e Treinos', () => {
+  it('modo finanças: Finanças (com Relatório) + Saúde (Treino, Dieta, Plano, Calorias e peso)', () => {
     const secoes = secoesSidebar('financas');
     expect(secoes.map((s) => s.label)).toEqual(['Finanças', 'Saúde']);
     const todos = secoes.flatMap((s) => hrefs(s.items));
-    expect(todos).toEqual(['/financas', '/financas/relatorio', '/financas/gastos', '/financas/carteiras', '/financas/contas', '/financas/orcamento', '/financas/metas', '/assinaturas', '/saude', '/treinos']);
+    expect(todos).toEqual([
+      '/financas', '/financas/relatorio', '/financas/gastos', '/financas/contas', '/assinaturas', '/financas/orcamento', '/financas/metas', '/financas/carteiras',
+      '/treinos', '/refeicoes', '/treinos/plano', '/saude',
+    ]);
     for (const href of todos) expect(isRotaVisivel(href, 'financas')).toBe(true);
     for (const oculto of OCULTOS_NO_FINANCAS) expect(todos).not.toContain(oculto);
   });
 });
 
 describe('BottomNav modo finanças', () => {
-  it('design v2: Início, Assinaturas e Relatório como links (o "Mais" é botão do menu lateral)', () => {
+  it('Início, Treino, Dieta e Relatório; sem "Mais" (o ☰ do topo já abre o menu)', () => {
     const itens = itensBottomFinancas();
-    expect(itens.map((i) => i.label)).toEqual(['Início', 'Assinaturas', 'Relatório']);
-    expect(hrefs(itens)).toEqual(['/financas', '/assinaturas', '/financas/relatorio']);
-    expect(itens.map((i) => i.icone)).toEqual(['house', 'credit-card', 'file-text']);
+    expect(itens.map((i) => i.label)).toEqual(['Início', 'Treino', 'Dieta', 'Relatório']);
+    expect(hrefs(itens)).toEqual(['/financas', '/treinos', '/refeicoes', '/financas/relatorio']);
+    expect(itens.map((i) => i.icone)).toEqual(['house', 'dumbbell', 'salad', 'file-text']);
+    expect(itens.map((i) => i.label)).not.toContain('Mais');
   });
 
-  it('"Mais" acende fora das abas fixas (Gastos, Metas, Bancos, Config) e apaga nelas', () => {
-    for (const r of ['/financas/gastos', '/financas/metas', '/financas/carteiras', '/configuracoes', '/saude']) expect(maisAtivo(r)).toBe(true);
-    for (const r of ['/financas', '/assinaturas', '/financas/relatorio']) expect(maisAtivo(r)).toBe(false);
+  it('Treino não acende no Plano de treino (que mora no menu)', () => {
+    const treino = itensBottomFinancas()[1]!;
+    expect(isNavAtivo('/treinos', treino)).toBe(true);
+    expect(isNavAtivo('/treinos/plano', treino)).toBe(false);
   });
 
-  it('Treinos e Saúde não entram na barra (ficam no menu lateral, aberto pelo Mais)', () => {
-    expect(hrefs(itensBottomFinancas())).not.toContain('/treinos');
-    expect(hrefs(itensBottomFinancas())).not.toContain('/saude');
-    expect(isRotaVisivel('/treinos', 'financas')).toBe(true);
-    for (const r of ['/saude', '/saude/dieta', '/saude/peso']) expect(isRotaVisivel(r, 'financas')).toBe(true);
-    // A /dieta antiga (água, lista simples) não entra no modo Finanças.
+  it('Saúde antiga fica no menu; a /dieta antiga não entra no modo Finanças', () => {
+    for (const r of ['/saude', '/saude/dieta', '/saude/peso', '/treinos/plano', '/refeicoes']) expect(isRotaVisivel(r, 'financas')).toBe(true);
     expect(isRotaVisivel('/dieta', 'financas')).toBe(false);
   });
 
@@ -72,9 +73,16 @@ describe('BottomNav modo finanças', () => {
 });
 
 describe('Drawer', () => {
-  it('modo finanças: seções de finanças + Saúde + Treinos + Configurações, sem módulos ocultos', () => {
+  it('modo finanças: o que não está na barra, em seções Finanças / Saúde / Conta', () => {
+    const secoes = secoesDrawer('financas');
+    expect(secoes.map((s) => s.label)).toEqual(['Finanças', 'Saúde', 'Conta']);
     const todos = hrefs(itensDrawer('financas'));
-    expect(todos).toEqual(['/financas', '/financas/relatorio', '/financas/gastos', '/financas/carteiras', '/financas/contas', '/financas/orcamento', '/financas/metas', '/assinaturas', '/saude', '/treinos', '/configuracoes']);
+    expect(todos).toEqual([
+      '/financas/gastos', '/financas/contas', '/assinaturas', '/financas/orcamento', '/financas/metas', '/financas/carteiras',
+      '/treinos/plano', '/saude', '/configuracoes',
+    ]);
+    // Nada duplicado com a barra de baixo.
+    for (const aba of hrefs(itensBottomFinancas())) expect(todos).not.toContain(aba);
     for (const href of todos) expect(isRotaVisivel(href, 'financas')).toBe(true);
     for (const oculto of OCULTOS_NO_FINANCAS) expect(todos).not.toContain(oculto);
   });

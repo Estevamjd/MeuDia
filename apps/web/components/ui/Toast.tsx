@@ -3,6 +3,7 @@
 import { useState, useCallback, createContext, useContext, type ReactNode } from 'react';
 import { clsx } from 'clsx';
 import { CheckCircle, XCircle, AlertTriangle, Info, X } from 'lucide-react';
+import { vibrarLeve } from '../../lib/feedback';
 
 type ToastType = 'success' | 'error' | 'warning' | 'info';
 
@@ -59,7 +60,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value: ToastContextValue = {
-    success: (msg) => addToast('success', msg),
+    success: (msg) => {
+      vibrarLeve(); // toque curto de "deu certo" (Android); no iPhone nada acontece
+      addToast('success', msg);
+    },
     error: (msg) => addToast('error', msg),
     warning: (msg) => addToast('warning', msg),
     info: (msg) => addToast('info', msg),

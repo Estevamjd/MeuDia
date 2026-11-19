@@ -13,3 +13,4 @@ export * from './metas-saude';
 export * from './peso';
 export * from './nutricao';
 export * from './creatina';
+export * from './registros';

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeftRight, HandCoins, ShoppingBag } from 'lucide-react';
 import { CATEGORIA_OUTROS, hojeSP } from '@meudia/shared';
@@ -28,9 +28,14 @@ interface LancamentoRapidoSheetProps {
 /** Folha do "+": Gastei · Entrou dinheiro · Transferir (o "Paguei" e o "Recebi" ficam nos cards da home). */
 export function LancamentoRapidoSheet({ open, onClose, inicial = 'menu' }: LancamentoRapidoSheetProps) {
   const [acao, setAcao] = useState<AcaoRapida>(inicial);
-  useEffect(() => {
+  // Ao abrir, a ação volta para `inicial` NO MESMO render (padrão "ajustar estado durante o render").
+  // Antes era um useEffect: o 1º quadro mostrava o form da última vez (ex.: Transferir, que também tem "Valor")
+  // e só depois trocava para o Gastei, apagando o que já tinha sido digitado.
+  const [abertoAntes, setAbertoAntes] = useState(open);
+  if (open !== abertoAntes) {
+    setAbertoAntes(open);
     if (open) setAcao(inicial);
-  }, [open, inicial]);
+  }
 
   return (
     <Modal isOpen={open} onClose={onClose} title={TITULOS[acao]} className="max-h-[calc(100dvh-2rem)] overflow-y-auto">

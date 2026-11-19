@@ -140,7 +140,7 @@ export default function SaudeHojePage() {
           {feitoHoje ? (
             <span className="rounded-[2px] border border-accent3/50 px-2 py-0.5 text-[10px] uppercase tracking-[1.4px] text-accent3">feito</span>
           ) : (
-            <Link href="/treinos" className={classeBotaoContorno}>
+            <Link href="/treinos/plano" className={classeBotaoContorno}>
               Começar →
             </Link>
           )}
@@ -161,7 +161,7 @@ export default function SaudeHojePage() {
         titulo="Nenhum treino hoje."
         explicacao="Monte o treino do dia na aba Treino."
         acao="Montar treino"
-        href="/treinos"
+        href="/treinos/plano"
       />
     );
   }

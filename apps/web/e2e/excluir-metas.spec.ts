@@ -89,7 +89,7 @@ test('excluir lançamentos, transferências e banco; criar, guardar e excluir me
   const aba = async (nome: 'Início' | 'Gastos') => {
     // Design v2: Gastos saiu da barra e fica no menu "Mais".
     if (nome === 'Gastos') {
-      await nav.getByRole('button', { name: 'Mais opções' }).click();
+      await page.getByRole('button', { name: 'Abrir menu' }).click();
       await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Gastos' }).click();
     } else {
       await nav.getByRole('link', { name: nome }).click();

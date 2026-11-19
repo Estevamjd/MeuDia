@@ -45,7 +45,7 @@ const competenciaSP = (d) => hojeSP(d).slice(0, 7);
 
 /** Defaults de coluna (DEFAULT do SQL). */
 const DEFAULTS = {
-  profiles: () => ({ nome: null, email: null, avatar_url: null, peso_atual: null, altura: null, meta_peso: null, meta_calorias: 2000, meta_agua: 8, objetivo: null, onboarding_feito: false, created_at: nowIso() }),
+  profiles: () => ({ nome: null, email: null, avatar_url: null, peso_atual: null, altura: null, meta_peso: null, meta_calorias: 2000, meta_agua: 8, objetivo: null, onboarding_feito: false, whatsapp: null, created_at: nowIso() }),
   contas_pagar: () => ({ assinatura_id: null, categoria: 'Contas', dia_vencimento: null, mes_vencimento: null, data_vencimento: null, ativo: true, created_at: nowIso(), updated_at: nowIso() }),
   pagamentos_conta: () => ({ transacao_id: null, created_at: nowIso() }),
   rendas: () => ({ dia_recebimento: null, ativo: true, carteira_id: null, created_at: nowIso(), updated_at: nowIso() }),
@@ -64,6 +64,9 @@ const DEFAULTS = {
   // Saúde (000_baseline): refeicoes.items JSONB DEFAULT '[]', totais DEFAULT 0; registros_peso.data DEFAULT CURRENT_DATE.
   refeicoes: () => ({ data: hojeSP(), items: [], total_calorias: 0, total_proteina: 0, total_carbo: 0, total_gordura: 0 }),
   registros_peso: () => ({ data: hojeSP(), observacao: null }),
+  // 010: registro rápido de treino/refeição (aba Treino/Dieta; também pelo WhatsApp).
+  registros_treino: () => ({ data: hojeSP(), duracao_min: null, origem: 'app', created_at: nowIso() }),
+  registros_refeicao: () => ({ data: hojeSP(), origem: 'app', created_at: nowIso() }),
   preferencias_agente: () => ({ notif_treino: false, notif_refeicao: false, notif_suplemento: false, agenda_saude: 'nao', created_at: nowIso() }),
 };
 const COM_UPDATED_AT = new Set(['contas_pagar', 'rendas', 'orcamento_categorias', 'carteiras', 'transferencias', 'metas']);
@@ -78,6 +81,7 @@ const UNIQUES = {
   lembretes_enviados: [['conta_id', 'competencia', 'etapa', 'canal']],
   registros_agua: [['user_id', 'data']],
   registros_peso: [['user_id', 'data']],
+  profiles: [['whatsapp']],
   scores_diarios: [['user_id', 'data']],
   preferencias_agente: [['user_id']],
   registros_habito: [['habito_id', 'data']],
