@@ -87,12 +87,18 @@ test('excluir lançamentos, transferências e banco; criar, guardar e excluir me
   };
   const nav = page.getByRole('navigation', { name: 'Navegação principal' });
   const aba = async (nome: 'Início' | 'Gastos') => {
-    await nav.getByRole('link', { name: nome }).click();
+    // Design v2: Gastos saiu da barra e fica no menu "Mais".
+    if (nome === 'Gastos') {
+      await nav.getByRole('button', { name: 'Mais opções' }).click();
+      await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Gastos' }).click();
+    } else {
+      await nav.getByRole('link', { name: nome }).click();
+    }
     await page.waitForURL(nome === 'Início' ? /\/financas$/ : /\/financas\/gastos/);
   };
   // O "+" virou o botão "Gastei" (Início); "Voltar" leva ao menu com Entrou dinheiro/Transferir.
   const acao = async (nome: RegExp) => {
-    await tocar(page.getByRole('region', { name: 'Últimos gastos' }).getByRole('button', { name: 'Gastei' }));
+    await tocar(page.getByRole('region', { name: 'Últimos lançamentos' }).getByRole('button', { name: 'Gastei' }));
     if (!nome.test('Gastei')) {
       await page.getByRole('dialog', { name: 'Gastei' }).getByRole('button', { name: 'Voltar' }).click();
       await page.getByRole('dialog', { name: 'O que aconteceu?' }).getByRole('button', { name: nome }).click();

@@ -484,7 +484,7 @@ export default function NotasPage() {
               onClick={() => setFiltroTag(null)}
               className={clsx(
                 'rounded-full px-3 py-1 text-xs font-medium transition-colors',
-                !filtroTag ? 'bg-accent text-white' : 'bg-card2 text-muted hover:text-text',
+                !filtroTag ? 'bg-accent text-accent-fg' : 'bg-card2 text-muted hover:text-text',
               )}
             >
               Todas
@@ -495,7 +495,7 @@ export default function NotasPage() {
                 onClick={() => setFiltroTag(filtroTag === tag ? null : tag)}
                 className={clsx(
                   'rounded-full px-3 py-1 text-xs font-medium transition-colors',
-                  filtroTag === tag ? 'bg-accent text-white' : 'bg-card2 text-muted hover:text-text',
+                  filtroTag === tag ? 'bg-accent text-accent-fg' : 'bg-card2 text-muted hover:text-text',
                 )}
               >
                 {tag}

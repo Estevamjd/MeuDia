@@ -4,15 +4,17 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
 import { clsx } from 'clsx';
-import { House, Landmark, ReceiptText, Settings, Target, type LucideIcon } from 'lucide-react';
+import { CreditCard, Ellipsis, FileText, House, type LucideIcon } from 'lucide-react';
 import { useAppMode } from '../AppModeProvider';
 import {
   BOTTOM_TABS_PADRAO,
   MENU_MAIS_PADRAO,
   isNavAtivo,
   itensBottomFinancas,
+  maisAtivo,
   type IconeAba,
 } from '../../lib/navegacao';
+import { useMenuLateral } from '../../lib/menu-lateral';
 
 const TABS_PRINCIPAIS = BOTTOM_TABS_PADRAO;
 const MENU_MAIS = MENU_MAIS_PADRAO;
@@ -24,26 +26,30 @@ export function BottomNav() {
 
 const ICONES: Record<IconeAba, LucideIcon> = {
   house: House,
-  'receipt-text': ReceiptText,
-  target: Target,
-  landmark: Landmark,
-  settings: Settings,
+  'credit-card': CreditCard,
+  'file-text': FileText,
 };
 
-/** 5 abas fixas com rótulo sempre visível; a ativa tem cor accent, traço no topo e `aria-current="page"`. */
+const ABA =
+  'relative flex min-h-[56px] min-w-[44px] flex-1 flex-col items-center justify-center gap-1 px-1 pb-1 pt-2 text-[11px] font-medium leading-tight transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
+
+/** Design v2: Início, Assinaturas, Relatório e "Mais" (abre o menu lateral). A ativa fica ciano com `aria-current="page"`. */
 function BottomNavFinancas() {
   const pathname = usePathname();
+  const abrirMenu = useMenuLateral((m) => m.abrir);
+  const menuAberto = useMenuLateral((m) => m.aberto);
+  const mais = maisAtivo(pathname);
   return (
     <nav
       aria-label="Navegação principal"
-      className="fixed bottom-0 left-0 right-0 z-nav border-t border-white/10 bg-card/95 backdrop-blur-xl md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-nav border-t border-border bg-[#040813]/[0.88] backdrop-blur-xl md:hidden"
       style={{
         paddingBottom: 'env(safe-area-inset-bottom)',
         paddingLeft: 'env(safe-area-inset-left)',
         paddingRight: 'env(safe-area-inset-right)',
       }}
     >
-      <div className="flex items-stretch px-1">
+      <div className="grid grid-cols-4 items-stretch px-2">
         {itensBottomFinancas().map((item) => {
           const ativo = isNavAtivo(pathname, item);
           const Icone = ICONES[item.icone];
@@ -52,17 +58,24 @@ function BottomNavFinancas() {
               key={item.href}
               href={item.href}
               aria-current={ativo ? 'page' : undefined}
-              className={clsx(
-                'relative flex min-h-[52px] min-w-[44px] flex-1 flex-col items-center justify-center gap-0.5 px-1 pb-1 pt-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent',
-                ativo ? 'text-accent' : 'text-gray-500',
-              )}
+              className={clsx(ABA, ativo ? 'text-accent' : 'text-muted hover:text-text')}
             >
-              {ativo && <span aria-hidden="true" className="absolute left-1/2 top-0 h-[3px] w-7 -translate-x-1/2 rounded-full bg-accent" />}
-              <Icone size={22} aria-hidden="true" />
-              <span className="text-[11px] font-medium leading-tight">{item.label}</span>
+              <Icone size={20} aria-hidden="true" className={ativo ? 'drop-shadow-[0_0_8px_rgba(0,229,255,0.55)]' : undefined} />
+              <span>{item.label}</span>
             </Link>
           );
         })}
+        <button
+          type="button"
+          onClick={abrirMenu}
+          aria-haspopup="dialog"
+          aria-expanded={menuAberto}
+          aria-label="Mais opções"
+          className={clsx(ABA, mais || menuAberto ? 'text-accent' : 'text-muted hover:text-text')}
+        >
+          <Ellipsis size={20} aria-hidden="true" />
+          <span>Mais</span>
+        </button>
       </div>
     </nav>
   );

@@ -1,23 +1,24 @@
 import type { Metadata, Viewport } from 'next';
 import { unstable_noStore as noStore } from 'next/cache';
-import { DM_Sans, Syne } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 import { Providers } from './providers';
 import { AppModeProvider } from '../components/AppModeProvider';
 import { getAppMode } from '../lib/app-mode';
 
-const dmSans = DM_Sans({
-  subsets: ['latin'],
-  // 700: links e números do Caderno (Saúde e Treino) em negrito real, sem negrito sintético.
-  weight: ['400', '500', '700'],
-  variable: '--font-dm',
+// Geist / Geist Mono auto-hospedadas (OFL, app/fonts): mesma tipografia do Mestres CRM (Astro G), sem Google Fonts.
+// As variáveis antigas (--font-dm / --font-syne) apontam para a Geist para todas as classes existentes seguirem valendo.
+const geist = localFont({
+  src: './fonts/Geist-Variable.woff2',
+  weight: '100 900',
+  variable: '--font-geist',
   display: 'swap',
 });
 
-const syne = Syne({
-  subsets: ['latin'],
-  weight: ['700', '800'],
-  variable: '--font-syne',
+const geistMono = localFont({
+  src: './fonts/GeistMono-Variable.woff2',
+  weight: '100 900',
+  variable: '--font-geist-mono',
   display: 'swap',
 });
 
@@ -27,7 +28,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
-  themeColor: '#7c6aff',
+  themeColor: '#050a16',
 };
 
 export const metadata: Metadata = {
@@ -71,7 +72,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // Força render por request: sem isso o layout é pré-renderizado no build e o APP_MODE congela no valor do build.
   noStore();
   return (
-    <html lang="pt-BR" className={`${dmSans.variable} ${syne.variable}`}>
+    <html lang="pt-BR" className={`${geist.variable} ${geistMono.variable}`}>
       <head>
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
@@ -79,7 +80,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body className="bg-bg font-dm text-text antialiased">
+      <body className="astrog-ceu bg-bg font-dm text-text antialiased">
         <AppModeProvider mode={getAppMode()} vapidPublicKey={process.env.VAPID_PUBLIC_KEY || null}>
           <Providers>{children}</Providers>
         </AppModeProvider>

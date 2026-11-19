@@ -25,7 +25,7 @@ export interface CardSaldoHojeProps {
 }
 
 /** "Cofrinho" (quanto tem hoje): total das carteiras no total, chips por banco e "Começou o mês com". */
-export function CardSaldoHoje({ total, carteiras, comecouMes, nomeMes, escondido, onAlternarOlho, compacto = false }: CardSaldoHojeProps) {
+export function CardSaldoHoje({ total, carteiras, comecouMes, nomeMes, escondido, onAlternarOlho, compacto = false, semOlho = false }: CardSaldoHojeProps & { semOlho?: boolean }) {
   const valor = (v: number) => (escondido ? VALOR_OCULTO : formatBRLSinal(v));
   if (carteiras.length === 0) {
     return (
@@ -33,7 +33,7 @@ export function CardSaldoHoje({ total, carteiras, comecouMes, nomeMes, escondido
         <p className="text-[15px] text-text">Diga onde fica seu dinheiro para ver quanto você tem hoje.</p>
         <Link
           href="/financas/carteiras?nova=1"
-          className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-gradient-to-r from-accent to-accent2 text-base font-medium text-white"
+          className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg bg-accent text-base font-medium text-accent-fg"
         >
           Adicionar banco ou carteira
         </Link>
@@ -46,7 +46,7 @@ export function CardSaldoHoje({ total, carteiras, comecouMes, nomeMes, escondido
       titulo="Cofrinho"
       icone={<Wallet size={20} />}
       compacto={compacto}
-      acao={
+      acao={semOlho ? undefined : (
         <button
           type="button"
           onClick={onAlternarOlho}
@@ -56,7 +56,7 @@ export function CardSaldoHoje({ total, carteiras, comecouMes, nomeMes, escondido
         >
           {escondido ? <EyeOff size={18} /> : <Eye size={18} />}
         </button>
-      }
+      )}
     >
       <p
         data-testid="saldo-hoje-valor"

@@ -187,8 +187,9 @@ test('modo Finanças: cadastro de saúde, Hoje, Dieta, Peso e o vazio do Caderno
     range.selectNodeContents(el);
     return { fonte: cs.fontFamily, espaco: cs.letterSpacing, quebra: cs.whiteSpace, render: cs.textRendering, linhas: range.getClientRects().length };
   });
-  expect(medida.fonte).toMatch(/DM_Sans|DM Sans/);
-  expect(medida.fonte).not.toMatch(/^'?DM Sans'?, sans-serif$/);
+  // Design v2: Geist auto-hospedada (next/font/local), não a pilha genérica.
+  expect(medida.fonte).toMatch(/geist/i);
+  expect(medida.fonte).not.toMatch(/^'?Geist'?, sans-serif$/);
   expect(medida.espaco).toBe('normal');
   expect(medida.quebra).toBe('nowrap');
   expect(medida.render).toBe('geometricprecision');

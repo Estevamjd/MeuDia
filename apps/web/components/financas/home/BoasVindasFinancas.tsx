@@ -21,7 +21,7 @@ export function BoasVindasFinancas({ rendaCadastrada, onCadastrarRenda }: BoasVi
   const { titulo, subtitulo } = PASSOS[passo];
 
   return (
-    <section aria-labelledby="boas-vindas-financas" className="space-y-4 rounded-card border border-accent/30 bg-card p-5">
+    <section aria-labelledby="boas-vindas-financas" className="lap-cartao space-y-4 !border-accent/30 p-5">
       <div className="space-y-2">
         <p className="text-[13px] font-medium text-muted">
           Passo {passo} de {TOTAL_PASSOS}
@@ -47,7 +47,7 @@ export function BoasVindasFinancas({ rendaCadastrada, onCadastrarRenda }: BoasVi
       ) : (
         <Link
           href="/financas/contas?nova=1"
-          className={`inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-accent to-accent2 font-medium text-white transition-all duration-200 hover:opacity-90 ${BOTAO_GRANDE}`}
+          className={`inline-flex items-center justify-center rounded-lg bg-accent font-medium text-accent-fg transition-all duration-200 hover:opacity-90 ${BOTAO_GRANDE}`}
         >
           Adicionar conta
         </Link>

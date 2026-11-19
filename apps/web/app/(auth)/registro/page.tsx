@@ -10,6 +10,7 @@ import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import { createClient } from '../../../lib/supabase/client';
 import { Input } from '../../../components/ui/Input';
 import { Button } from '../../../components/ui/Button';
+import { MarcaAuth } from '../../../components/auth/MarcaAuth';
 import { getAuthCallbackUrl } from '../../../lib/auth/callback';
 
 const registroSchema = z
@@ -79,17 +80,12 @@ export default function RegistroPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-bg px-4">
-      <div className="w-full max-w-md animate-fadeSlide">
-        <div className="mb-8 text-center">
-          <h1 className="bg-gradient-to-r from-accent to-accent2 bg-clip-text font-syne text-3xl font-bold text-transparent">
-            MeuDia
-          </h1>
-          <p className="mt-2 text-sm text-muted">Crie sua conta e comece a organizar seu dia</p>
-        </div>
+    <main className="astrog-ceu bg-glow-orbs flex min-h-screen items-center justify-center px-4 py-10">
+      <div className="relative z-10 w-full max-w-md animate-fadeSlide">
+        <MarcaAuth titulo="Crie sua conta" subtitulo="Comece a organizar seu dia" />
 
         {emailEnviado ? (
-          <div className="rounded-card border border-border bg-card p-8 text-center" role="status">
+          <div className="lap-cartao rounded-2xl p-6 text-center sm:p-8" role="status">
             <Mail size={32} className="mx-auto mb-4 text-accent" />
             <p className="text-sm text-text">Enviamos um link para seu e-mail. Confirme para entrar.</p>
             <Link
@@ -102,7 +98,7 @@ export default function RegistroPage() {
         ) : (
           <form
             onSubmit={handleSubmit(onSubmit)}
-            className="rounded-card border border-border bg-card p-8"
+            className="lap-cartao rounded-2xl p-6 sm:p-8"
           >
             {serverError && (
               <div className="mb-4 rounded-lg border border-red/30 bg-red/[0.08] px-4 py-3 text-sm text-red" role="alert">

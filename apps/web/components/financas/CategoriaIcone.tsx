@@ -23,10 +23,12 @@ interface CategoriaIconeProps {
   categoria: string | null | undefined;
   tamanho?: keyof typeof TAMANHOS;
   className?: string;
+  /** Design v2 (Astro G): fundo do trilho e ícone ciano, igual para todas as categorias. */
+  neutro?: boolean;
 }
 
 /** Ícone da categoria num quadrado com fundo suave da mesma cor (padrão dos cards do dashboard). Decorativo. */
-export function CategoriaIcone({ categoria, tamanho = 'md', className }: CategoriaIconeProps) {
+export function CategoriaIcone({ categoria, tamanho = 'md', className, neutro = false }: CategoriaIconeProps) {
   const info = categoriaInfo(categoria);
   const Icone = ICONES_CATEGORIA[info.icone] ?? Tag;
   const t = TAMANHOS[tamanho];
@@ -36,7 +38,7 @@ export function CategoriaIcone({ categoria, tamanho = 'md', className }: Categor
       data-categoria-icone={info.nome}
       data-icone={info.icone}
       className={clsx('inline-flex shrink-0 items-center justify-center rounded-xl', t.caixa, className)}
-      style={{ backgroundColor: `${info.cor}24`, color: info.cor }}
+      style={neutro ? { backgroundColor: 'var(--trilho)', color: 'var(--accent)' } : { backgroundColor: `${info.cor}24`, color: info.cor }}
     >
       <Icone size={t.icone} strokeWidth={2} />
     </span>

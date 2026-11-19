@@ -7,6 +7,7 @@ import {
   isNavAtivo,
   itensBottomFinancas,
   itensDrawer,
+  maisAtivo,
   secoesSidebar,
 } from '../navegacao';
 
@@ -28,21 +29,26 @@ describe('Sidebar por APP_MODE', () => {
     const secoes = secoesSidebar('financas');
     expect(secoes.map((s) => s.label)).toEqual(['Finanças', 'Saúde']);
     const todos = secoes.flatMap((s) => hrefs(s.items));
-    expect(todos).toEqual(['/financas', '/financas/carteiras', '/financas/contas', '/financas/orcamento', '/financas/metas', '/assinaturas', '/saude', '/treinos']);
+    expect(todos).toEqual(['/financas', '/financas/relatorio', '/financas/gastos', '/financas/carteiras', '/financas/contas', '/financas/orcamento', '/financas/metas', '/assinaturas', '/saude', '/treinos']);
     for (const href of todos) expect(isRotaVisivel(href, 'financas')).toBe(true);
     for (const oculto of OCULTOS_NO_FINANCAS) expect(todos).not.toContain(oculto);
   });
 });
 
 describe('BottomNav modo finanças', () => {
-  it('5 abas: Início, Gastos, Metas, Bancos e Config (nessa ordem), todas links com ícone lucide', () => {
+  it('design v2: Início, Assinaturas e Relatório como links (o "Mais" é botão do menu lateral)', () => {
     const itens = itensBottomFinancas();
-    expect(itens.map((i) => i.label)).toEqual(['Início', 'Gastos', 'Metas', 'Bancos', 'Config']);
-    expect(hrefs(itens)).toEqual(['/financas', '/financas/gastos', '/financas/metas', '/financas/carteiras', '/configuracoes']);
-    expect(itens.map((i) => i.icone)).toEqual(['house', 'receipt-text', 'target', 'landmark', 'settings']);
+    expect(itens.map((i) => i.label)).toEqual(['Início', 'Assinaturas', 'Relatório']);
+    expect(hrefs(itens)).toEqual(['/financas', '/assinaturas', '/financas/relatorio']);
+    expect(itens.map((i) => i.icone)).toEqual(['house', 'credit-card', 'file-text']);
   });
 
-  it('Treinos e Saúde não entram na barra (segue com 5 abas fixas; ficam no menu lateral)', () => {
+  it('"Mais" acende fora das abas fixas (Gastos, Metas, Bancos, Config) e apaga nelas', () => {
+    for (const r of ['/financas/gastos', '/financas/metas', '/financas/carteiras', '/configuracoes', '/saude']) expect(maisAtivo(r)).toBe(true);
+    for (const r of ['/financas', '/assinaturas', '/financas/relatorio']) expect(maisAtivo(r)).toBe(false);
+  });
+
+  it('Treinos e Saúde não entram na barra (ficam no menu lateral, aberto pelo Mais)', () => {
     expect(hrefs(itensBottomFinancas())).not.toContain('/treinos');
     expect(hrefs(itensBottomFinancas())).not.toContain('/saude');
     expect(isRotaVisivel('/treinos', 'financas')).toBe(true);
@@ -68,7 +74,7 @@ describe('BottomNav modo finanças', () => {
 describe('Drawer', () => {
   it('modo finanças: seções de finanças + Saúde + Treinos + Configurações, sem módulos ocultos', () => {
     const todos = hrefs(itensDrawer('financas'));
-    expect(todos).toEqual(['/financas', '/financas/carteiras', '/financas/contas', '/financas/orcamento', '/financas/metas', '/assinaturas', '/saude', '/treinos', '/configuracoes']);
+    expect(todos).toEqual(['/financas', '/financas/relatorio', '/financas/gastos', '/financas/carteiras', '/financas/contas', '/financas/orcamento', '/financas/metas', '/assinaturas', '/saude', '/treinos', '/configuracoes']);
     for (const href of todos) expect(isRotaVisivel(href, 'financas')).toBe(true);
     for (const oculto of OCULTOS_NO_FINANCAS) expect(todos).not.toContain(oculto);
   });

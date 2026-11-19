@@ -22,7 +22,7 @@ export function LineChart({
   data,
   dataKey,
   xAxisKey = 'data',
-  color = '#7c6aff',
+  color = '#00e5ff',
   height = 200,
 }: LineChartProps) {
   return (

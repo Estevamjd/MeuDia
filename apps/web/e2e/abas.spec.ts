@@ -70,7 +70,7 @@ const despesa = (descricao: string, categoria: string, valor: number, data: stri
   tipo: 'despesa', descricao, categoria, valor, data, carteira_id, banco, created_at: `${data}T${hora}:00:00.000Z`,
 });
 
-test('5 abas, Início sem rolar em 390×844, Ver todos, Chat no header, Gastei e filtros de Gastos', async ({ page }) => {
+test('design v2: Início, Assinaturas, Relatório e Mais; Ver todos, Chat no header, Gastei e filtros de Gastos', async ({ page }) => {
   const erros = coletarErros(page);
   const EVIDENCIAS = pastaEvidencias('icones-abas');
   // Dados típicos: 2 bancos, 2 contas, 3 gastos (e 1 em setembro), salário já recebido.
@@ -93,12 +93,15 @@ test('5 abas, Início sem rolar em 390×844, Ver todos, Chat no header, Gastei e
     ],
   });
 
-  // ── Início sem rolar em 390×844 ────────────────────────────────────────────
+  // ── Início (design v2) em 390×844 ──────────────────────────────────────────
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
   const nav = page.getByRole('navigation', { name: 'Navegação principal' });
-  const ultimos = page.getByRole('region', { name: 'Últimos gastos' });
-  await expect(ultimos.getByRole('listitem')).toHaveCount(3);
+  const ultimos = page.getByRole('region', { name: 'Últimos lançamentos' });
+  // Salário (receita) + 3 gastos de outubro; cada linha com o selo de origem (tudo manual aqui).
+  await expect(ultimos.getByTestId('lancamento')).toHaveCount(4);
+  await expect(ultimos.locator('[data-origem="manual"]')).toHaveCount(4);
+  await expect(page.getByRole('region', { name: 'Para onde foi' })).toContainText('Mercado');
   await expect(page.getByTestId('saldo-hoje-valor')).toHaveText(brl('1.280,00'));
   await expect(page.getByRole('region', { name: 'Contas a vencer' }).locator('[data-conta]')).toHaveCount(2);
   await expect(page.getByText('Sobra do mês', { exact: true })).toHaveCount(1);
@@ -121,26 +124,21 @@ test('5 abas, Início sem rolar em 390×844, Ver todos, Chat no header, Gastei e
   await expect(page.getByRole('dialog', { name: 'Gastei' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  // Fechado o banner, a reserva some e a Início volta a caber sem rolar.
+  // Fechado o banner, a reserva some. A Início v2 rola (Sobra, Para onde foi, Últimos lançamentos, Cofrinho), sem rolagem lateral.
   await banner.getByRole('button', { name: 'Fechar' }).click();
   await expect(banner).toBeHidden();
   await page.evaluate(() => window.scrollTo(0, 0));
-
-  const caixaUltimo = (await ultimos.boundingBox())!;
-  expect(caixaUltimo.y + caixaUltimo.height, 'último bloco atrás da barra').toBeLessThanOrEqual(caixaNav.y);
-  const { scroll, altura } = await page.evaluate(() => ({ scroll: document.scrollingElement!.scrollHeight, altura: window.innerHeight }));
-  expect(scroll, 'Início rola em 390×844').toBeLessThanOrEqual(altura);
+  const larguras = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, cliente: document.documentElement.clientWidth }));
+  expect(larguras.scroll, 'rolagem lateral na Início').toBeLessThanOrEqual(larguras.cliente);
   await page.screenshot({ path: path.join(EVIDENCIAS, '10-inicio-resumida.png'), animations: 'disabled' });
 
-  // ── Barra: 5 abas, ≥ 44px, safe-area, aria-current ─────────────────────────
+  // ── Barra: Início, Assinaturas, Relatório (links) + Mais (botão), ≥ 44px, safe-area, aria-current ──
   expect(await nav.getAttribute('style')).toContain('safe-area-inset-bottom');
   expect(caixaNav.y + caixaNav.height).toBeLessThanOrEqual(844);
   const abas = [
-    { nome: 'Início', url: /\/financas$/, titulo: 'Início' },
-    { nome: 'Gastos', url: /\/financas\/gastos$/, titulo: 'Gastos' },
-    { nome: 'Metas', url: /\/financas\/metas$/, titulo: /Metas/ },
-    { nome: 'Bancos', url: /\/financas\/carteiras$/, titulo: 'Bancos e carteira' },
-    { nome: 'Config', url: /\/configuracoes$/, titulo: /Configura/ },
+    { nome: 'Início', url: /\/financas$/, titulo: 'Olá, Lia' },
+    { nome: 'Assinaturas', url: /\/assinaturas$/, titulo: 'Assinaturas' },
+    { nome: 'Relatório', url: /\/financas\/relatorio$/, titulo: 'Seu outubro, Lia' },
   ];
   await expect(nav.getByRole('link')).toHaveText(abas.map((a) => a.nome));
   for (const aba of [...abas.slice(1), abas[0]!]) {
@@ -154,7 +152,20 @@ test('5 abas, Início sem rolar em 390×844, Ver todos, Chat no header, Gastei e
     expect(caixa.height, `${aba.nome} < 44px`).toBeGreaterThanOrEqual(44);
     expect(caixa.width, `${aba.nome} < 44px`).toBeGreaterThanOrEqual(44);
   }
-  // Notificações (lembretes) agora ficam em Config: verificado na passagem acima.
+  // "Mais" abre o menu lateral com Gastos, Metas, Bancos, Contas, Orçamento, Saúde, Treinos e Configurações.
+  const mais = nav.getByRole('button', { name: 'Mais opções' });
+  const caixaMais = (await mais.boundingBox())!;
+  expect(caixaMais.height).toBeGreaterThanOrEqual(44);
+  await mais.click();
+  const menu = page.getByRole('dialog', { name: /MeuDia/ });
+  await expect(menu).toBeVisible();
+  for (const nome of ['Gastos', 'Metas', 'Bancos e carteira', 'Contas', 'Orçamento', 'Configurações']) await expect(menu.getByRole('link', { name: nome, exact: true })).toBeVisible();
+  await menu.getByRole('link', { name: 'Metas' }).click();
+  await page.waitForURL(/\/financas\/metas$/);
+  await expect(nav.locator('[aria-current="page"]')).toHaveCount(0);
+  await expect(mais).toHaveClass(/text-accent/);
+  await nav.getByRole('link', { name: 'Início' }).click();
+  await page.waitForURL(/\/financas$/);
 
   // ── Chat pelo ícone do header ──────────────────────────────────────────────
   const chat = page.getByRole('button', { name: 'Abrir assistente' });
@@ -175,10 +186,10 @@ test('5 abas, Início sem rolar em 390×844, Ver todos, Chat no header, Gastei e
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
 
-  // ── "Ver todos os gastos" → Gastos ─────────────────────────────────────────
-  await page.getByRole('link', { name: /Ver todos os gastos/ }).click();
+  // ── "Ver todos" → Gastos (no menu Mais) ────────────────────────────────────
+  await ultimos.getByRole('link', { name: /Ver todos/ }).click();
   await page.waitForURL(/\/financas\/gastos$/);
-  await expect(nav.getByRole('link', { name: 'Gastos' })).toHaveAttribute('aria-current', 'page');
+  await expect(mais).toHaveClass(/text-accent/);
 
   // ── Filtros (URL), lista e total ───────────────────────────────────────────
   const total = page.getByTestId('total-gastos');
@@ -216,7 +227,7 @@ test('5 abas, Início sem rolar em 390×844, Ver todos, Chat no header, Gastei e
   await page.waitForURL(/\/financas\/gastos\?categoria=Mercado$/);
   await expect(total).toHaveText(brl('86,40'));
   await expect(lista.getByRole('listitem')).toHaveCount(1);
-  await expect(nav.getByRole('link', { name: 'Gastos' })).toHaveAttribute('aria-current', 'page');
+  await expect(nav.locator('[aria-current="page"]')).toHaveCount(0);
   await page.getByLabel('Categoria').selectOption('');
   await page.getByRole('button', { name: 'Mês anterior' }).click();
   await page.waitForURL(/\/financas\/gastos\?mes=2026-09$/);

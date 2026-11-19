@@ -3,7 +3,7 @@ import { paginasPorChave } from './cron-pagination';
 import { erroDb } from './erros-db';
 import { getSupabase } from './supabase';
 
-const COLUMNS = 'id, user_id, tipo, categoria, descricao, valor, data, banco, automatico, created_at, carteira_id, ajuste';
+const COLUMNS = 'id, user_id, tipo, categoria, descricao, valor, data, banco, automatico, created_at, carteira_id, ajuste, origem';
 
 export async function findByUserId(userId: string): Promise<Transacao[]> {
   const { data, error } = await getSupabase()

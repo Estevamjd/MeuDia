@@ -88,7 +88,7 @@ function Conteudo({ acao, setAcao, onClose }: { acao: AcaoRapida; setAcao: (a: A
         <Link
           href="/financas/carteiras?nova=1"
           onClick={onClose}
-          className="inline-flex w-full items-center justify-center rounded-lg bg-gradient-to-r from-accent to-accent2 py-3 text-base font-medium text-white"
+          className="inline-flex w-full items-center justify-center rounded-lg bg-accent py-3 text-base font-medium text-accent-fg"
         >
           Adicionar banco ou carteira
         </Link>

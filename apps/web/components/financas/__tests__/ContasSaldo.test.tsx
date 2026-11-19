@@ -133,8 +133,8 @@ describe('CardSobraMes (decisão final do Estevam)', () => {
     expect(texto()).not.toMatch(/2\.200|2\.090|110/);
   });
 
-  it('o card "Em 7 dias você terá" não existe mais', () => {
-    expect(Object.keys(CardPrevisao)).toEqual(['CardSobraMes']);
+  it('o card "Em 7 dias você terá" não existe mais (só o card e a explicação do "por quê?")', () => {
+    expect(Object.keys(CardPrevisao).sort()).toEqual(['CardSobraMes', 'ExplicacaoSobra']);
   });
 });
 

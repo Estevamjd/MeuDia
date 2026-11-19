@@ -3,6 +3,7 @@ import { Pencil, Trash2 } from 'lucide-react';
 import type { Transacao } from '@meudia/shared';
 import { formatBRL, formatDiaMes } from '../../lib/financas-ui';
 import { CategoriaIcone } from './CategoriaIcone';
+import { OrigemSelo } from './OrigemSelo';
 
 export type VinculoLancamento = 'recebimento' | 'pagamento';
 
@@ -41,6 +42,9 @@ export function LinhaLancamento({ t, vinculo, comCategoria = false, acoes }: Lin
         </div>
         <p data-meta className="break-words text-[12px] leading-snug text-muted">
           {detalhe}
+          <span className="ml-1.5 inline-flex align-middle">
+            <OrigemSelo t={t} />
+          </span>
           {vinculo && (
             <span className="ml-1.5 whitespace-nowrap rounded-full bg-card2 px-2 py-0.5 text-[11px]">{vinculo === 'pagamento' ? 'Paguei' : 'Recebi'}</span>
           )}

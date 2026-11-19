@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
-import { Plus } from 'lucide-react';
+import { Eye, EyeOff, Plus } from 'lucide-react';
 import { competenciaDe, hojeSP } from '@meudia/shared';
 import { Button } from '../../../components/ui';
 import { AgentBannerAuto } from '../../../components/agent';
@@ -10,12 +10,16 @@ import { FinancasHomeView } from '../../../components/financas/home/FinancasHome
 import { useFinancasHome } from '../../../components/financas/home/useFinancasHome';
 import { LancamentoRapidoSheet, type AcaoRapida } from '../../../components/financas/LancamentoRapidoSheet';
 import { SeletorMes } from '../../../components/financas/SeletorMes';
+import { BOTAO_REDONDO, CabecalhoPagina, primeiroNome } from '../../../components/financas/resumo/CabecalhoPagina';
+import { useProfile } from '../../../hooks/useProfile';
 import { deslocarCompetencia } from '../../../lib/financas-ui';
 
-/** Aba Início (modo Finanças): resumo do mês que cabe numa tela. */
+/** Aba Início (modo Finanças): design v2 Astro G. */
 export default function FinancasPage() {
   const mode = useAppMode();
   const hojeISO = useMemo(() => hojeSP(), []);
+  const { data: profile } = useProfile();
+  const nome = primeiroNome(profile?.nome);
 
   // --- Seletor de mês (competência em SP, igual ao backend) ---
   const [competencia, setCompetencia] = useState(() => competenciaDe(hojeISO));
@@ -26,16 +30,29 @@ export default function FinancasPage() {
   const home = useFinancasHome(competencia, hojeISO, () => setFolha('gastei'));
 
   return (
-    <div className="animate-fadeSlide space-y-2.5 md:space-y-5">
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="font-syne text-2xl font-bold text-text md:text-3xl">{mode === 'financas' ? 'Início' : 'Finanças'}</h1>
-        <div className="flex items-center gap-2">
-          <Button onClick={() => setFolha('menu')} className="hidden md:inline-flex">
-            <Plus size={16} aria-hidden="true" /> Lançar
-          </Button>
-          <SeletorMes competencia={competencia} onMudar={mudarMes} />
-        </div>
-      </div>
+    <div className="mx-auto w-full max-w-2xl animate-fadeSlide space-y-4 md:space-y-5">
+      <CabecalhoPagina
+        titulo={mode === 'financas' ? (nome ? `Olá, ${nome}` : 'Olá') : 'Finanças'}
+        contexto={<SeletorMes competencia={competencia} onMudar={mudarMes} discreto />}
+        acoes={
+          <>
+            <Button onClick={() => setFolha('menu')} className="hidden md:inline-flex">
+              <Plus size={16} aria-hidden="true" /> Lançar
+            </Button>
+            {home.onAlternarOlho && (
+              <button
+                type="button"
+                onClick={home.onAlternarOlho}
+                aria-pressed={home.escondido}
+                aria-label={home.escondido ? 'Mostrar valores' : 'Esconder valores'}
+                className={BOTAO_REDONDO}
+              >
+                {home.escondido ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+              </button>
+            )}
+          </>
+        }
+      />
 
       <LancamentoRapidoSheet open={folha !== null} inicial={folha ?? 'menu'} onClose={() => setFolha(null)} />
 

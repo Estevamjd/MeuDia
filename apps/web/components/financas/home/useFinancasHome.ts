@@ -18,6 +18,7 @@ import { usePagamentoAcoes } from '../usePagamentoAcoes';
 import type { FinancasHomeViewProps } from './FinancasHomeView';
 import { montarHome } from './montarHome';
 import { montarDashboard } from './montarDashboard';
+import { montarResumoMes } from '../resumo/montarResumoMes';
 import type { RendaAReceberItem } from './CardRendaAReceber';
 import { lerEsconderValores, salvarEsconderValores } from '../../../lib/carteiras-ui';
 
@@ -58,6 +59,10 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, onGas
   const dados = useMemo(
     () => (painel.data ? montarDashboard(competencia, hojeISO, painel.data, transacoes.data ?? []) : null),
     [competencia, hojeISO, painel.data, transacoes.data],
+  );
+  const resumoMes = useMemo(
+    () => (transacoes.data ? montarResumoMes(competencia, transacoes.data, dados?.sobraMes ?? null) : null),
+    [competencia, transacoes.data, dados],
   );
   const carteirasAtivas = painel.data?.carteiras.map((s) => s.carteira) ?? [];
   const carteiraPadrao = carteirasAtivas.find((c) => c.id === painel.data?.carteiraPadraoId)?.id ?? carteirasAtivas[0]?.id ?? null;
@@ -155,5 +160,13 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, onGas
         }
       : null,
     onGastei,
+    resumo: resumoMes,
+    escondido,
+    onAlternarOlho: () =>
+      setEscondido((v) => {
+        salvarEsconderValores(!v);
+        return !v;
+      }),
   };
 }
+

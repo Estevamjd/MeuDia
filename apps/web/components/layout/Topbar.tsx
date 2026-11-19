@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { clsx } from 'clsx';
@@ -8,6 +8,7 @@ import { Menu, MessageCircle } from 'lucide-react';
 import { useAppMode } from '../AppModeProvider';
 import { tabsTopbar } from '../../lib/topbar';
 import { NavDrawer } from './NavDrawer';
+import { useMenuLateral } from '../../lib/menu-lateral';
 
 const PAGE_TITLES: Record<string, string> = {
   '/inicio': '✦ MeuDia',
@@ -24,6 +25,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/financas/gastos': '🧾 Gastos',
   '/financas/metas': '🎯 Metas',
   '/financas/carteiras': '🏦 Bancos',
+  '/financas/relatorio': 'Relatório',
   '/compras': '🛒 Compras',
   '/veiculo': '🚗 Veículo',
   '/assinaturas': '💳 Assinaturas',
@@ -45,18 +47,20 @@ export function Topbar({ onSignOut, onOpenChat, chatAberto = false }: TopbarProp
   const mode = useAppMode();
   const tabs = tabsTopbar(mode);
   const comDrawer = mode === 'financas' && !!onSignOut;
-  const [drawerAberto, setDrawerAberto] = useState(false);
+  // Compartilhado com a aba "Mais" da BottomNav.
+  const drawerAberto = useMenuLateral((m) => m.aberto);
+  const abrirDrawer = useMenuLateral((m) => m.abrir);
+  const fecharDrawer = useMenuLateral((m) => m.fechar);
   const botaoMenuRef = useRef<HTMLButtonElement>(null);
-  const fecharDrawer = useCallback(() => setDrawerAberto(false), []);
 
   const pageTitle = PAGE_TITLES[pathname] ?? '✦ MeuDia';
 
   return (
     <>
       <nav
-        className="sticky top-0 z-header border-b border-border"
+        className={clsx('sticky top-0 z-header', comDrawer ? 'border-b border-transparent md:border-border' : 'border-b border-border')}
         style={{
-          background: 'rgba(16,16,26,0.95)',
+          background: 'rgba(5,10,22,0.82)',
           backdropFilter: 'blur(12px)',
           // Finanças no celular: mesma margem de 1rem do conteúdo (a Início precisa caber sem rolar).
           paddingLeft: comDrawer ? 'max(1rem, env(safe-area-inset-left))' : 'max(2rem, env(safe-area-inset-left))',
@@ -72,7 +76,7 @@ export function Topbar({ onSignOut, onOpenChat, chatAberto = false }: TopbarProp
             <button
               ref={botaoMenuRef}
               type="button"
-              onClick={() => setDrawerAberto(true)}
+              onClick={abrirDrawer}
               aria-label="Abrir menu"
               aria-expanded={drawerAberto}
               // O NavDrawer só existe no DOM quando aberto; nunca referenciar id inexistente.
@@ -83,7 +87,12 @@ export function Topbar({ onSignOut, onOpenChat, chatAberto = false }: TopbarProp
               <Menu size={22} aria-hidden="true" />
             </button>
           )}
-          <span className="min-w-0 flex-1 truncate font-syne text-base font-bold text-text">{pageTitle}</span>
+          {comDrawer ? (
+            // Modo Finanças: cada tela tem o próprio título grande; o topo só leva a marca (design v2).
+            <span className="lap-rotulo min-w-0 flex-1 truncate text-center text-muted">MeuDia</span>
+          ) : (
+            <span className="min-w-0 flex-1 truncate font-syne text-base font-bold text-text">{pageTitle}</span>
+          )}
           {comDrawer && onOpenChat && (
             <button
               type="button"

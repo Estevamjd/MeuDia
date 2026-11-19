@@ -127,3 +127,37 @@ export function CardSobraMes({ sobra, escondido }: CardSobraMesProps) {
     </section>
   );
 }
+
+/** "por quê?" da Início v2: a conta do "No fim do mês sobra" (renda, gastos e cada conta), dentro do bloco principal. */
+export function ExplicacaoSobra({ sobra, escondido, id }: CardSobraMesProps & { id: string }) {
+  const v = (n: number) => oculto(escondido, n);
+  const contasAPagar = emCentavos(sobra.contasAPagar.reduce((s, c) => s + c.valor, 0));
+  const resultado = sobra.valor < 0 ? `faltam ${v(sobra.valor)}` : `sobra ${v(sobra.valor)}`;
+  return (
+    <section aria-labelledby={`${id}-titulo`} id={id} className="mt-3 space-y-1.5 rounded-xl bg-black/30 p-3 text-[13px] text-text">
+      <h3 id={`${id}-titulo`} className="text-[13px] font-medium">
+        No fim do mês sobra
+      </h3>
+      <p data-testid="previsao-fim-mes-conta" className="tabular-nums text-muted-text">
+        Renda {v(sobra.renda.total)} − gastos lançados {v(sobra.despesasLancadas)} − contas a pagar {v(contasAPagar)} = {resultado}
+      </p>
+      <ul className="space-y-1">
+        {sobra.renda.lancada > 0 && <Linha rotulo="+ Receitas lançadas no mês" valor={sobra.renda.lancada} sinal="+" escondido={escondido} />}
+        {sobra.rendasAReceber.map((r) => (
+          <Linha key={r.id} rotulo={`+ ${r.descricao} (sem "Recebi", dia ${formatDiaMes(r.data)})`} valor={r.valor} sinal="+" escondido={escondido} />
+        ))}
+        <Linha rotulo="= Renda do mês" valor={sobra.renda.total} escondido={escondido} total />
+        {sobra.despesasLancadas > 0 && <Linha rotulo="− Despesas lançadas no mês" valor={sobra.despesasLancadas} sinal="−" escondido={escondido} />}
+        {sobra.contasAPagar.map((c) => (
+          <Linha key={c.id} rotulo={`− ${c.descricao} (vence ${formatDiaMes(c.vencimento)})`} valor={c.valor} sinal="−" escondido={escondido} />
+        ))}
+        <Linha rotulo="= Despesas do mês" valor={sobra.despesas} escondido={escondido} total />
+        <Linha rotulo="= No fim do mês sobra" valor={sobra.valor} escondido={escondido} total />
+      </ul>
+      <p className="pt-1 text-muted-text">
+        Sobra do mês = renda do mês − gastos já lançados (contas ainda não pagas não entram). No fim do mês sobra = desconta também as
+        contas a pagar. O dinheiro guardado nos bancos não entra.
+      </p>
+    </section>
+  );
+}

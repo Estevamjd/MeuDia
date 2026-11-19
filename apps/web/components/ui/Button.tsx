@@ -13,7 +13,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-gradient-to-r from-accent to-accent2 text-white font-medium px-5 py-2.5 hover:opacity-90 glow-accent',
+    'bg-accent text-accent-fg font-medium px-5 py-2.5 hover:bg-[#5cefff] shadow-[0_0_24px_-6px_rgba(0,229,255,0.55)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
   ghost:
     'bg-transparent text-muted hover:text-text hover:bg-card2 px-4 py-2',
   danger:

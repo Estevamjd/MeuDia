@@ -31,7 +31,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             className={clsx(
-              'w-full rounded-lg border border-border bg-card2 px-3 py-2.5 text-sm text-text',
+              'min-h-[44px] w-full rounded-xl border border-border bg-[#121a2b] px-3 py-2.5 text-[15px] text-text',
               'placeholder:text-muted/60',
               'transition-colors duration-200',
               'focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30',

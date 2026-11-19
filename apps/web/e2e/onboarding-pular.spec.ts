@@ -22,7 +22,7 @@ test('onboarding: "Pular por agora" conclui e vai para a home', async ({ page })
   await page.getByRole('button', { name: 'Pular por agora' }).click();
 
   await page.waitForURL(/\/financas$/);
-  await expect(page.getByRole('heading', { name: 'Início', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /^Olá/, level: 1 })).toBeVisible();
   for (let i = 0; i < 12; i++) {
     expect(new URL(page.url()).pathname, 'voltou para /onboarding').not.toMatch(/^\/onboarding/);
     await page.waitForTimeout(250);

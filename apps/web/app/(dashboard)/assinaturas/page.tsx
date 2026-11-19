@@ -15,13 +15,13 @@ import {
   useContasMes,
 } from '../../../hooks';
 import { isVencendoEstaSemana, situacaoPorAssinatura } from '../../../lib/assinaturas';
+import { CabecalhoPagina } from '../../../components/financas/resumo/CabecalhoPagina';
 
 import {
   Badge,
   Button,
   Input,
   Modal,
-  StatCard,
   EmptyState,
   SkeletonCard,
   SkeletonList,
@@ -318,14 +318,8 @@ export default function AssinaturasPage() {
   // --- Empty state ---
   if (!assinaturas || assinaturas.length === 0) {
     return (
-      <div className="animate-fadeSlide space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="font-syne text-3xl font-bold text-text">Assinaturas</h1>
-          <Button onClick={() => setShowAddModal(true)}>
-            <Plus size={16} />
-            Nova Assinatura
-          </Button>
-        </div>
+      <div className="mx-auto w-full max-w-2xl animate-fadeSlide space-y-4">
+        <CabecalhoPagina titulo="Assinaturas" contexto="O que se repete todo mês" acoes={<BotaoNova onClick={() => setShowAddModal(true)} />} />
 
         <EmptyState
           icon={<CreditCard size={48} />}
@@ -346,35 +340,37 @@ export default function AssinaturasPage() {
     );
   }
 
+  const quantasSemana = vencendoSemana.length;
   return (
-    <div className="animate-fadeSlide space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="font-syne text-3xl font-bold text-text">Assinaturas</h1>
-        <Button onClick={() => setShowAddModal(true)}>
-          <Plus size={16} />
-          Nova Assinatura
-        </Button>
-      </div>
+    <div className="mx-auto w-full max-w-2xl animate-fadeSlide space-y-3">
+      <CabecalhoPagina
+        titulo="Assinaturas"
+        contexto="O que se repete todo mês"
+        acoes={<BotaoNova onClick={() => setShowAddModal(true)} />}
+        className="mb-2"
+      />
 
-      {/* Total mensal card */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <StatCard
-          label="Total mensal"
-          value={formatBRL(totalMensal ?? 0)}
-          icon={<DollarSign size={16} />}
-          tag={{ text: `${assinaturas.length} assinaturas`, color: 'purple' }}
-        />
-        <StatCard
-          label="Vencendo esta semana"
-          value={vencendoSemana.length}
-          icon={<Calendar size={16} />}
-          tag={{
-            text: vencendoSemana.length > 0 ? 'Atenção' : 'Nenhuma',
-            color: vencendoSemana.length > 0 ? 'orange' : 'green',
-          }}
-        />
-      </div>
+      {/* Total do mês (bloco principal Astro G) */}
+      <section aria-labelledby="total-assinaturas" className="lap-heroi px-5 pb-5 pt-5">
+        <div className="flex min-h-6 items-center justify-between gap-2">
+          <h2 id="total-assinaturas" className="lap-rotulo lap-texto-3 font-normal">
+            Total do mês
+          </h2>
+          <span className="inline-flex h-[22px] shrink-0 items-center whitespace-nowrap rounded-full border border-accent/20 bg-accent/[0.12] px-2 text-[11px] font-medium text-accent">
+            {assinaturas.length === 1 ? '1 ativa' : `${assinaturas.length} ativas`}
+          </span>
+        </div>
+        <p className="mt-2.5 whitespace-nowrap text-[clamp(2rem,9vw,2.5rem)] font-light leading-[1.1] tracking-[-0.035em] tabular-nums">
+          {formatBRL(totalMensal ?? 0)}
+        </p>
+        <p className="lap-texto-2 mt-2 text-[13px] leading-[18px]">
+          {quantasSemana === 0
+            ? 'Nenhuma vence esta semana.'
+            : quantasSemana === 1
+              ? 'Uma vence esta semana.'
+              : `${quantasSemana} vencem esta semana.`}
+        </p>
+      </section>
 
       {/* Situação do mês (badges): carregando/erro não pode parecer "sem conta" */}
       {loadingContas && (
@@ -383,10 +379,7 @@ export default function AssinaturasPage() {
         </p>
       )}
       {erroContas && (
-        <div
-          role="alert"
-          className="flex items-center justify-between gap-3 rounded-card border border-red/40 bg-card p-3 text-sm text-text"
-        >
+        <div role="alert" className="lap-cartao flex items-center justify-between gap-3 p-3 text-sm text-text">
           <span>Não foi possível carregar a situação (paga/pendente/vencida) deste mês.</span>
           <Button variant="ghost" onClick={() => void refetchContas()} isLoading={fetchingContas}>
             Tentar de novo
@@ -394,13 +387,12 @@ export default function AssinaturasPage() {
         </div>
       )}
 
-      {/* Vencendo esta semana */}
-      {vencendoSemana.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="font-syne text-lg font-semibold text-orange">
-            Vencendo esta semana ({vencendoSemana.length})
+      {quantasSemana > 0 && (
+        <section aria-labelledby="vencendo-semana" className="lap-cartao lap-cartao-alerta px-4 pb-2 pt-4">
+          <h2 id="vencendo-semana" className="mb-2 text-base font-medium tracking-[-0.02em] text-text">
+            Vencendo esta semana
           </h2>
-          <div className="space-y-3">
+          <ul>
             {vencendoSemana.map((assinatura) => (
               <AssinaturaCard
                 key={assinatura.id}
@@ -411,17 +403,16 @@ export default function AssinaturasPage() {
                 onDelete={() => setDeletingAssinatura(assinatura)}
               />
             ))}
-          </div>
-        </div>
+          </ul>
+        </section>
       )}
 
-      {/* Todas as outras */}
-      <div className="space-y-3">
-        <h2 className="font-syne text-lg font-semibold text-text">
-          {vencendoSemana.length > 0 ? 'Outras assinaturas' : 'Todas as assinaturas'} ({outras.length})
+      <section aria-labelledby="todas-assinaturas" className="lap-cartao px-4 pb-2 pt-4">
+        <h2 id="todas-assinaturas" className="mb-2 text-base font-medium tracking-[-0.02em] text-text">
+          {quantasSemana > 0 ? 'Outras assinaturas' : 'Todas as assinaturas'}
         </h2>
         {outras.length > 0 ? (
-          <div className="space-y-3">
+          <ul>
             {outras.map((assinatura) => (
               <AssinaturaCard
                 key={assinatura.id}
@@ -431,11 +422,11 @@ export default function AssinaturasPage() {
                 onDelete={() => setDeletingAssinatura(assinatura)}
               />
             ))}
-          </div>
+          </ul>
         ) : (
-          <p className="text-sm text-muted">Todas as assinaturas vencem esta semana.</p>
+          <p className="pb-2 text-sm text-muted">Todas as assinaturas vencem esta semana.</p>
         )}
-      </div>
+      </section>
 
       {/* Add Modal */}
       <AssinaturaModal
@@ -491,50 +482,54 @@ interface AssinaturaCardProps {
 
 function AssinaturaCard({ assinatura, situacao, highlight, onEdit, onDelete }: AssinaturaCardProps) {
   return (
-    <div
-      className={clsx(
-        'group flex items-center gap-4 rounded-card border bg-card p-4 transition-all hover:bg-card2',
-        highlight ? 'border-orange/40' : 'border-border',
-      )}
-      style={{ borderLeftWidth: '4px', borderLeftColor: assinatura.cor }}
-    >
-      {/* Icon */}
-      <div
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl"
-        style={{ backgroundColor: `${assinatura.cor}20` }}
+    <li className="group grid grid-cols-[36px_minmax(0,1fr)_auto_auto] items-center gap-x-3 border-t border-border py-3 first:border-t-0 first:pt-1">
+      <span
+        aria-hidden="true"
+        className="grid h-9 w-9 place-items-center rounded-[10px] bg-trilho text-lg"
+        style={{ boxShadow: `inset 0 0 0 1px ${assinatura.cor}40` }}
       >
         {assinatura.icone}
-      </div>
+      </span>
 
-      {/* Info */}
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-text">
+      <div className="min-w-0">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-text">
           <span className="min-w-0 max-w-full truncate">{assinatura.nome}</span>
           {situacao && (
             <Badge color={SITUACAO_BADGE[situacao].color} className="shrink-0 whitespace-nowrap">
               {SITUACAO_BADGE[situacao].label}
             </Badge>
           )}
-        </span>
-        <span className="flex items-center gap-1 text-xs text-muted">
-          <Calendar size={12} />
+        </p>
+        <p className="mt-0.5 text-xs text-muted">
           Vence dia {assinatura.dia_vencimento}
-        </span>
+          {highlight ? ' · esta semana' : ''}
+        </p>
       </div>
 
-      {/* Value */}
-      <span className="whitespace-nowrap text-sm font-bold text-text">{formatBRL(assinatura.valor)}</span>
+      <div className="text-right">
+        <strong className="block whitespace-nowrap text-sm font-medium tracking-[-0.02em] text-text tabular-nums">{formatBRL(assinatura.valor)}</strong>
+        <span className="text-[11px] text-muted">Mensal</span>
+      </div>
 
-      {/* Actions */}
       {/* Mobile e touch (sem hover): sempre visível. Desktop com mouse: hover ou foco por teclado. */}
-      <div className="flex shrink-0 gap-1 transition-opacity md:[@media(hover:hover)_and_(pointer:fine)]:opacity-0 focus-within:opacity-100 group-hover:opacity-100">
-        <Button variant="icon" onClick={onEdit} aria-label={`Editar assinatura ${assinatura.nome}`}>
+      <div className="-mr-2 flex shrink-0 transition-opacity md:[@media(hover:hover)_and_(pointer:fine)]:opacity-0 focus-within:opacity-100 group-hover:opacity-100">
+        <Button variant="icon" onClick={onEdit} aria-label={`Editar assinatura ${assinatura.nome}`} className="h-11 w-9">
           <Pencil size={14} />
         </Button>
-        <Button variant="icon" onClick={onDelete} aria-label={`Excluir assinatura ${assinatura.nome}`}>
+        <Button variant="icon" onClick={onDelete} aria-label={`Excluir assinatura ${assinatura.nome}`} className="h-11 w-9">
           <Trash2 size={14} />
         </Button>
       </div>
-    </div>
+    </li>
+  );
+}
+
+function BotaoNova({ onClick }: { onClick: () => void }) {
+  return (
+    <Button onClick={onClick} aria-label="Nova Assinatura" className="h-9 px-3">
+      <Plus size={16} aria-hidden="true" />
+      <span className="hidden sm:inline">Nova Assinatura</span>
+      <span className="sm:hidden">Nova</span>
+    </Button>
   );
 }

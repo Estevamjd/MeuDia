@@ -177,7 +177,7 @@ export function AddHabitoModal({
                       className={clsx(
                         'flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold transition-all',
                         selected
-                          ? 'bg-accent text-white'
+                          ? 'bg-accent text-accent-fg'
                           : 'border border-border bg-card2 text-muted hover:border-accent/50',
                       )}
                       aria-label={`${dia} ${selected ? 'selecionado' : 'não selecionado'}`}

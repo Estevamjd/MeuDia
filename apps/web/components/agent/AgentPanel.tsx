@@ -346,7 +346,7 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
           <div className="flex items-center justify-between border-b border-border py-1 pl-4 pr-2 md:py-2">
             <div className="flex items-center gap-2.5">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent2">
-                <Bot size={16} className="text-white" />
+                <Bot size={16} className="text-accent-fg" />
               </div>
               <div>
                 <h2 id="agent-panel-titulo" className="text-sm font-semibold text-text">Agente MeuDia</h2>
@@ -493,7 +493,7 @@ function ResumoTab({
               className={clsx(
                 'rounded-lg px-3 py-2 text-xs font-medium transition-colors',
                 i === 0
-                  ? 'bg-accent text-white hover:bg-accent/80'
+                  ? 'bg-accent text-accent-fg hover:bg-accent/80'
                   : 'border border-border text-muted hover:text-text hover:border-accent/30',
               )}
             >

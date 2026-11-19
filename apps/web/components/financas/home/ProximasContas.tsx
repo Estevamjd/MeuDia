@@ -35,7 +35,7 @@ export interface ProximasContasProps {
 /** "Contas a vencer": até 2 contas com "Paguei" em 1 toque; vencida/hoje em destaque (sem banner separado). */
 export function ProximasContas({ contas, totalMes, hojeISO, contaOcupada, pagamentoBloqueado, onPagar, rendasAReceber = [], onRecebi }: ProximasContasProps) {
   return (
-    <section id="proximas-contas" aria-labelledby="proximas-contas-titulo" className="scroll-mt-20 space-y-2 rounded-xl border border-border bg-card px-4 py-3">
+    <section id="proximas-contas" aria-labelledby="proximas-contas-titulo" className="lap-cartao scroll-mt-20 space-y-2 px-4 py-3">
       <div className="flex items-center justify-between gap-3">
         <h2 id="proximas-contas-titulo" className="text-[13px] font-medium text-muted">
           Contas a vencer

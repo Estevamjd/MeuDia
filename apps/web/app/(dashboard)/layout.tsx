@@ -77,7 +77,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <ToastProvider>
-      <div className="flex min-h-screen bg-bg bg-glow-orbs">
+      <div className="astrog-ceu bg-glow-orbs flex min-h-screen">
         {/* Sidebar desktop */}
         <div className="hidden md:block">
           <Sidebar onSignOut={signOut} userName={userName} onOpenAgent={() => setAgentOpen(true)} />

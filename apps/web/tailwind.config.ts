@@ -8,31 +8,39 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      // Astro G dark (Mestres CRM): azul-noite + ciano #00e5ff. Os nomes antigos seguem valendo em todo o app.
       colors: {
-        bg: '#080810',
-        surface: '#10101a',
-        card: '#16161f',
-        card2: '#1c1c28',
-        border: 'rgba(255,255,255,0.07)',
-        accent: '#7c6aff',
-        accent2: '#ff6a9a',
-        accent3: '#6affda',
-        orange: '#ff9f4a',
-        green: '#4ade80',
-        'green-dark': '#22a35a',
-        yellow: '#fbbf24',
+        bg: '#050a16',
+        surface: '#060b17',
+        card: '#0b1220',
+        card2: '#101827',
+        border: '#1c2638',
+        accent: '#00e5ff',
+        // Texto sobre o ciano (botão primário, chips ativos): 13:1.
+        'accent-fg': '#06101c',
+        accent2: '#00ffa3',
+        accent3: '#5cefff',
+        orange: '#fab219',
+        green: '#34d399',
+        'green-dark': '#0ca30c',
+        yellow: '#fab219',
         red: '#f87171',
-        text: '#eeeef8',
-        muted: '#65657a',
-        // Saúde e Treino (Caderno B): texto secundário legível; `muted` só em elementos não textuais.
-        'muted-text': '#a3a3b8',
+        text: '#f5f6f8',
+        // Texto secundário: 6,9:1 no card (#0b1220).
+        muted: '#94a3b8',
+        'muted-text': '#a8b4c7',
+        // Trilhos e superfícies discretas (barras vazias, ícones de linha).
+        trilho: '#151f31',
       },
       fontFamily: {
-        syne: ['var(--font-syne)', 'Syne', 'sans-serif'],
-        dm: ['var(--font-dm)', 'DM Sans', 'sans-serif'],
+        syne: ['var(--font-geist)', 'Geist', 'system-ui', 'sans-serif'],
+        dm: ['var(--font-geist)', 'Geist', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-geist)', 'Geist', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-geist-mono)', 'Geist Mono', 'ui-monospace', 'monospace'],
       },
       borderRadius: {
         card: '16px',
+        heroi: '20px',
       },
       // Escala única de camadas (lib/camadas.ts): z-header, z-banner, z-nav, z-modal, z-agente, z-toast, z-sobreposicao.
       zIndex: zIndexTailwind,

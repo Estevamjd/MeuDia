@@ -111,11 +111,12 @@ test('Config: seções, nome, dia do salário, Categorias → Orçamento, Baixar
   });
   // O seed entra direto no mock: recarrega para o cache do React Query não ficar com a Início de antes do seed.
   await page.reload();
-  await expect(page.getByRole('region', { name: 'Últimos gastos' }).getByRole('listitem')).toHaveCount(3);
+  await expect(page.getByRole('region', { name: 'Últimos lançamentos' }).getByTestId('lancamento')).toHaveCount(4);
 
   // ── Config: h1 e seções na ordem ───────────────────────────────────────────
   const nav = page.getByRole('navigation', { name: 'Navegação principal' });
-  await nav.getByRole('link', { name: 'Config' }).click();
+  await nav.getByRole('button', { name: 'Mais opções' }).click();
+  await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Configurações' }).click();
   await page.waitForURL(/\/configuracoes$/);
   await expect(page.getByRole('heading', { level: 1 }).first()).toHaveText('Configurações');
   await expect(page.locator('[data-secao]')).toHaveCount(6);
@@ -193,7 +194,8 @@ test('Config: seções, nome, dia do salário, Categorias → Orçamento, Baixar
   await page.screenshot({ path: path.join(EVIDENCIAS, '04-orcamento-sem-sobra-prevista.png'), animations: 'disabled' });
 
   // ── Gastos: ícones de Comida (utensils), Unha (paintbrush) e Sobrancelha (eye) ──
-  await nav.getByRole('link', { name: 'Gastos' }).click();
+  await nav.getByRole('button', { name: 'Mais opções' }).click();
+  await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Gastos' }).click();
   await page.waitForURL(/\/financas\/gastos$/);
   const lista = page.getByRole('region', { name: 'Últimas despesas' });
   const icone = (texto: string) => lista.getByRole('listitem').filter({ hasText: texto }).locator('[data-icone]');
@@ -207,7 +209,8 @@ test('Config: seções, nome, dia do salário, Categorias → Orçamento, Baixar
   await page.screenshot({ path: path.join(EVIDENCIAS, '03-gastos-icones-novos.png'), animations: 'disabled' });
 
   // ── Sair → /login ──────────────────────────────────────────────────────────
-  await nav.getByRole('link', { name: 'Config' }).click();
+  await nav.getByRole('button', { name: 'Mais opções' }).click();
+  await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Configurações' }).click();
   await page.waitForURL(/\/configuracoes$/);
   await page.locator('[data-secao="sair"]').getByRole('button', { name: 'Sair' }).click();
   await page.waitForURL(/\/login/);

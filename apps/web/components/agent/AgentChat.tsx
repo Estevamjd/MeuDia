@@ -60,7 +60,7 @@ export function AgentChat({
         ) : mensagens.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-accent to-accent2 mb-3">
-              <Bot size={24} className="text-white" />
+              <Bot size={24} className="text-accent-fg" />
             </div>
             <p className="text-sm font-medium text-text">Agente MeuDia</p>
             <p className="mt-1 text-xs text-muted max-w-[240px]">
@@ -107,7 +107,7 @@ export function AgentChat({
                 )}
               >
                 {msg.role === 'agent' ? (
-                  <Bot size={14} className="text-white" />
+                  <Bot size={14} className="text-accent-fg" />
                 ) : (
                   <User size={14} className="text-muted" />
                 )}
@@ -155,7 +155,7 @@ export function AgentChat({
         {isSending && (
           <div className="flex gap-2">
             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent2">
-              <Bot size={14} className="text-white" />
+              <Bot size={14} className="text-accent-fg" />
             </div>
             <div className="rounded-xl bg-card2 px-3 py-2">
               <div className="flex gap-1">
@@ -189,7 +189,7 @@ export function AgentChat({
           <button
             onClick={handleEnviar}
             disabled={!input.trim() || isSending}
-            className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-white transition-all hover:bg-accent/80 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-accent-fg transition-all hover:bg-accent/80 disabled:opacity-40 disabled:cursor-not-allowed"
             aria-label="Enviar mensagem"
           >
             <Send size={16} />

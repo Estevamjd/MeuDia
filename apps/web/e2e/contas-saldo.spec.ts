@@ -61,7 +61,7 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   };
   // O "+" saiu da barra: "Gastei" na Início abre a folha no gasto; "Voltar" leva a Entrou dinheiro/Transferir.
   const abrirAcao = async (acao: RegExp) => {
-    await tocar(page.getByRole('region', { name: 'Últimos gastos' }).getByRole('button', { name: 'Gastei' }));
+    await tocar(page.getByRole('region', { name: 'Últimos lançamentos' }).getByRole('button', { name: 'Gastei' }));
     if (acao.test('Gastei')) return page.getByRole('dialog');
     await page.getByRole('dialog', { name: 'Gastei' }).getByRole('button', { name: 'Voltar' }).click();
     const menu = page.getByRole('dialog', { name: 'O que aconteceu?' });
@@ -70,7 +70,13 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
     return page.getByRole('dialog');
   };
   const irPara = async (aba: 'Início' | 'Gastos', url: RegExp) => {
-    await bottomNav.getByRole('link', { name: aba }).click();
+    // Design v2: Gastos saiu da barra e fica no menu "Mais".
+    if (aba === 'Gastos') {
+      await bottomNav.getByRole('button', { name: 'Mais opções' }).click();
+      await page.getByRole('dialog', { name: '✦ MeuDia' }).getByRole('link', { name: 'Gastos' }).click();
+    } else {
+      await bottomNav.getByRole('link', { name: aba }).click();
+    }
     await page.waitForURL(url);
   };
 
@@ -145,7 +151,11 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await expect(page.getByText('Em 7 dias você terá')).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Cofrinho' })).toBeVisible();
   await expect(fimMes).toHaveText(/^−R\$\s120,00$/);
+  // A conta do fim do mês fica no "por quê?" do bloco Sobra do mês (design v2): abre, confere e fecha.
+  const porQue = page.getByRole('button', { name: 'por quê? No fim do mês sobra' });
+  await tocar(porQue);
   await expect(page.getByTestId('previsao-fim-mes-conta')).toHaveText(/^Renda R\$\s100,00 − gastos lançados R\$\s0,00 − contas a pagar R\$\s220,00 = faltam R\$\s120,00$/);
+  await tocar(porQue);
 
   // 4. Transferir R$ 50 Caixa → Nubank: total igual, Nubank 700 · Caixa 100; gasto do mês não muda.
   folha = await abrirAcao(/Transferir/);
@@ -164,17 +174,20 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
 
   // 5. Gastei R$ 25 em Comida no Nubank → Hoje 775, rosca Comida 25, fim do mês −145.
   folha = await abrirAcao(/Gastei/);
+  // No Chromium a folha abre antes de o refetch da transferência terminar e o form remonta: espera a rede assentar.
+  await page.waitForLoadState('networkidle');
   await folha.getByLabel('Valor').fill('2500');
   await tocar(folha.getByRole('radio', { name: 'Comida' }));
   const nubankGasto = folha.getByRole('radiogroup', { name: 'Saiu de' }).getByRole('radio', { name: 'Nubank' });
   await nubankGasto.click();
   await expect(nubankGasto).toHaveAttribute('aria-checked', 'true');
   await expect(folha.getByRole('radio', { name: 'Comida' })).toHaveAttribute('aria-checked', 'true');
+  await expect(folha.getByLabel('Valor')).toHaveValue(/25,00/);
   await shot('03-gastei.png');
   await folha.getByRole('button', { name: 'Salvar gasto' }).click();
   await confirmarToast('Gasto salvo');
   await expect(hoje).toHaveText(brl('775,00'));
-  await expect(page.getByRole('region', { name: 'Últimos gastos' })).toContainText(/R\$\s25,00/);
+  await expect(page.getByRole('region', { name: 'Últimos lançamentos' })).toContainText(/R\$\s25,00/);
   await expect(fimMes).toHaveText(/^−R\$\s145,00$/);
 
   // 6. Só agora a renda: R$ 900 dia 5 (sem Recebi) entra na renda do mês: sobra 1.000 − 245 = 755.
@@ -341,6 +354,7 @@ test('previsão A: fim do mês = 2.090 e o card "Em 7 dias" não aparece', async
   await expect(page.getByTestId('saldo-hoje-valor')).toHaveText(brl('235,00'));
   await expect(page.getByRole('region', { name: 'Cofrinho' })).toBeVisible();
   await expect(page.getByTestId('previsao-fim-mes-valor')).toHaveText(brl('2.090,00'));
+  await page.getByRole('button', { name: 'por quê? No fim do mês sobra' }).click();
   await expect(page.getByTestId('previsao-fim-mes-conta')).toHaveText(/^Renda R\$\s2\.200,00 − gastos lançados R\$\s0,00 − contas a pagar R\$\s110,00 = sobra R\$\s2\.090,00$/);
   await expect(page.getByText('Em 7 dias você terá')).toHaveCount(0);
   expect(erros, 'erros na página ou respostas HTTP ≥ 400').toEqual([]);

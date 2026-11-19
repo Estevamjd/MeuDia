@@ -77,7 +77,7 @@ export function StepModulos({ data, onChange }: StepModulosProps) {
                 className={clsx(
                   'flex h-5 w-5 items-center justify-center rounded border transition-colors',
                   active
-                    ? 'border-accent bg-accent text-white'
+                    ? 'border-accent bg-accent text-accent-fg'
                     : 'border-muted/40 bg-transparent',
                 )}
               >

@@ -3,24 +3,52 @@
 @tailwind utilities;
 
 :root {
-  --bg:       #080810;
-  --surface:  #10101a;
-  --card:     #16161f;
-  --card2:    #1c1c28;
-  --border:   rgba(255, 255, 255, 0.07);
-  --accent:   #7c6aff;
-  --accent2:  #ff6a9a;
-  --accent3:  #6affda;
-  --text:     #eeeef8;
-  --muted:    #65657a;
-  /* Texto secundário (rótulos, legendas, "sem valor"): 8,06:1 no --bg. --muted fica só para bordas e trilhos. */
-  --muted-text: #a3a3b8;
-  --green:    #4ade80;
-  /* Excedente da barra de calorias acima de 100% (não é texto). */
-  --green-dark: #22a35a;
-  --yellow:   #fbbf24;
+  /* Astro G dark (Mestres CRM: globals.css + lapidacao.css + themes.ts). */
+  --bg:       #050a16;
+  --bg-deep:  #040813;
+  --surface:  #060b17;
+  --card:     #0b1220;
+  --card2:    #101827;
+  --border:   #1c2638;
+  --accent:   #00e5ff;
+  --accent-fg: #06101c;
+  --accent-soft: rgba(0, 229, 255, 0.12);
+  --accent-soft-2: rgba(0, 229, 255, 0.2);
+  --accent2:  #00ffa3;
+  --accent3:  #5cefff;
+  --text:     #f5f6f8;
+  --muted:    #94a3b8;
+  --muted-text: #a8b4c7;
+  --trilho:   #151f31;
+  --green:    #34d399;
+  --green-dark: #0ca30c;
+  --yellow:   #fab219;
   --red:      #f87171;
-  --orange:   #ff9f4a;
+  --orange:   #fab219;
+
+  /* Material do bloco principal (ciano profundo) */
+  --lap-m-fundo: oklch(0.2 0.05 232);
+  --lap-m-vizinho: oklch(0.13 0.03 262);
+  --lap-m-meio: oklch(0.42 0.1 222);
+  --lap-m-luz: oklch(0.62 0.13 210);
+  --lap-m-brilho: oklch(0.9 0.15 200);
+  --lap-m-brilho-foco: color-mix(in oklch, var(--lap-m-brilho) 30%, transparent);
+  --lap-h-texto-2: oklch(0.95 0.03 205 / 0.84);
+  --lap-h-texto-3: oklch(0.9 0.04 205 / 0.62);
+  --lap-h-positivo: oklch(0.9 0.15 200);
+  --lap-luz-aresta: oklch(1 0 0 / 0.06);
+  --lap-luz-topo: oklch(1 0 0 / 0.025);
+  --lap-borda-fina: oklch(1 0 0 / 0.07);
+  --lap-sombra-cartao: inset 0 1px 0 var(--lap-luz-aresta), 0 1px 2px oklch(0 0 0 / 0.5), 0 16px 32px -20px oklch(0 0 0 / 0.7);
+  --lap-grao: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  --astrog-ceu:
+    radial-gradient(1px 1px at 12% 18%, rgba(245, 247, 250, 0.5) 50%, transparent 51%),
+    radial-gradient(1px 1px at 37% 71%, rgba(245, 247, 250, 0.38) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 58% 29%, rgba(0, 229, 255, 0.55) 50%, transparent 51%),
+    radial-gradient(1px 1px at 79% 84%, rgba(245, 247, 250, 0.42) 50%, transparent 51%),
+    radial-gradient(1px 1px at 91% 43%, rgba(245, 247, 250, 0.3) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 24% 92%, rgba(0, 255, 163, 0.35) 50%, transparent 51%),
+    radial-gradient(1px 1px at 66% 58%, rgba(0, 229, 255, 0.35) 50%, transparent 51%);
 }
 
 @layer base {
@@ -33,13 +61,15 @@
   body {
     background-color: var(--bg);
     color: var(--text);
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-geist), 'Geist', system-ui, sans-serif;
+    font-feature-settings: 'ss01' on;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Syne', sans-serif;
+    font-family: var(--font-geist), 'Geist', system-ui, sans-serif;
+    letter-spacing: -0.02em;
   }
 
   ::-webkit-scrollbar { width: 4px; }
@@ -58,33 +88,20 @@
 }
 
 @layer utilities {
-  .glow-accent  { box-shadow: 0 0 20px rgba(124,106,255,0.3); }
+  .glow-accent  { box-shadow: 0 0 20px rgba(0,229,255,0.3); }
   .glow-orange  { box-shadow: 0 0 20px rgba(255,159,74,0.3); }
   .glow-green   { box-shadow: 0 0 20px rgba(74,222,128,0.3); }
-  .glow-accent2 { box-shadow: 0 0 20px rgba(255,106,154,0.3); }
+  .glow-accent2 { box-shadow: 0 0 20px rgba(0,255,163,0.3); }
 
-  /* Background glow orbs — v3 exact */
-  .bg-glow-orbs::before,
-  .bg-glow-orbs::after {
+  /* Brilho ciano do topo (lapidacao.css do CRM); fica atrás do conteúdo. */
+  .bg-glow-orbs::before {
     content: '';
     position: fixed;
-    border-radius: 50%;
+    inset: 0 0 auto 0;
+    height: 520px;
     pointer-events: none;
     z-index: 0;
-  }
-  .bg-glow-orbs::before {
-    top: -300px;
-    left: -300px;
-    width: 700px;
-    height: 700px;
-    background: radial-gradient(circle, rgba(124,106,255,0.1) 0%, transparent 65%);
-  }
-  .bg-glow-orbs::after {
-    bottom: -200px;
-    right: -200px;
-    width: 500px;
-    height: 500px;
-    background: radial-gradient(circle, rgba(255,106,154,0.07) 0%, transparent 65%);
+    background: radial-gradient(80% 60% at 50% -12%, rgba(0, 229, 255, 0.09), transparent 62%);
   }
 }
 
@@ -98,8 +115,8 @@
   display: flex; align-items: center; gap: 14px;
 }
 .ai-bar.purple {
-  background: linear-gradient(135deg,rgba(124,106,255,0.13),rgba(106,255,218,0.06));
-  border: 1px solid rgba(124,106,255,0.28);
+  background: linear-gradient(135deg,rgba(0,229,255,0.13),rgba(106,255,218,0.06));
+  border: 1px solid rgba(0,229,255,0.28);
 }
 .ai-bar.green {
   background: linear-gradient(135deg,rgba(74,222,128,0.11),rgba(106,255,218,0.05));
@@ -130,7 +147,7 @@
   border-radius: 15px; padding: 18px;
   transition: transform 0.18s, border-color 0.18s;
 }
-.v3-card:hover { transform: translateY(-2px); border-color: rgba(124,106,255,0.2); }
+.v3-card:hover { transform: translateY(-2px); border-color: rgba(0,229,255,0.2); }
 .v3-card.gc:hover { border-color: rgba(74,222,128,0.2); }
 .v3-card.oc:hover { border-color: rgba(255,159,74,0.2); }
 
@@ -139,7 +156,7 @@
   font-size: 10.5px; font-weight: 700; letter-spacing: 1px;
   text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
 }
-.cval { font-family: 'Syne',sans-serif; font-size: 30px; font-weight: 700; margin-bottom: 3px; }
+.cval { font-family: var(--font-geist),sans-serif; font-size: 30px; font-weight: 700; margin-bottom: 3px; }
 .csub { font-size: 11.5px; color: var(--muted); }
 
 /* Tags */
@@ -151,7 +168,7 @@
 .tag.g { background: rgba(74,222,128,0.14);  color: var(--green); }
 .tag.r { background: rgba(248,113,113,0.14); color: var(--red); }
 .tag.y { background: rgba(251,191,36,0.14);  color: var(--yellow); }
-.tag.p { background: rgba(124,106,255,0.14); color: var(--accent); }
+.tag.p { background: rgba(0,229,255,0.14); color: var(--accent); }
 .tag.t { background: rgba(106,255,218,0.14); color: var(--accent3); }
 .tag.o { background: rgba(255,159,74,0.14);  color: var(--orange); }
 
@@ -165,7 +182,7 @@
 .pfill { height: 100%; border-radius: 10px; transition: width 1s ease; }
 
 /* Section title */
-.stitle { font-family: 'Syne',sans-serif; font-size: 14.5px; font-weight: 700; margin-bottom: 14px; }
+.stitle { font-family: var(--font-geist),sans-serif; font-size: 14.5px; font-weight: 700; margin-bottom: 14px; }
 
 /* Agenda list */
 .alist { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
@@ -213,3 +230,131 @@
 .snm   { font-size: 13px; font-weight: 500; }
 .sdt   { font-size: 10.5px; color: var(--muted); }
 .spr   { font-size: 12.5px; font-weight: 600; color: var(--accent2); }
+
+
+/* ══════════════════════════════════════════════════════════════
+   Astro G (Mestres CRM) — céu, grão, cartão com luz no topo, bloco principal
+   ══════════════════════════════════════════════════════════════ */
+
+/* Céu de estrelas (ladrilho 420×420) + brilho do topo no fundo da página. */
+.astrog-ceu {
+  background-color: var(--bg);
+  background-image: radial-gradient(80% 45% at 50% -8%, rgba(0, 229, 255, 0.07), transparent 62%), var(--astrog-ceu);
+  background-size: auto, 420px 420px;
+  background-repeat: no-repeat, repeat;
+  background-attachment: fixed, fixed;
+}
+
+/* Cartão: luz fina no topo + aresta clara + sombra funda. */
+.lap-cartao {
+  background: linear-gradient(180deg, var(--lap-luz-topo), transparent 96px), var(--card);
+  border: 1px solid var(--lap-borda-fina);
+  border-radius: 0.75rem;
+  box-shadow: var(--lap-sombra-cartao);
+}
+.lap-cartao-alerta {
+  box-shadow: var(--lap-sombra-cartao), inset 0 0 0 1px rgba(250, 178, 25, 0.35);
+}
+
+/* Bloco principal: material ciano profundo com foco de luz, anéis e grão. */
+.lap-heroi {
+  --lap-foco: 78% 48%;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 20px;
+  color: #fff;
+  background:
+    radial-gradient(34% 62% at var(--lap-foco), var(--lap-m-brilho-foco), transparent 72%),
+    radial-gradient(55% 85% at 104% -6%, color-mix(in oklch, var(--lap-m-luz) 70%, transparent), transparent 62%),
+    radial-gradient(60% 90% at 62% 124%, color-mix(in oklch, var(--lap-m-meio) 72%, transparent), transparent 66%),
+    radial-gradient(55% 95% at -8% 115%, color-mix(in oklch, var(--lap-m-vizinho) 90%, transparent), transparent 70%),
+    radial-gradient(50% 80% at 6% -24%, color-mix(in oklch, var(--lap-m-meio) 55%, transparent), transparent 72%),
+    linear-gradient(135deg, var(--lap-m-fundo), var(--lap-m-vizinho));
+  background-color: #0b2233;
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.22),
+    inset 0 0 0 1px oklch(1 0 0 / 0.07),
+    0 40px 80px -40px oklch(0.6 0.13 210 / 0.45),
+    0 2px 4px oklch(0 0 0 / 0.5);
+}
+.lap-heroi::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: repeating-radial-gradient(circle at var(--lap-foco), oklch(1 0 0 / 0.07) 0 1px, transparent 1.5px 30px);
+  -webkit-mask: radial-gradient(46% 92% at var(--lap-foco), #000 10%, transparent 78%);
+  mask: radial-gradient(46% 92% at var(--lap-foco), #000 10%, transparent 78%);
+}
+.lap-heroi::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background-image: var(--lap-grao);
+  background-size: 160px;
+  opacity: 0.16;
+  mix-blend-mode: overlay;
+}
+.lap-heroi > * { position: relative; z-index: 2; }
+.lap-heroi .lap-texto-2 { color: var(--lap-h-texto-2); }
+.lap-heroi .lap-texto-3 { color: var(--lap-h-texto-3); }
+.lap-heroi .lap-positivo { color: var(--lap-h-positivo); }
+.lap-vidro {
+  background: oklch(0.15 0.04 240 / 0.66);
+  border: 1px solid oklch(1 0 0 / 0.08);
+  border-radius: 12px;
+}
+.lap-barra-luz {
+  background: var(--accent);
+  box-shadow: 0 0 12px color-mix(in oklch, var(--accent) 55%, transparent);
+}
+
+/* Rótulo em mono maiúsculo (SOBRA DO MÊS, ENTROU, SAIU). */
+.lap-rotulo {
+  font-family: var(--font-geist-mono), 'Geist Mono', ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Selo de origem do lançamento: nunca corta, nunca quebra. */
+.selo-origem {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-family: var(--font-geist-mono), 'Geist Mono', ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.selo-origem-whatsapp { color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent-soft-2); }
+.selo-origem-manual { color: var(--muted); background: var(--trilho); border: 1px solid var(--border); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Luz fina no topo de todo cartão do app (mesmo efeito do CRM), sem mexer em cada componente. */
+.bg-card.border,
+.bg-card.rounded-card,
+.bg-card.rounded-xl,
+.bg-card.rounded-2xl {
+  background-image: linear-gradient(180deg, var(--lap-luz-topo), transparent 96px);
+}

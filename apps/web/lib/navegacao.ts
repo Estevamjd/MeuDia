@@ -43,6 +43,8 @@ const SECOES_PADRAO: NavSection[] = [
 // Modo Finanças: só finanças (as subrotas ganham item próprio).
 const ITENS_FINANCAS: NavItem[] = [
   { href: '/financas', label: 'Resumo do mês', emoji: '💸', exato: true },
+  { href: '/financas/relatorio', label: 'Relatório mensal', emoji: '📄' },
+  { href: '/financas/gastos', label: 'Gastos', emoji: '🧾' },
   { href: '/financas/carteiras', label: 'Bancos e carteira', emoji: '🏦' },
   { href: '/financas/contas', label: 'Contas', emoji: '🧾' },
   { href: '/financas/orcamento', label: 'Orçamento', emoji: '📊' },
@@ -103,19 +105,22 @@ export const MENU_MAIS_PADRAO: readonly NavItem[] = [
 export const HREF_NOVA_CONTA = '/financas/contas?nova=1';
 
 /** Nome do ícone lucide (kebab-case) de cada aba; o componente mapeia para o ícone. */
-export type IconeAba = 'house' | 'receipt-text' | 'target' | 'landmark' | 'settings';
+export type IconeAba = 'house' | 'credit-card' | 'file-text';
 
 export type ItemBottomFinancas = NavItem & { icone: IconeAba };
 
-// 5 abas fixas (BRIEF-ICONES-ABAS §0.1): o "+" virou o botão Gastei, Contas fica no card da Início e no drawer,
-// Orçamento no drawer e Chat no ícone do header.
+// Design v2 (Astro G, aprovado pelo Estevam em 18/11/2026): Início, Assinaturas, Relatório + "Mais" (abre o menu lateral
+// com Gastos, Metas, Bancos, Contas, Orçamento, Saúde, Treinos e Configurações). O "Gastei" fica no card da Início.
 const BOTTOM_FINANCAS: ItemBottomFinancas[] = [
   { href: '/financas', label: 'Início', emoji: '🏠', icone: 'house', exato: true },
-  { href: '/financas/gastos', label: 'Gastos', emoji: '🧾', icone: 'receipt-text' },
-  { href: '/financas/metas', label: 'Metas', emoji: '🎯', icone: 'target' },
-  { href: '/financas/carteiras', label: 'Bancos', emoji: '🏦', icone: 'landmark' },
-  { href: '/configuracoes', label: 'Config', emoji: '⚙️', icone: 'settings' },
+  { href: '/assinaturas', label: 'Assinaturas', emoji: '💳', icone: 'credit-card' },
+  { href: '/financas/relatorio', label: 'Relatório', emoji: '📄', icone: 'file-text' },
 ];
+
+/** "Mais" acende quando a rota atual não é de nenhuma das abas fixas. */
+export function maisAtivo(pathname: string, mode: AppMode = 'financas'): boolean {
+  return !itensBottomFinancas(mode).some((item) => isNavAtivo(pathname, item));
+}
 
 export function itensBottomFinancas(mode: AppMode = 'financas'): ItemBottomFinancas[] {
   return filtrarPorModo(BOTTOM_FINANCAS, mode);

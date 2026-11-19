@@ -253,7 +253,7 @@ function CampoSomarNoTotal({ value, onChange, id }: { value: boolean; onChange: 
   return (
     <label htmlFor={id} className="flex min-h-[44px] cursor-pointer items-center justify-between gap-3 rounded-lg border border-border bg-card2 px-3">
       <span className="text-sm text-text">Somar no total</span>
-      <input id={id} type="checkbox" role="switch" checked={value} onChange={(e) => onChange(e.target.checked)} className="h-5 w-5 accent-[#7c6aff]" />
+      <input id={id} type="checkbox" role="switch" checked={value} onChange={(e) => onChange(e.target.checked)} className="h-5 w-5 accent-[#00e5ff]" />
     </label>
   );
 }

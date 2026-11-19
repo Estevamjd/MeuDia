@@ -17,7 +17,11 @@ export interface Transacao {
   carteira_id?: UUID | null;
   /** Correção de saldo: entra no saldo, mas fica fora de renda/gasto/gráficos. */
   ajuste?: boolean;
+  /** Onde nasceu (009): `app` = manual, `whatsapp` = assistente. Ausente = legado/`app`. */
+  origem?: OrigemLancamento;
 }
+
+export type OrigemLancamento = 'app' | 'whatsapp';
 
 export interface TransacaoInsert {
   tipo: TipoTransacao;

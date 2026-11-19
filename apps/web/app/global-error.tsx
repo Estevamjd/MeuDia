@@ -16,7 +16,7 @@ export default function GlobalError({
 
   return (
     <html lang="pt-BR">
-      <body style={{ backgroundColor: '#080810', color: '#eeeef8', fontFamily: 'sans-serif' }}>
+      <body style={{ backgroundColor: '#050a16', color: '#f5f6f8', fontFamily: 'sans-serif' }}>
         <div
           style={{
             display: 'flex',
@@ -30,14 +30,14 @@ export default function GlobalError({
           }}
         >
           <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>Algo deu errado</h1>
-          <p style={{ color: '#65657a', fontSize: '14px', maxWidth: '400px' }}>
+          <p style={{ color: '#94a3b8', fontSize: '14px', maxWidth: '400px' }}>
             Ocorreu um erro inesperado. Nossa equipe ja foi notificada.
           </p>
           <button
             onClick={reset}
             style={{
-              backgroundColor: '#7c6aff',
-              color: 'white',
+              backgroundColor: '#00e5ff',
+              color: '#06101c',
               border: 'none',
               padding: '10px 24px',
               borderRadius: '8px',

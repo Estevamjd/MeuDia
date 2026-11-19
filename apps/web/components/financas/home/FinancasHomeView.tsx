@@ -3,9 +3,11 @@ import { BoasVindasFinancas, type BoasVindasFinancasProps } from './BoasVindasFi
 import type { SecoesHome } from './montarHome';
 import { ProximasContas, type ContaProxima } from './ProximasContas';
 import { RendaSheet, type RendaSheetProps } from './RendaSheet';
-import { UltimosGastos } from './UltimosGastos';
 import { CardSaldoHoje } from './CardSaldoHoje';
-import { CardSobraMes } from './CardPrevisao';
+import { HeroiSobra } from '../resumo/HeroiSobra';
+import { ParaOndeFoi } from '../resumo/ParaOndeFoi';
+import { UltimosLancamentos } from '../resumo/UltimosLancamentos';
+import type { ResumoMes } from '../resumo/montarResumoMes';
 import type { RendaAReceberItem } from './CardRendaAReceber';
 import type { DadosDashboard } from './montarDashboard';
 import { RecebiSheet, type RecebiSheetProps } from './RecebiSheet';
@@ -34,11 +36,16 @@ export interface FinancasHomeViewProps {
   /** Abre a folha de lançamento já no "Gastei" (Voltar leva a Entrou dinheiro/Transferir). */
   onGastei: () => void;
   dashboard?: DashboardHome | null;
+  /** Sobra, Entrou/Saiu, categorias e últimos lançamentos do mês (design v2). */
+  resumo?: ResumoMes | null;
+  escondido?: boolean;
+  /** Olho do cabeçalho (esconde os valores); usado pela página. */
+  onAlternarOlho?: () => void;
 }
 
 /**
- * Início resumida (decisão 7), nesta ordem e só isto: Cofrinho → No fim do mês sobra → Contas a vencer (com "A receber")
- * → 3 últimos gastos. Cabe em 390×844 acima da barra de abas sem rolar (e2e/abas.spec.ts).
+ * Início (design v2 Astro G, aprovado em 18/11/2026): Sobra do mês (com Entrou/Saiu) → Contas a vencer (com "A receber")
+ * → Para onde foi → Últimos lançamentos com selo Manual/WhatsApp e o "Gastei".
  */
 export function FinancasHomeView({
   estado,
@@ -53,6 +60,8 @@ export function FinancasHomeView({
   onPagar,
   onGastei,
   dashboard = null,
+  resumo = null,
+  escondido = false,
 }: FinancasHomeViewProps) {
   if (estado === 'carregando') {
     return (
@@ -83,13 +92,15 @@ export function FinancasHomeView({
   const contas = secoes.contasAVencer ?? (rendasAReceber.length ? { contas: [], totalMes: 0 } : null);
 
   return (
-    <div className="space-y-2.5">
-      {erroPainel && <p role="alert" className="rounded-card border border-border bg-card p-4 text-sm text-muted">{erroPainel}</p>}
+    <div className="space-y-3">
+      {erroPainel && <p role="alert" className="lap-cartao p-4 text-sm text-muted">{erroPainel}</p>}
 
       {boasVindas && <BoasVindasFinancas {...boasVindas} />}
 
-      {d && <CardSaldoHoje {...d.saldo} escondido={d.escondido} onAlternarOlho={d.onAlternarOlho} compacto />}
-      {d && !soConvite && d.sobraMes && <CardSobraMes sobra={d.sobraMes} escondido={d.escondido} />}
+      {/* Usuária nova sem banco: só o convite (sem cards vazios nem "R$ 0,00"). */}
+      {soConvite && d && <CardSaldoHoje {...d.saldo} escondido={d.escondido} onAlternarOlho={d.onAlternarOlho} compacto />}
+
+      {!soConvite && resumo && <HeroiSobra resumo={resumo} escondido={escondido} sobra={d?.sobraMes ?? null} />}
 
       {contas && (
         <ProximasContas
@@ -103,8 +114,11 @@ export function FinancasHomeView({
         />
       )}
 
-      {/* "Gastei" sempre à mão (o "+" saiu da barra); só a usuária sem banco vê apenas o convite. */}
-      {!soConvite && <UltimosGastos gastos={secoes.ultimosGastos} onGastei={onGastei} />}
+      {!soConvite && resumo && <ParaOndeFoi categorias={resumo.categorias} escondido={escondido} />}
+      {!soConvite && <UltimosLancamentos lancamentos={resumo?.ultimos ?? []} escondido={escondido} onGastei={onGastei} />}
+
+      {/* Cofrinho (saldo por banco) segue na Início, depois do resumo do mês; o olho fica no cabeçalho da página. */}
+      {!soConvite && d && <CardSaldoHoje {...d.saldo} escondido={escondido} onAlternarOlho={d.onAlternarOlho} compacto semOlho />}
 
       <RendaSheet {...rendaSheet} />
       {d && <RecebiSheet {...d.recebiSheet} />}

@@ -47,7 +47,7 @@ export function CargaSugestao({
       <div className="flex gap-1.5 shrink-0">
         <button
           onClick={() => onAceitar(sugestao.cargaSugerida)}
-          className="flex h-7 w-7 items-center justify-center rounded-md bg-accent text-white transition-colors hover:bg-accent/80"
+          className="flex h-7 w-7 items-center justify-center rounded-md bg-accent text-accent-fg transition-colors hover:bg-accent/80"
           aria-label="Aceitar sugestão"
         >
           <Check size={14} />
