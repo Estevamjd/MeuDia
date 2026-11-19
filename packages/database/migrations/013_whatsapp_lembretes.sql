@@ -52,9 +52,10 @@ BEGIN
     'envios_total', (SELECT COUNT(*) FROM private.whatsapp_envios e WHERE e.telefone = c.telefone AND e.status = 'enviado'),
     'envios_sem_resposta', (SELECT COUNT(*) FROM private.whatsapp_envios e WHERE e.telefone = c.telefone AND e.status = 'enviado' AND e.created_at > c.ultima_msg_em),
     'chaves_7d', COALESCE((SELECT jsonb_agg(e.chave) FROM private.whatsapp_envios e WHERE e.telefone = c.telefone AND e.dia > v_hoje - 7 AND e.status <> 'falhou'), '[]'::jsonb),
-    'treino_hoje', (SELECT jsonb_build_object('nome', t.nome, 'hora', EXTRACT(HOUR FROM t.horario)::INT)
+    -- `horario` vem da 008 (pode não existir ainda): lido via to_jsonb para funcionar com ou sem a coluna.
+    'treino_hoje', (SELECT jsonb_build_object('nome', t.nome, 'hora', EXTRACT(HOUR FROM (pg_catalog.to_jsonb(t)->>'horario')::TIME)::INT)
         FROM public.treinos t WHERE t.user_id = c.user_id AND COALESCE(t.ativo, TRUE) AND t.dia_semana = EXTRACT(DOW FROM v_hoje)::INT
-        ORDER BY t.horario NULLS LAST, t.created_at LIMIT 1),
+        ORDER BY (pg_catalog.to_jsonb(t)->>'horario') NULLS LAST, t.created_at LIMIT 1),
     'treinou_hoje', EXISTS (SELECT 1 FROM public.registros_treino r WHERE r.user_id = c.user_id AND r.data = v_hoje)
                  OR EXISTS (SELECT 1 FROM public.sessoes_treino s WHERE s.user_id = c.user_id AND s.concluida
                               AND (s.inicio AT TIME ZONE 'America/Sao_Paulo')::DATE = v_hoje),
