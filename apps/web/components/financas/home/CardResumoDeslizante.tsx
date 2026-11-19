@@ -352,7 +352,15 @@ function PaginaMeta({ meta, sobraMensal, hojeISO, escondido }: { meta: MetaDoCar
         <span className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[color-mix(in_oklch,var(--lap-h-positivo)_55%,transparent)] to-[var(--lap-h-positivo)]" style={{ width: `${p.pct}%` }} />
         {p.pctEsperado !== null && !p.alcancada && (
           <span className="absolute -bottom-[5px] -top-[5px] w-0.5 -translate-x-1/2 rounded bg-text/55" style={{ left: `${p.pctEsperado}%` }} data-testid="cartao-meta-hoje">
-            <em className="lap-rotulo lap-texto-3 absolute left-1/2 top-4 -translate-x-1/2 whitespace-nowrap not-italic text-[9.5px]">hoje {p.pctEsperado}%</em>
+            <em
+              className={clsx(
+                'lap-rotulo lap-texto-3 absolute top-4 whitespace-nowrap not-italic text-[9.5px]',
+                // Perto das pontas o rótulo encosta para dentro da barra, sem cortar ("hoje 0%", "hoje 100%").
+                p.pctEsperado < 12 ? 'left-0' : p.pctEsperado > 88 ? 'right-0' : 'left-1/2 -translate-x-1/2',
+              )}
+            >
+              hoje {p.pctEsperado}%
+            </em>
           </span>
         )}
         <span

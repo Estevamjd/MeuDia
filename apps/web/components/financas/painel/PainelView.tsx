@@ -124,7 +124,7 @@ function Celula({ rotulo, valor, nota, testid }: { rotulo: string; valor: string
   return (
     <div className="lap-vidro min-w-0 px-2.5 py-2">
       <p className="lap-rotulo lap-texto-3 truncate text-[10px]">{rotulo}</p>
-      <p data-testid={testid} className="mt-0.5 truncate text-[14px] font-medium tabular-nums">{valor}</p>
+      <p data-testid={testid} className="mt-0.5 break-words text-[13px] font-medium leading-tight tracking-[-0.02em] tabular-nums">{valor}</p>
       <p className="lap-texto-3 truncate text-[11px]">{nota}</p>
     </div>
   );
