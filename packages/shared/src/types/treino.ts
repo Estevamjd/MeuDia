@@ -10,6 +10,8 @@ export interface Treino {
   tipo: TipoTreino | null;
   observacao: string | null;
   ordem: number;
+  /** Hora planejada do treino ("HH:MM", migration 008). null = sem hora; o lembrete do WhatsApp sai 1h antes. */
+  horario?: string | null;
   created_at: string;
   exercicios?: Exercicio[];
 }
@@ -20,6 +22,7 @@ export interface TreinoInsert {
   tipo?: TipoTreino | null;
   observacao?: string | null;
   ordem?: number;
+  horario?: string | null;
 }
 
 export interface Exercicio {

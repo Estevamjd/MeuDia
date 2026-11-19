@@ -13,6 +13,7 @@ import {
   useIniciarSessao,
   useFinalizarSessao,
   useCriarTreino,
+  useAtualizarTreino,
   useAdicionarExercicio,
   useAtualizarExercicio,
   useExcluirExercicio,
@@ -36,6 +37,7 @@ import { SeletorDias, type DiaSeletor } from '../../../../components/treinos/Sel
 import { ExercicioCaderno, type MarcarSerie } from '../../../../components/treinos/ExercicioCaderno';
 import { Cabecalho, LinkAcao, Subabas, TelaCaderno, VazioCaderno, classeBotaoCheio } from '../../../../components/caderno';
 import { LembreteTreino } from '../../../../components/treinos/LembreteTreino';
+import { HorarioTreino } from '../../../../components/treinos/HorarioTreino';
 
 // Segunda primeiro (S T Q Q S S D); valores de `treinos.dia_semana` (0 = domingo).
 const ORDEM_SEMANA = [1, 2, 3, 4, 5, 6, 0] as const;
@@ -68,6 +70,7 @@ export default function TreinosPage() {
   const iniciarSessao = useIniciarSessao();
   const finalizarSessao = useFinalizarSessao();
   const criarTreino = useCriarTreino();
+  const atualizarTreino = useAtualizarTreino();
   const adicionarExercicio = useAdicionarExercicio();
   const atualizarExercicio = useAtualizarExercicio();
   const excluirExercicio = useExcluirExercicio();
@@ -278,6 +281,20 @@ export default function TreinosPage() {
       </div>
 
       {conteudo}
+
+      {treino && !treinosQ.isLoading && !treinosQ.isError && (
+        <HorarioTreino
+          key={treino.id}
+          horario={treino.horario}
+          salvando={atualizarTreino.isPending}
+          onSalvar={(horario) =>
+            atualizarTreino.mutate(
+              { id: treino.id, data: { horario } },
+              { onError: () => toast.error('Não deu para salvar o horário. Tente de novo.') },
+            )
+          }
+        />
+      )}
 
       <LembreteTreino
         ligado={lembreteQ.isError ? null : lembreteQ.data}

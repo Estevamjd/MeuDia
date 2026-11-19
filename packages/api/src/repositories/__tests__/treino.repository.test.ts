@@ -16,6 +16,7 @@ const query = {
 };
 beforeEach(() => {
   vi.clearAllMocks();
+  repo.__reiniciarDeteccao008Treino();
   getSupabase.mockReturnValue({ from: vi.fn().mockReturnValue(query) });
 });
 
@@ -47,4 +48,35 @@ it('create/update gravam `descricao`, nunca `observacao`', async () => {
   await repo.update('t', { nome: 'Y' }, 'u');
   expect(query.update).toHaveBeenCalledWith({ nome: 'Y' });
   for (const c of colunasTreino()) expect(COLUNAS_TREINOS).toContain(c);
+});
+
+it('lê e grava a hora do plano (`horario`, 008) como HH:MM', async () => {
+  result = { data: { id: 't', user_id: 'u', nome: 'X', dia_semana: 1, tipo: null, descricao: null, ordem: 0, horario: '19:30:00', created_at: '' }, error: null };
+  const t = await repo.update('t', { horario: '19:30' }, 'u');
+  expect(query.update).toHaveBeenCalledWith({ horario: '19:30' });
+  expect(colunasTreino()).toContain('horario');
+  expect(t.horario).toBe('19:30');
+  await repo.update('t', { horario: null }, 'u');
+  expect(query.update).toHaveBeenLastCalledWith({ horario: null });
+});
+
+it('sem a 008 no banco: repete sem `horario` e não manda a hora', async () => {
+  let chamadas = 0;
+  const respostas = [
+    { data: null, error: { code: '42703', message: 'column treinos.horario does not exist' } },
+    { data: { id: 't', user_id: 'u', nome: 'X', dia_semana: 1, tipo: null, descricao: null, ordem: 0, created_at: '' }, error: null },
+  ];
+  const q = { ...query, then: (resolve: (v: unknown) => unknown) => Promise.resolve(respostas[Math.min(chamadas++, 1)]).then(resolve) };
+  getSupabase.mockReturnValue({ from: vi.fn().mockReturnValue(q) });
+  const t = await repo.update('t', { nome: 'X', horario: '07:00' }, 'u');
+  expect(query.update).toHaveBeenNthCalledWith(1, { nome: 'X', horario: '07:00' });
+  expect(query.update).toHaveBeenNthCalledWith(2, { nome: 'X' });
+  expect(String(query.select.mock.calls.at(-1)?.[0])).not.toContain('horario');
+  expect(t.horario).toBeNull();
+});
+
+it('erro que não é de schema não cai no fallback', async () => {
+  result = { data: null, error: { code: '23505', message: 'dup' } };
+  await expect(repo.update('t', { nome: 'X' }, 'u')).rejects.toThrow('dup');
+  expect(query.update).toHaveBeenCalledTimes(1);
 });

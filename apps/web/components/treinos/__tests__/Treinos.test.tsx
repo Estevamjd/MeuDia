@@ -5,6 +5,7 @@ import type { Exercicio, SerieRealizada } from '@meudia/shared';
 import { ExercicioCaderno } from '../ExercicioCaderno';
 import { SeletorDias } from '../SeletorDias';
 import { LembreteTreino } from '../LembreteTreino';
+import { HorarioTreino } from '../HorarioTreino';
 
 afterEach(cleanup);
 
@@ -124,5 +125,33 @@ describe('LembreteTreino', () => {
     expect(chave.disabled).toBe(true);
     expect(chave.getAttribute('aria-checked')).toBe('false');
     expect(screen.getByText('Disponível depois da próxima atualização do app.')).toBeTruthy();
+  });
+});
+
+describe('HorarioTreino', () => {
+  it('salva a hora nova ao sair do campo e não salva sem mudança', () => {
+    const onSalvar = vi.fn();
+    render(<HorarioTreino horario="19:00" salvando={false} onSalvar={onSalvar} />);
+    const campo = screen.getByLabelText('Horário do treino');
+    fireEvent.blur(campo);
+    expect(onSalvar).not.toHaveBeenCalled();
+    fireEvent.change(campo, { target: { value: '07:30' } });
+    fireEvent.blur(campo);
+    expect(onSalvar).toHaveBeenCalledWith('07:30');
+    expect(screen.getByText('O lembrete no WhatsApp chega 1h antes.')).toBeTruthy();
+  });
+
+  it('apagar a hora salva null', () => {
+    const onSalvar = vi.fn();
+    render(<HorarioTreino horario="19:00" salvando={false} onSalvar={onSalvar} />);
+    const campo = screen.getByLabelText('Horário do treino');
+    fireEvent.change(campo, { target: { value: '' } });
+    fireEvent.blur(campo);
+    expect(onSalvar).toHaveBeenCalledWith(null);
+  });
+
+  it('sem hora explica o que acontece', () => {
+    render(<HorarioTreino horario={null} salvando={false} onSalvar={vi.fn()} />);
+    expect(screen.getByText(/Sem hora definida/)).toBeTruthy();
   });
 });

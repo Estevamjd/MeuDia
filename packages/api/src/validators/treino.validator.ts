@@ -7,6 +7,7 @@ export const treinoInsertSchema = z.object({
   tipo: z.enum(['musculacao', 'cardio', 'funcional', 'descanso']).nullable().optional(),
   observacao: z.string().max(2000).nullable().optional(),
   ordem: z.number().optional(),
+  horario: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Horário no formato HH:MM').nullable().optional(),
 });
 
 export const exercicioInsertSchema = z.object({

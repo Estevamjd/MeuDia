@@ -255,6 +255,10 @@ todo dia (por isso o check-in é sorteado e há teto semanal).
 | Check-in "teve algum gasto hoje?" | 20h–21h45 | nenhum gasto lançado no dia | dias sorteados (~55%), no máx. 3 por semana |
 | Refeição | 12h30–14h | só com meta de alimentação e sem refeição registrada | sorteio de 40%, no máx. 2 por semana |
 
+O horário do treino no plano é a coluna `treinos.horario` (migration 008, aplicada em produção em 19/11/2026).
+A pessoa define a hora em Treino → Plano → "Horário do treino". Sem hora definida, vale a próxima regra da tabela.
+A RPC lê a coluna via `to_jsonb`, então funciona com ou sem a 008.
+
 **Travas (código + banco):**
 
 - Só quem tem conta ligada, **escreveu para o bot nos últimos 14 dias** e não pediu para parar. Número que
