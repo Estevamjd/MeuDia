@@ -13,11 +13,11 @@ import {
 } from '@meudia/shared';
 import { hojeLocal, usePerfilSaude, usePesoRecente, useProfile, useRegistrarPesoDoDia, useUpdateProfile } from '../../../../hooks';
 import { Cabecalho, Chip, LinkAcao, Rotulo, Secao, Subabas, TelaCaderno, VazioCaderno, classeBotaoCheio, classeTextoCaderno } from '../../../../components/caderno';
+import { AvisoPerfilSoLeitura } from '../../../../components/saude/AvisoPerfilSoLeitura';
 import { EmptyState } from '../../../../components/ui/EmptyState';
 import { Modal } from '../../../../components/ui/Modal';
 import { Skeleton, SkeletonList } from '../../../../components/ui/Skeleton';
 import { useToast } from '../../../../components/ui/Toast';
-import { perfilVazio } from '../../../../lib/perfil-saude';
 
 // Recharts só por next/dynamic (lib/__tests__/recharts-dinamico.test.ts): fora do JS inicial da rota.
 const GraficoPeso = dynamic(() => import('../../../../components/saude/GraficoPeso').then((m) => m.GraficoPeso), {
@@ -45,7 +45,7 @@ export default function SaudePesoPage() {
   const profileQ = useProfile();
   const atualizarPerfil = useUpdateProfile();
   const registrar = useRegistrarPesoDoDia();
-  const { perfil, salvar } = usePerfilSaude();
+  const { perfil, podeEditar, fonte, atualizar, recarregar } = usePerfilSaude();
   const [dias, setDias] = useState<(typeof PERIODOS)[number]>(30);
   const [registrando, setRegistrando] = useState(false);
   const [editandoMeta, setEditandoMeta] = useState(false);
@@ -59,8 +59,9 @@ export default function SaudePesoPage() {
   const ritmo = perfil?.ritmoPct ?? RITMOS_SEMANAIS_PCT[1];
   const realista = metaKg && atual && prazo ? metaRealista({ pesoMetaKg: metaKg, pesoAtualKg: atual, hoje, prazo }) : null;
 
-  const guardarLocal = (mudanca: { ritmoPct?: number; prazoMeta?: string | null }) =>
-    salvar({ ...(perfil ?? perfilVazio('adiado')), ...mudanca });
+  // Prazo e ritmo vão para a conta (perfil_saude) só como as colunas mudadas, e só depois da carga do perfil
+  // (podeEditar): antes disso, ou sem rede, os controles ficam desligados e nada sobrescreve a linha.
+  const guardarPerfil = (mudanca: { ritmoPct?: number; prazoMeta?: string | null }) => atualizar(mudanca);
 
   const salvarPeso = async (peso: number) => {
     try {
@@ -75,7 +76,7 @@ export default function SaudePesoPage() {
   const salvarMeta = async (peso: number | null, data: string | null) => {
     try {
       await atualizarPerfil.mutateAsync({ meta_peso: peso });
-      guardarLocal({ prazoMeta: data });
+      await guardarPerfil({ prazoMeta: data });
       setEditandoMeta(false);
     } catch {
       toast.error('Não deu para salvar o peso-meta. Tente de novo.');
@@ -143,18 +144,19 @@ export default function SaudePesoPage() {
                 <p className="text-[14.5px] text-muted-text">Sem peso-meta.</p>
               )}
             </div>
-            <LinkAcao onClick={() => setEditandoMeta(true)} ariaLabel="Editar peso-meta">
+            <LinkAcao onClick={() => setEditandoMeta(true)} ariaLabel="Editar peso-meta" disabled={!podeEditar}>
               {metaKg ? 'editar' : 'definir'}
             </LinkAcao>
           </div>
           <Rotulo id="ritmo" className="mt-5">Ritmo por semana (% do peso)</Rotulo>
-          <div role="group" aria-labelledby="ritmo" className="mt-2 flex gap-3">
+          <div role="group" aria-labelledby="ritmo" aria-busy={!podeEditar} className="mt-2 flex gap-3">
             {RITMOS_SEMANAIS_PCT.map((p) => (
-              <Chip key={p} ativo={ritmo === p} onClick={() => guardarLocal({ ritmoPct: p })}>
+              <Chip key={p} ativo={ritmo === p} disabled={!podeEditar} onClick={() => void guardarPerfil({ ritmoPct: p }).catch(() => toast.error('Não deu para salvar o ritmo. Tente de novo.'))}>
                 {fmtPct(p)}%
               </Chip>
             ))}
           </div>
+          {fonte === 'indisponivel' && <AvisoPerfilSoLeitura fonte={fonte} onTentarDeNovo={recarregar} className="mt-3 border-l-2 border-accent3 pl-3" />}
           {atual && (
             <p className="mt-2 text-[14px] text-muted-text tabular-nums">
               {fmtPct(ritmo)}% de {fmtKg(atual)} kg ≈ {fmtKg(ritmoKgSemana(ritmo, atual), 2)} kg/semana
@@ -229,7 +231,6 @@ export default function SaudePesoPage() {
           void salvarMeta(n, data);
           return null;
         }}
-        nota="A data fica guardada neste aparelho até a próxima atualização do app."
       />
     </TelaCaderno>
   );

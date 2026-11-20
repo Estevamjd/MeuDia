@@ -111,7 +111,7 @@ export interface ContextoComentario {
 /** O que a IA recebe: só fatos verdadeiros (do banco e do que a pessoa disse); nada de texto livre longo. */
 export function contextoDoComentario({ contato, intencao, gancho, extras }: ContextoComentario): string {
   const linhas = [
-    `Acabou de registrar: ${intencao.tipo}${'descricao' in intencao && intencao.descricao ? ` "${intencao.descricao}"` : ''}${'valor' in intencao ? ` de R$ ${intencao.valor.toFixed(2).replace('.', ',')}` : ''}.`,
+    `Acabou de registrar: ${intencao.tipo}${'descricao' in intencao && intencao.descricao ? ` "${intencao.descricao}"` : ''}${'valor' in intencao && intencao.valor != null ? ` de R$ ${intencao.valor.toFixed(2).replace('.', ',')}` : ''}.`,
     `Objetivo: ${contato.objetivo ?? 'não informado'}. Metas: ${contato.metas.join(', ') || 'não informado'}.`,
   ];
   if (contato.fatos.length) linhas.push(`Já te contou: ${contato.fatos.slice(-5).join('; ')}.`);

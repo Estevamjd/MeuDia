@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
-import { format, subDays } from 'date-fns';
 import { Plus, CheckSquare, Flame, Target } from 'lucide-react';
 import type { Habito, HabitoInsert, RegistroHabito, ContextoUsuario } from '@meudia/shared';
 import { DIAS_SEMANA_CURTO } from '@meudia/shared';
@@ -22,6 +21,8 @@ import {
   useSessoesSemana,
   useResumoMensal,
 } from '../../../hooks';
+import { anoMesSP, diaSemanaDe, hojeSP } from '../../../lib/hoje';
+import { historicoHabitos } from '../../../lib/habitos-semana';
 import { useAuth } from '../../../hooks/useAuth';
 
 import {
@@ -43,8 +44,8 @@ export default function HabitosPage() {
   const toast = useToast();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const hoje = useMemo(() => new Date(), []);
-  const hojeStr = format(hoje, 'yyyy-MM-dd');
-  const diaSemana = hoje.getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  const hojeStr = hojeSP(hoje);
+  const diaSemana = diaSemanaDe(hojeStr);
 
   // --- Data hooks ---
   const { user } = useAuth();
@@ -56,7 +57,8 @@ export default function HabitosPage() {
   const { data: scoreHoje } = useScoreHoje();
   const { data: treinos } = useTreinos();
   const { data: sessoesSemana } = useSessoesSemana();
-  const { data: resumoMensal } = useResumoMensal(hoje.getFullYear(), hoje.getMonth() + 1);
+  const mesSP = anoMesSP(hoje);
+  const { data: resumoMensal } = useResumoMensal(mesSP.ano, mesSP.mes);
 
   // --- Mutations ---
   const criarHabito = useCriarHabito();
@@ -105,46 +107,13 @@ export default function HabitosPage() {
 
   const streakDias = streak ?? 0;
 
-  // --- Week view data ---
-  const semanaStatus = useMemo(() => {
-    if (!registrosSemana || !habitosAtivos.length) {
-      return Array(7).fill('pending') as string[];
-    }
-
-    const result: string[] = [];
-
-    for (let i = 6; i >= 0; i--) {
-      const dia = subDays(hoje, i);
-      const diaStr = format(dia, 'yyyy-MM-dd');
-      const diaDaSemana = dia.getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6;
-
-      const habitosDoDia = habitosAtivos.filter(
-        (h) => h.frequencia === 'diario' || h.dias_semana.includes(diaDaSemana),
-      );
-
-      if (habitosDoDia.length === 0) {
-        result.push('rest');
-        continue;
-      }
-
-      const registrosDoDia = registrosSemana.filter(
-        (r) => r.data === diaStr && r.concluido,
-      );
-      const percentual = (registrosDoDia.length / habitosDoDia.length) * 100;
-
-      if (percentual >= 80) result.push('done');
-      else if (percentual >= 50) result.push('partial');
-      else if (i === 0) result.push('today');
-      else result.push('missed');
-    }
-
-    return result;
-  }, [registrosSemana, habitosAtivos, hoje]);
+  // --- Week view data (dias civis de SP terminando em hojeStr, em qualquer fuso do aparelho) ---
+  const semana = useMemo(() => historicoHabitos(habitosAtivos, registrosSemana, hoje), [registrosSemana, habitosAtivos, hoje]);
 
   // --- Contexto do agente IA ---
   const contextoAgente: ContextoUsuario = useMemo(() => {
     const treinoHoje = treinos?.find((t) => t.dia_semana === diaSemana) ?? null;
-    const hojeStr2 = format(hoje, 'yyyy-MM-dd');
+    const hojeStr2 = hojeSP(hoje);
     const sessoesConcluidas = sessoesSemana?.filter((s) => s.concluido).length ?? 0;
     const treinoHojeConcluido = sessoesSemana?.some(
       (s) => s.treino_id === treinoHoje?.id && s.data === hojeStr2 && s.concluido,
@@ -389,12 +358,10 @@ export default function HabitosPage() {
       <div className="animate-fadeSlide rounded-card border border-border bg-card p-5">
         <h2 className="mb-4 font-syne text-sm font-semibold text-text">Últimos 7 dias</h2>
         <div className="flex items-center justify-between gap-2">
-          {semanaStatus.map((status, i) => {
-            const dia = subDays(hoje, 6 - i);
-            const diaCurto = DIAS_SEMANA_CURTO[dia.getDay()];
-            const diaNum = format(dia, 'dd');
+          {semana.map(({ iso, diaSemana: diaDaSemana, diaDoMes: diaNum, status }) => {
+            const diaCurto = DIAS_SEMANA_CURTO[diaDaSemana];
             return (
-              <div key={i} className="flex flex-col items-center gap-1.5">
+              <div key={iso} className="flex flex-col items-center gap-1.5">
                 <span className="text-[10px] text-muted">{diaCurto}</span>
                 <div
                   className={clsx(

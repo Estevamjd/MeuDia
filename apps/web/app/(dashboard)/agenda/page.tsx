@@ -38,6 +38,7 @@ import {
   Textarea,
 } from '../../../components/ui';
 import { AgentBannerAuto } from '../../../components/agent';
+import { dataCivilSP, hojeSP } from '../../../lib/hoje';
 
 const PRIORIDADE_COLORS: Record<string, 'red' | 'orange' | 'yellow' | 'green'> = {
   urgente: 'red',
@@ -85,7 +86,7 @@ export default function AgendaPage() {
   const toast = useToast();
 
   // Date navigation
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(() => dataCivilSP());
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
   // Data
@@ -105,7 +106,7 @@ export default function AgendaPage() {
 
   // Formatted date
   const formattedDate = format(selectedDate, "EEEE, dd 'de' MMMM", { locale: ptBR });
-  const isToday = format(new Date(), 'yyyy-MM-dd') === dateStr;
+  const isToday = hojeSP() === dateStr;
 
   // Group compromissos by hour
   const groupedCompromissos = useMemo(() => {
@@ -124,7 +125,7 @@ export default function AgendaPage() {
   // Navigation handlers
   const goToPrevDay = useCallback(() => setSelectedDate((d) => subDays(d, 1)), []);
   const goToNextDay = useCallback(() => setSelectedDate((d) => addDays(d, 1)), []);
-  const goToToday = useCallback(() => setSelectedDate(new Date()), []);
+  const goToToday = useCallback(() => setSelectedDate(dataCivilSP()), []);
 
   // Open add modal
   const handleOpenAdd = useCallback(() => {

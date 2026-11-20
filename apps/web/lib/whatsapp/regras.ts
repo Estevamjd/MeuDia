@@ -96,6 +96,8 @@ export function interpretarPorRegras(mensagem: string, ctx: ContextoRegras): Int
   const t = semAcento(original);
   if (/^(?:ajuda|help|menu|oi|ola|bom dia|boa tarde|boa noite|\?|comandos?)\b[!.?\s]*$/.test(t)) return { tipo: 'ajuda' };
 
+  if (/^(?:(?:desfazer|desfaz)(?:\s+(?:o\s+)?ultimo(?:\s+(?:registro|lancamento|gasto))?)?|(?:apaga(?:r)?|cancela(?:r)?)\s+(?:o\s+)?ultimo(?:\s+(?:registro|lancamento|gasto))?)[!. ]*$/.test(t)) return { tipo: 'desfazer' };
+
   // Lembretes proativos: "parar lembretes"/"pare", "voltar lembretes", "lembretes às 19h".
   if (/^(?:pare|para|parar|stop|chega)[!. ]*$/.test(t) || /\b(?:parar?|pare|desativ\w*|deslig\w*|cancel\w*|sem)\s+(?:os\s+|com\s+os\s+|de\s+(?:me\s+)?mandar\s+)?lembretes?\b/.test(t) || /\bpar[ae] de me lembrar\b/.test(t)) {
     return { tipo: 'lembretes', ativos: false, hora: null };
@@ -153,7 +155,12 @@ export function interpretarPorRegras(mensagem: string, ctx: ContextoRegras): Int
     const semVerbo = original.replace(/^(?:gastei|paguei|comprei|recebi|ganhei|entrou|caiu)\b/i, '');
     const desc = limparDescricao(semVerbo.replace(valor.trecho, ' '));
     const tipo = entrada ? 'entrada' : 'gasto';
-    return comData({ tipo, valor: valor.valor, descricao: maiuscula(desc).slice(0, 200), categoria: categoriaDoTexto(desc, tipo) });
+    return comData({ tipo, valor: valor.valor, descricao: maiuscula(desc).slice(0, 200), categoria: categoriaDoTexto(desc, tipo), ...(/^paguei\b/.test(t) ? { pagar: true } : {}) });
+  }
+
+  if (/^paguei\b/.test(t)) {
+    const descricao = maiuscula(limparDescricao(original.replace(/^paguei\s*/i, ''))).slice(0, 200);
+    if (descricao) return comData({ tipo: 'gasto' as const, valor: null, descricao, categoria: categoriaDoTexto(descricao, 'gasto'), pagar: true as const });
   }
 
   return { tipo: 'desconhecido' };

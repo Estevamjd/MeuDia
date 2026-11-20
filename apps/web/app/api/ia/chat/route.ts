@@ -17,7 +17,7 @@ const fallback = (gravada: boolean, motivo?: string) => {
 };
 
 /**
- * F1 meudia-ia: transforma "gastei 45 no mercado" no card de um gasto. Grava a mensagem no chat para consumir cota;
+ * F1 meudia-ia: transforma "gastei 45 no mercado" no card de um gasto. Grava a mensagem no chat antes de consumir a cota atômica;
  * a transação só é gravada pelo Confirmar, pelo "Gastei" que já existe. Client do usuário (cookies + RLS), nunca service_role.
  * Sem chave, cota do dia estourada, erro ou resposta inválida do modelo: `{fallback:true}` e o cliente usa as regras.
  */

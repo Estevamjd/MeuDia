@@ -4,8 +4,7 @@ import type {
   SerieRealizada,
   SerieRealizadaInsert,
 } from '@meudia/shared';
-import { AppError } from '@meudia/shared';
-import { addDays, format, parseISO } from 'date-fns';
+import { AppError, hojeSP, inicioDoDiaSP, somarDias } from '@meudia/shared';
 import { getSupabase } from './supabase';
 
 // Banco real (000_baseline, GAP-10): `inicio` (timestamptz) e `concluida`; não há `data` nem `concluido`.
@@ -24,7 +23,7 @@ interface SessaoRow {
 }
 
 function paraSessao({ inicio, concluida, ...resto }: SessaoRow): SessaoTreino {
-  return { ...resto, data: format(new Date(inicio), 'yyyy-MM-dd'), concluido: !!concluida };
+  return { ...resto, data: hojeSP(new Date(inicio)), concluido: !!concluida };
 }
 
 // `data` (só o dia) não vai ao banco: `inicio` fica com o default NOW(), que guarda também a hora.
@@ -34,7 +33,7 @@ function paraRow(sessao: Partial<SessaoTreinoInsert>): Record<string, unknown> {
   return concluido === undefined ? resto : { ...resto, concluida: concluido };
 }
 
-/** `startDate`/`endDate` em AAAA-MM-DD (dia local, inclusive): vira [início de startDate, início do dia após endDate). */
+/** `startDate`/`endDate` em AAAA-MM-DD (dia de São Paulo, inclusive): vira [início de startDate, início do dia após endDate). */
 export async function findByUserAndDateRange(
   userId: string,
   startDate: string,
@@ -44,8 +43,8 @@ export async function findByUserAndDateRange(
     .from('sessoes_treino')
     .select(COLUNAS_SESSAO)
     .eq('user_id', userId)
-    .gte('inicio', parseISO(startDate).toISOString())
-    .lt('inicio', addDays(parseISO(endDate), 1).toISOString())
+    .gte('inicio', inicioDoDiaSP(startDate))
+    .lt('inicio', inicioDoDiaSP(somarDias(endDate, 1)))
     .order('inicio', { ascending: true });
 
   if (error) throw new AppError(error.message, 'DB_ERROR');

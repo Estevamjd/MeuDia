@@ -11,6 +11,7 @@ export {
   useExcluirExercicio,
   useReordenarExercicios,
   useSessoesSemana,
+  useSessoesTreinoDesde,
   useSeriesDaSessao,
   useHistoricoExercicio,
   useIniciarSessao,

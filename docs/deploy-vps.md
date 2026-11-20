@@ -173,3 +173,27 @@ real da imagem, aceitação dos labels pelo Traefik e respostas 429 permanecem p
 
 O smoke atualizado por outro agente (login 200 + modo em `/onboarding`) também passou contra o runner
 isolado. `/api/modo` não existe nesta revisão. O runner local foi encerrado ao final.
+
+## Ordem da Wave 2B (migration 016)
+
+Com OK do Estevam para deploy e, separadamente, para aplicar a migration:
+
+1. Publicar primeiro o código compatível com ausência da 016 e verificar o app.
+2. Antes da aplicação, conferir se `public.perfil_saude` e `public.ia_uso_diario` já existem por criação manual;
+   se existirem, comparar o schema com a 016 (`IF NOT EXISTS` não corrige um schema diferente).
+3. Aplicar `packages/database/migrations/016_whatsapp_v2_saude.sql` em transação única (`psql -1`, conexão
+   aprovada pelo dono). A 016 ainda não foi aplicada. Não aplicar antes do código: a limpeza saiu do registro
+   e passa a depender do novo chamador diário, entre 03:00 e 05:59 BRT.
+4. Verificar desfazer, conciliação e manutenção; seguir o smoke previsto neste documento após o deploy.
+
+Antes de qualquer down, com autorização, fazer backup protegido de `public.perfil_saude` e
+`public.ia_uso_diario` e validar a restauração. Exemplo no psql, em diretório de backup protegido:
+
+```sql
+\copy public.perfil_saude TO 'perfil_saude.csv' WITH (FORMAT csv, HEADER true)
+\copy public.ia_uso_diario TO 'ia_uso_diario.csv' WITH (FORMAT csv, HEADER true)
+```
+
+O down apaga essas duas tabelas e o log privado de ações/manutenções, perde o perfil de saúde da conta e
+reinicia a cota diária. Guardar também esses logs em backup se forem necessários para recuperação operacional.
+Só então executar `016_whatsapp_v2_saude_down.sql`; ele restaura a função de registro da 012.

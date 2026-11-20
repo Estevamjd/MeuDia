@@ -47,7 +47,10 @@ function clienteFalso({ usuario = { id: A } as { id: string } | null, mensagensH
   const client = {
     auth: { getUser: vi.fn(async () => ({ data: { user: usuario }, error: null })) },
     from,
-    rpc: escrita('rpc', 'rpc'),
+    rpc: vi.fn(async (...args: unknown[]): Promise<{ data: { permitido: boolean } | null; error: { code: string } | null; status: number }> => {
+      chamadas.push({ tabela: 'rpc', metodo: 'rpc', args });
+      return { data: null, error: { code: 'PGRST202' }, status: 404 };
+    }),
   };
   return { client, chamadas };
 }
@@ -103,6 +106,7 @@ describe('POST /api/ia/chat', () => {
     // Só a mensagem entra no chat; nada em transacoes.
     expect(chamadas.filter((c) => ['insert', 'update', 'delete', 'upsert', 'rpc'].includes(c.metodo))).toEqual([
       { tabela: 'chat_agente', metodo: 'insert', args: [{ user_id: A, role: 'user', conteudo: 'gastei 45 no mercado' }] },
+      { tabela: 'rpc', metodo: 'rpc', args: ['ia_consumir_cota', { p_limite: 50 }] },
     ]);
     expect(chamadas.some((c) => c.tabela === 'transacoes')).toBe(false);
   });
@@ -179,6 +183,7 @@ describe('POST /api/ia/chat', () => {
     expect(await res.json()).toEqual({ fallback: true, gravada: true });
     expect(chamadas.filter((c) => ['insert', 'update', 'delete', 'upsert', 'rpc'].includes(c.metodo))).toEqual([
       { tabela: 'chat_agente', metodo: 'insert', args: [{ user_id: A, role: 'user', conteudo: 'gastei 45 no mercado' }] },
+      { tabela: 'rpc', metodo: 'rpc', args: ['ia_consumir_cota', { p_limite: 50 }] },
     ]);
   });
 
@@ -218,6 +223,27 @@ describe('POST /api/ia/chat', () => {
     expect(resultados.filter((r) => !r.fallback)).toHaveLength(50);
     expect(chamadas.filter((c) => c.metodo === 'insert')).toHaveLength(60);
     expect(chamadas[0]).toMatchObject({ tabela: 'chat_agente', metodo: 'insert' });
+  });
+
+  it('RPC protegida permite sem depender da contagem de mensagens legadas', async () => {
+    const { client, chamadas } = clienteFalso({ mensagensHoje: 100 });
+    client.rpc.mockResolvedValue({ data: { permitido: true }, error: null, status: 200 });
+    vi.mocked(createServerSupabaseClient).mockReturnValue(client as never);
+    fetchMock.mockResolvedValue(respostaGemini({ valor: 45, categoria: 'Mercado' }));
+    expect((await (await pedir('gastei 45 no mercado')).json()).fallback).toBe(false);
+    expect(client.rpc).toHaveBeenCalledWith('ia_consumir_cota', { p_limite: 50 });
+    expect(chamadas.filter((c) => c.tabela === 'chat_agente').map((c) => c.metodo)).toEqual(['insert']);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('RPC protegida recusa mesmo com chat vazio e sem consultar contagem legada', async () => {
+    const { client, chamadas } = clienteFalso();
+    client.rpc.mockResolvedValue({ data: { permitido: false }, error: null, status: 200 });
+    vi.mocked(createServerSupabaseClient).mockReturnValue(client as never);
+    expect(await (await pedir('gastei 45 no mercado')).json()).toEqual({ fallback: true, gravada: true });
+    expect(client.rpc).toHaveBeenCalledWith('ia_consumir_cota', { p_limite: 50 });
+    expect(chamadas.filter((c) => c.tabela === 'chat_agente').map((c) => c.metodo)).toEqual(['insert']);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('erro no insert → fallback sem contagem nem Gemini', async () => {

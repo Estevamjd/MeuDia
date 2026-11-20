@@ -1,4 +1,4 @@
-# Exclusão de conta (000_baseline + 001–014)
+# Exclusão de conta (000_baseline + 001–016)
 
 Inventário do SQL versionado; não inspeciona o banco de produção. `C` = ON DELETE CASCADE;
 `N(coluna)` = ON DELETE SET NULL apenas nessa coluna. Todas as tabelas abaixo são `public`, salvo indicação.
@@ -50,12 +50,16 @@ As FKs fazem a limpeza na mesma transação do DELETE de `auth.users`, inclusive
 | private.whatsapp_envios | sim | user_id → auth.users C; telefone sem FK | cascata auth, sem PostgREST |
 | cofrinho_movimentos | sim | user_id → profiles C | cascata perfil |
 | cofrinho_fechamentos | sim (PK composta) | user_id → profiles C | cascata perfil |
-| private.whatsapp_mensagens | não | nenhuma; só id externo e created_at | não há vínculo com conta; retenção de 7 dias na RPC whatsapp_registrar |
+| ia_uso_diario | sim (PK composta) | user_id → profiles C | cascata perfil |
+| perfil_saude | sim (PK) | user_id → profiles C | cascata perfil |
+| private.whatsapp_manutencoes | não | nenhuma; só dia da manutenção global | preservada, sem dados da conta |
+| private.whatsapp_acoes | sim | user_id → profiles C | cascata perfil, sem PostgREST |
+| private.whatsapp_mensagens | não | nenhuma; só id externo e created_at | não há vínculo com conta; retenção de 7 dias na RPC whatsapp_manutencao_diaria |
 | private.integracoes | não | nenhuma; configuração global do webhook | preservada, não pertence à conta |
 
 001 repete o schema do baseline, 002 repete agente, 003 repete notas; 004 só policies.
 008 acrescenta campos/restrições e notificações; 009 só origem; 012 só fatos/funções;
-013 acrescenta preferências e envios. Nenhuma outra FK RESTRICT/NO ACTION permanece nas tabelas inventariadas após 014.
+013 acrescenta preferências e envios. Nenhuma outra FK RESTRICT/NO ACTION permanece nas tabelas inventariadas após 016. A 015 só acrescenta RPCs; a 016 acrescenta perfil_saude, ia_uso_diario e o log privado whatsapp_acoes, todos removidos pela cascata do perfil.
 
 ## Triggers e atomicidade
 
@@ -70,8 +74,7 @@ mesma transação, portanto não sobra órfão, qualquer que seja a ordem intern
 `trg_carteiras_preparar_exclusao` da 007 limpa transferências sem lado e o nome do banco,
 sem bloquear a exclusão. O Cofrinho limita permissões, sem trigger de DELETE.
 O roteiro existente `packages/database/tests/006_carteiras.sql` já cria vínculos vivos,
-apaga auth.users e executa `SET CONSTRAINTS ALL IMMEDIATE` (não executado nesta tarefa,
-que proíbe acesso a banco).
+apaga auth.users e executa `SET CONSTRAINTS ALL IMMEDIATE` (executado somente em PostgreSQL local descartável).
 
 Falha de FK/trigger em deleteUser reverte a transação inteira; a rota retorna 500 e loga
 apenas uma categoria fixa. Não há loop nem exclusões HTTP anteriores para deixar dados
@@ -82,8 +85,8 @@ O schema private tem acesso revogado (010); não depende de expô-lo na API nem 
 
 IDs externos em private.whatsapp_mensagens podem identificar mensagens no provedor, mas
 não têm user_id, telefone ou FK. Não existe RPC de exclusão por conta e não é seguro apagar
-IDs de terceiros. A retenção é oportunista (próxima chamada de whatsapp_registrar), não um
-TTL automático. Contatos com user_id NULL também não são atribuíveis à conta por FK.
+IDs de terceiros. A retenção de sete dias é executada pela manutenção diária (whatsapp_manutencao_diaria),
+não um TTL automático. Contatos com user_id NULL também não são atribuíveis à conta por FK.
 Garantir remoção imediata desses resíduos exige desenho SQL aprovado pelo dono; esta
-mudança não cria migration nem promete que a cascata os apaga. Storage não é inventariado
+cascata não apaga esses IDs externos sem vínculo. Storage não é inventariado
 por estas migrations: objetos de Storage, se houver, podem impedir o hard delete do Auth.

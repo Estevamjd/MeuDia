@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -16,6 +16,7 @@ import {
   getResendErrorMessage,
   isEmailNotConfirmedError,
 } from '../../../lib/auth/callback';
+import { destinoComLimite } from '../destino-com-limite';
 import { destinoSeLinkDeRecuperacao } from '../../../lib/auth/recuperacao';
 
 const loginSchema = z.object({
@@ -34,7 +35,6 @@ export default function LoginPage() {
 }
 
 function LoginContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
   const [showPassword, setShowPassword] = useState(false);
@@ -87,6 +87,8 @@ function LoginContent() {
       setServerError('Serviço indisponível. Verifique a configuração.');
       return;
     }
+    // Resolve antes de autenticar: o middleware redireciona POSTs de /login com sessão.
+    const destino = await destinoComLimite();
     const { error } = await supabase.auth.signInWithPassword({
       email: data.email,
       password: data.password,
@@ -106,8 +108,8 @@ function LoginContent() {
       return;
     }
 
-    router.push('/inicio');
-    router.refresh();
+    // Uma navegação de documento envia os cookies novos sem disputar com um refresh RSC.
+    window.location.assign(destino);
   };
 
   return (

@@ -122,14 +122,15 @@ export const classeBotaoContorno =
   'inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded border-[1.5px] border-accent3 px-4 font-dm text-[14px] font-bold tracking-normal text-accent3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent3';
 
 /** Chip (7/30/90 dias, ritmo, sexo, objetivo): ativo com borda e texto --accent3. */
-export function Chip({ ativo, onClick, children }: { ativo: boolean; onClick: () => void; children: ReactNode }) {
+export function Chip({ ativo, onClick, children, disabled }: { ativo: boolean; onClick: () => void; children: ReactNode; disabled?: boolean }) {
   return (
     <button
       type="button"
       aria-pressed={ativo}
       onClick={onClick}
+      disabled={disabled}
       className={clsx(
-        'min-h-11 whitespace-nowrap rounded border px-4 font-dm text-[14px] tracking-normal focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent3',
+        'min-h-11 whitespace-nowrap rounded border px-4 font-dm text-[14px] tracking-normal focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent3 disabled:opacity-50',
         ativo ? 'border-[1.5px] border-accent3 font-bold text-accent3' : 'border-text/[0.14] text-text',
       )}
     >

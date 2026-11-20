@@ -4,23 +4,30 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ChevronRight, Dumbbell, MessageCircle } from 'lucide-react';
 import { hojeSP, resumoSemana, somarDias, type RegistroTreino } from '@meudia/shared';
-import { useExcluirRegistroTreino, useRegistrarTreino, useRegistrosTreino } from '../../../hooks';
+import { useExcluirRegistroTreino, useRegistrarTreino, useRegistrosTreino, useSessoesTreinoDesde, useTreinos } from '../../../hooks';
 import { Button, ConfirmDialog, Input, SkeletonCard, useToast } from '../../../components/ui';
 import { CabecalhoPagina } from '../../../components/financas/resumo/CabecalhoPagina';
 import { SemanaPontos } from '../../../components/registros/SemanaPontos';
 import { Sequencia } from '../../../components/registros/Sequencia';
 import { LinhaRegistro } from '../../../components/registros/LinhaRegistro';
 import { quando } from '../../../components/registros/datas';
+import { unirTreinosDoDia } from '../../../lib/treino-dia';
 
 const SUGESTOES = ['Peito', 'Costas', 'Pernas', 'Ombro', 'Braço', 'Cardio', 'Corrida', 'Caminhada'];
 
-/** Aba Treino (Fase 2, v1): registrar em 2 toques, ver a semana e o histórico. O plano por dia fica em /treinos/plano. */
+/**
+ * Aba Treino (Fase 2, v1): registrar em 2 toques, ver a semana e o histórico. O plano por dia fica em /treinos/plano;
+ * sessão concluída lá conta aqui no dia dela, sem somar em dobro com o Treino rápido (`unirTreinosDoDia`).
+ */
 export default function TreinoPage() {
   const hojeISO = useMemo(() => hojeSP(), []);
   const ontemISO = somarDias(hojeISO, -1);
   // 8 semanas bastam para a sequência e o histórico curto (consulta pequena, plano grátis).
   const desde = somarDias(hojeISO, -56);
   const lista = useRegistrosTreino(desde);
+  // Sessões do Plano e nomes dos treinos: se falharem, a aba segue só com o Treino rápido.
+  const sessoesQ = useSessoesTreinoDesde(desde);
+  const treinosQ = useTreinos();
   const registrar = useRegistrarTreino();
   const excluir = useExcluirRegistroTreino();
   const toast = useToast();
@@ -30,8 +37,12 @@ export default function TreinoPage() {
   const [erro, setErro] = useState<string | null>(null);
   const [excluindo, setExcluindo] = useState<RegistroTreino | null>(null);
 
-  const registros = useMemo(() => lista.data ?? [], [lista.data]);
-  const semana = useMemo(() => resumoSemana(registros, hojeISO), [registros, hojeISO]);
+  const itens = useMemo(
+    () => unirTreinosDoDia(lista.data ?? [], sessoesQ.data ?? [], treinosQ.data ?? []),
+    [lista.data, sessoesQ.data, treinosQ.data],
+  );
+  const semana = useMemo(() => resumoSemana(itens, hojeISO), [itens, hojeISO]);
+  const planoHoje = itens.find((i) => i.data === hojeISO && i.tipo === 'plano');
 
   const enviar = (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +68,7 @@ export default function TreinoPage() {
     <div className="mx-auto w-full max-w-2xl animate-fadeSlide space-y-4 md:space-y-5">
       <CabecalhoPagina titulo="Treino" contexto="O que você fez e como foi a semana" />
 
-      {lista.isLoading ? (
+      {lista.isLoading || sessoesQ.isLoading ? (
         <div className="space-y-3" aria-busy="true" aria-label="Carregando treinos">
           <SkeletonCard />
           <SkeletonCard />
@@ -89,6 +100,11 @@ export default function TreinoPage() {
 
           <section aria-labelledby="treino-registrar" className="lap-cartao p-4">
             <h2 id="treino-registrar" className="mb-3 text-[15px] font-medium text-text">Registrar treino de hoje</h2>
+            {planoHoje && (
+              <p className="-mt-1 mb-3 text-[13px] text-muted" data-testid="treino-plano-hoje">
+                Hoje você concluiu “{planoHoje.titulo}” no plano. Já conta na semana.
+              </p>
+            )}
             <form onSubmit={enviar} className="space-y-3" noValidate>
               <Input
                 id="treino-descricao"
@@ -130,18 +146,18 @@ export default function TreinoPage() {
 
           <section aria-labelledby="treino-historico" className="lap-cartao px-4 pb-1 pt-4">
             <h2 id="treino-historico" className="text-[15px] font-medium text-text">Últimos treinos</h2>
-            {registros.length === 0 ? (
+            {itens.length === 0 ? (
               <p className="py-4 text-[13px] text-muted">Seus treinos aparecem aqui, com a data e de onde vieram.</p>
             ) : (
               <ul className="divide-y divide-border">
-                {registros.slice(0, 10).map((r) => (
+                {itens.slice(0, 10).map((i) => (
                   <LinhaRegistro
-                    key={r.id}
-                    titulo={r.descricao}
-                    meta={`${quando(r.data, hojeISO, ontemISO)}${r.duracao_min ? ` · ${r.duracao_min} min` : ''}`}
-                    origem={r.origem}
-                    onExcluir={() => setExcluindo(r)}
-                    rotuloExcluir={`Excluir treino ${r.descricao}`}
+                    key={`${i.tipo}:${i.id}`}
+                    titulo={i.titulo}
+                    meta={`${quando(i.data, hojeISO, ontemISO)}${i.duracao_min ? ` · ${i.duracao_min} min` : ''}`}
+                    {...(i.tipo === 'rapido'
+                      ? { origem: i.registro.origem, onExcluir: () => setExcluindo(i.registro), rotuloExcluir: `Excluir treino ${i.titulo}` }
+                      : { origem: 'plano' as const })}
                   />
                 ))}
               </ul>

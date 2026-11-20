@@ -1,14 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
 import { dietaService } from '@meudia/api';
 import { somarDias } from '@meudia/shared';
 import { useAuth } from './useAuth';
-import { EVENTO_PERFIL_SAUDE, lerPerfilSaude, salvarPerfilSaude, type PerfilSaude } from '../lib/perfil-saude';
+import { hojeSP } from '../lib/hoje';
 
-export const hojeLocal = () => format(new Date(), 'yyyy-MM-dd');
+/** Hoje em São Paulo (nome antigo mantido para as telas de Saúde). */
+export const hojeLocal = () => hojeSP();
 
 /** Peso dos últimos 90 dias + 6 de folga (a média de 7 dias do primeiro ponto do gráfico olha para trás). */
 export function usePesoRecente() {
@@ -37,40 +36,5 @@ export function useRegistrarPesoDoDia() {
   });
 }
 
-/**
- * Perfil de saúde guardado neste aparelho (sem a 009). `carregado` = já leu o localStorage
- * (evita abrir o cadastro por um instante antes de saber se a pessoa já respondeu).
- */
-export function usePerfilSaude() {
-  const { user } = useAuth();
-  const userId = user?.id;
-  const [perfil, setPerfil] = useState<PerfilSaude | null>(null);
-  const [carregado, setCarregado] = useState(false);
-
-  useEffect(() => {
-    if (!userId) return;
-    const ler = () => {
-      setPerfil(lerPerfilSaude(userId));
-      setCarregado(true);
-    };
-    ler();
-    window.addEventListener(EVENTO_PERFIL_SAUDE, ler);
-    window.addEventListener('storage', ler);
-    return () => {
-      window.removeEventListener(EVENTO_PERFIL_SAUDE, ler);
-      window.removeEventListener('storage', ler);
-    };
-  }, [userId]);
-
-  const salvar = useCallback(
-    (novo: PerfilSaude) => {
-      if (!userId) return false;
-      const ok = salvarPerfilSaude(userId, novo);
-      setPerfil(novo);
-      return ok;
-    },
-    [userId],
-  );
-
-  return { perfil, carregado: carregado && !!userId, salvar };
-}
+/** Perfil de saúde: `hooks/usePerfilSaude.ts` (conta + cache do aparelho). */
+export { usePerfilSaude } from './usePerfilSaude';

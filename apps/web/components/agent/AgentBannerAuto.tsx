@@ -11,6 +11,7 @@ import {
   useResumoMensal,
 } from '../../hooks';
 import { useAuth } from '../../hooks/useAuth';
+import { anoMesSP, diaSemanaDe, hojeSP } from '../../lib/hoje';
 import { AgentBanner } from './AgentBanner';
 
 interface AgentBannerAutoProps {
@@ -30,12 +31,12 @@ export function AgentBannerAuto({ className, onDismiss }: AgentBannerAutoProps) 
   const { data: habitos } = useHabitos();
   const { data: registrosHoje } = useRegistrosHoje();
   const now = useMemo(() => new Date(), []);
-  const { data: resumoMensal } = useResumoMensal(now.getFullYear(), now.getMonth() + 1);
+  const { data: resumoMensal } = useResumoMensal(anoMesSP(now).ano, anoMesSP(now).mes);
 
   const contexto: ContextoUsuario = useMemo(() => {
-    const diaSemana = now.getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+    const hojeStr = hojeSP(now);
+    const diaSemana = diaSemanaDe(hojeStr);
     const treinoHoje = treinos?.find((t) => t.dia_semana === diaSemana) ?? null;
-    const hojeStr = now.toISOString().split('T')[0];
     const sessoesConcluidas = sessoesSemana?.filter((s) => s.concluido).length ?? 0;
     const treinoHojeConcluido = sessoesSemana?.some(
       (s) => s.treino_id === treinoHoje?.id && s.data === hojeStr && s.concluido,

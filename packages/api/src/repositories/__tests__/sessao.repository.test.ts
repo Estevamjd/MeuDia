@@ -33,9 +33,9 @@ const colunasUsadas = (): string[] => [
 it('findByUserAndDateRange só usa colunas que existem e filtra o intervalo por `inicio`', async () => {
   await repo.findByUserAndDateRange('u', '2026-11-02', '2026-11-08');
   for (const c of colunasUsadas()) expect(COLUNAS_REAIS).toContain(c);
-  expect(query.gte).toHaveBeenCalledWith('inicio', new Date(2026, 10, 2).toISOString());
+  expect(query.gte).toHaveBeenCalledWith('inicio', '2026-11-02T03:00:00.000Z');
   // fim inclusivo: até o começo do dia seguinte (exclusivo)
-  expect(query.lt).toHaveBeenCalledWith('inicio', new Date(2026, 10, 9).toISOString());
+  expect(query.lt).toHaveBeenCalledWith('inicio', '2026-11-09T03:00:00.000Z');
 });
 
 it('devolve no formato do app: `data` (dia local de `inicio`) e `concluido`', async () => {
@@ -116,3 +116,39 @@ it('séries recentes sem exercício não consulta o banco', async () => {
   expect(await repo.findSeriesRecentes('u', [])).toEqual({ sessoes: [], series: [] });
   expect(getSupabase).not.toHaveBeenCalled();
 });
+
+it('sessão às 22h30 BRT pertence ao dia SP mesmo no dispositivo UTC', async () => {
+  const anterior = process.env.TZ;
+  process.env.TZ = 'UTC';
+  try {
+    const inicio = '2026-11-23T01:30:00Z';
+    result = { data: { id: 's', user_id: 'u', inicio, concluida: true }, error: null };
+    expect(await repo.findById('s', 'u')).toMatchObject({ data: '2026-11-22', concluido: true });
+  } finally {
+    if (anterior === undefined) delete process.env.TZ;
+    else process.env.TZ = anterior;
+  }
+});
+
+for (const tz of ['UTC', 'Asia/Tokyo']) {
+  it.each([
+    ['2026-11-20', '2026-11-20', '2026-11-20T03:00:00.000Z', '2026-11-21T03:00:00.000Z'],
+    ['2026-11-30', '2026-12-01', '2026-11-30T03:00:00.000Z', '2026-12-02T03:00:00.000Z'],
+    ['2026-12-31', '2026-12-31', '2026-12-31T03:00:00.000Z', '2027-01-01T03:00:00.000Z'],
+    ['2018-11-04', '2018-11-04', '2018-11-04T03:00:00.000Z', '2018-11-05T02:00:00.000Z'],
+    ['2019-02-17', '2019-02-17', '2019-02-17T03:00:00.000Z', '2019-02-18T03:00:00.000Z'],
+    ['2018-01-20', '2018-01-20', '2018-01-20T02:00:00.000Z', '2018-01-21T02:00:00.000Z'],
+  ])(`intervalo civil SP %s a %s independe do servidor em ${tz}`, async (inicio, fim, gte, lt) => {
+    const anterior = process.env.TZ;
+    process.env.TZ = tz;
+    try {
+      await repo.findByUserAndDateRange('u', inicio, fim);
+      expect(query.gte).toHaveBeenCalledWith('inicio', gte);
+      expect(query.lt).toHaveBeenCalledWith('inicio', lt);
+      expect(query.eq).toHaveBeenCalledWith('user_id', 'u');
+    } finally {
+      if (anterior === undefined) delete process.env.TZ;
+      else process.env.TZ = anterior;
+    }
+  });
+}

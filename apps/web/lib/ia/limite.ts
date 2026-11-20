@@ -15,20 +15,26 @@ export function inicioDoDiaSP(now = new Date()): string {
 }
 
 /**
- * Conta as mensagens do próprio usuário hoje (BRT) em `chat_agente`, sem migração.
- * A rota grava a mensagem antes de contar, então a atual entra na conta.
- * Limite conhecido: conta mensagens existentes no dia; limparChat pode zerar a cota,
- * pois users_own_data FOR ALL permite DELETE. Fechar exige contador sem DELETE
- * (tabela própria ou RPC SECURITY DEFINER), migração que depende do OK do Estevam.
- * Erro na contagem conta como "estourou": sem saber, não gasta cota.
+ * Consome a cota atômica da 016, independente do histórico apagável do chat.
+ * Antes da migration, apenas RPC ausente permite a contagem legada (a rota já
+ * gravou a mensagem atual). Qualquer outro erro falha fechado.
  */
 export async function passouDoLimite(client: SupabaseClient, userId: string, now = new Date()): Promise<boolean> {
-  const { count, error } = await client
-    .from('chat_agente')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('role', 'user')
-    .gte('created_at', inicioDoDiaSP(now));
-  if (error || count === null) return true;
-  return count > limiteDiario();
+  const limite = limiteDiario();
+  try {
+    const { data, error, status } = await client.rpc('ia_consumir_cota', { p_limite: limite });
+    if (!error) return !data || typeof data !== 'object' || data.permitido !== true;
+    if (error.code !== 'PGRST202' && error.code !== '42883' && status !== 404) return true;
+
+    const { count, error: erroContagem } = await client
+      .from('chat_agente')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('role', 'user')
+      .gte('created_at', inicioDoDiaSP(now));
+    if (erroContagem || count === null) return true;
+    return count > limite;
+  } catch {
+    return true;
+  }
 }

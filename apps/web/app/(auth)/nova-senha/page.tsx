@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { destinoComLimite } from '../destino-com-limite';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -32,9 +32,9 @@ type NovaSenhaForm = z.infer<typeof novaSenhaSchema>;
 type Estado = 'verificando' | 'pronto' | 'invalido' | 'salva';
 
 export default function NovaSenhaPage() {
-  const router = useRouter();
   const [estado, setEstado] = useState<Estado>('verificando');
   const [erro, setErro] = useState('');
+  const [navegando, setNavegando] = useState(false);
   const [mostrar, setMostrar] = useState(false);
 
   const {
@@ -152,9 +152,15 @@ export default function NovaSenhaPage() {
               <Button
                 type="button"
                 className="mt-6 w-full"
-                onClick={() => {
-                  router.push('/inicio');
-                  router.refresh();
+                isLoading={navegando}
+                onClick={async () => {
+                  setNavegando(true);
+                  try {
+                    const destino = await destinoComLimite();
+                    window.location.assign(destino);
+                  } finally {
+                    setNavegando(false);
+                  }
                 }}
               >
                 Ir para o MeuDia

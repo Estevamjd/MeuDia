@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
-import { format } from 'date-fns';
 import type { Transacao, TransacaoInsert } from '@meudia/shared';
 import { useCarteiras, useCriarTransacao, useAtualizarTransacao } from '../../hooks';
+import { hojeSP } from '../../lib/hoje';
 import { Button, Modal, Input, Select, useToast } from '../ui';
 import { SeletorCarteira } from './SeletorCarteira';
 
@@ -37,7 +37,7 @@ export function useLancamentoModais() {
   const [formCategoria, setFormCategoria] = useState('');
   const [formDescricao, setFormDescricao] = useState('');
   const [formValor, setFormValor] = useState('');
-  const [formData, setFormData] = useState(format(hoje, 'yyyy-MM-dd'));
+  const [formData, setFormData] = useState(hojeSP(hoje));
   const [formBanco, setFormBanco] = useState('');
 
   // --- Reset form ---
@@ -46,7 +46,7 @@ export function useLancamentoModais() {
     setFormCategoria('');
     setFormDescricao('');
     setFormValor('');
-    setFormData(format(hoje, 'yyyy-MM-dd'));
+    setFormData(hojeSP(hoje));
     setFormBanco('');
     setFormCarteira(null);
   }, [hoje]);

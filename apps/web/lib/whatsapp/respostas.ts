@@ -11,6 +11,7 @@ export const AJUDA = [
   '• treinei peito 40min',
   '• almocei arroz, feijão e frango',
   '• lembra que não gosto de academia de manhã',
+  '• desfazer (último registro do WhatsApp, em até 30 minutos)',
   '• lembretes às 19h / parar lembretes',
   'Pode escrever "ontem" para o dia anterior. "esquece tudo" apaga o que eu lembro.',
 ].join('\n');
@@ -58,7 +59,7 @@ export function confirmacao(i: IntencaoEscrita, nome?: string | null, extras?: E
   let base: string;
   switch (i.tipo) {
     case 'gasto':
-      base = `✅ Anotado${oi}: gasto de ${formatBRL(i.valor)} · ${i.categoria}${i.descricao ? ` (${i.descricao})` : ''}${quando(i.data)}.`;
+      base = `✅ Anotado${oi}: gasto${(i.valor ?? extras?.valor_registrado) != null ? ` de ${formatBRL(Number(i.valor ?? extras?.valor_registrado))}` : ''} · ${i.categoria}${i.descricao ? ` (${i.descricao})` : ''}${quando(i.data)}.`;
       break;
     case 'entrada':
       base = `✅ Anotado${oi}: entrada de ${formatBRL(i.valor)} · ${i.categoria}${quando(i.data)}.`;
@@ -70,6 +71,7 @@ export function confirmacao(i: IntencaoEscrita, nome?: string | null, extras?: E
       base = `🥗 ${rotuloRefeicao(i.refeicao)} anotado: ${i.descricao}${quando(i.data)}.`;
       break;
   }
+  if (i.tipo === 'gasto' && extras?.conta_paga) base = `${base.replace(/\.$/, '')} e marquei a conta ${extras.conta_paga} como paga.`;
   // Curto: só a dica mais útil (o comentário de amigo, quando há, vem no lugar dela). Detalhado: todas + comentário.
   const todas = dicasProativas(i, extras);
   const dicas = estilo.tamanho === 'detalhado' ? todas : comentario ? [] : todas.slice(0, 1);
@@ -83,6 +85,8 @@ export function erroRpc(erro: string | undefined): string {
   switch (erro) {
     case 'numero_sem_conta':
       return SEM_CONTA;
+    case 'conta_nao_identificada':
+      return 'Não identifiquei uma única conta pendente com esse nome. Me diga o nome completo e o valor, por exemplo: "paguei 120 de luz".';
     case 'valor_invalido':
       return 'O valor não parece certo. Ex.: "gastei 45,90 no mercado".';
     case 'data_invalida':
@@ -90,4 +94,9 @@ export function erroRpc(erro: string | undefined): string {
     default:
       return FALHOU;
   }
+}
+
+export const NADA_PARA_DESFAZER = 'Não encontrei registro feito pelo WhatsApp nos últimos 30 minutos para desfazer.';
+export function confirmacaoDesfazer(r: { descricao?: string; valor?: number | null }): string {
+  return `↩️ Desfiz: ${r.descricao ?? 'último registro'}${r.valor != null ? ` ${formatBRL(Number(r.valor))}` : ''}.`;
 }

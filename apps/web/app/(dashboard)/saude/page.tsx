@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { format, getDay } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { AlertCircle } from 'lucide-react';
 import { contarExercicios, contarSeries, totalDia, ultimoPeso, type MetasSaude, type RespostasSaude } from '@meudia/shared';
@@ -19,12 +19,14 @@ import {
 import { Cabecalho, LinkAcao, Rotulo, Secao, Subabas, TelaCaderno, VazioCaderno, classeBotaoContorno } from '../../../components/caderno';
 import { BarraCalorias, BarraProteina } from '../../../components/saude/Barras';
 import { LinhaTempo } from '../../../components/saude/LinhaTempo';
+import { AvisoPerfilSoLeitura } from '../../../components/saude/AvisoPerfilSoLeitura';
 import { OnboardingSaude } from '../../../components/saude/OnboardingSaude';
 import { useRefeicoesCaderno } from '../../../components/saude/useRefeicoesCaderno';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { SkeletonList } from '../../../components/ui/Skeleton';
 import { comTempoLimite } from '../../../lib/onboarding';
-import { MENSAGEM_ERRO_CADASTRO_SAUDE, paraProfile, perfilVazio, respostasIniciais } from '../../../lib/perfil-saude';
+import { diaSemanaDe } from '../../../lib/hoje';
+import { MENSAGEM_ERRO_CADASTRO_SAUDE, paraProfile, respostasIniciais } from '../../../lib/perfil-saude';
 import { recorteHoje } from '../../../lib/refeicoes-dia';
 
 const fmtKg = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -32,7 +34,7 @@ const fmtKg = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 
 /** Saúde · Hoje (tela 01/09): treino de hoje, calorias, proteína, até 4 refeições e o peso. */
 export default function SaudeHojePage() {
   const hoje = hojeLocal();
-  const { perfil, carregado, salvar } = usePerfilSaude();
+  const { perfil, carregado, podeEditar, fonte, salvarCadastro, adiar, recarregar } = usePerfilSaude();
   const profileQ = useProfile();
   const pesoQ = usePesoRecente();
   const treinosQ = useTreinos();
@@ -48,13 +50,16 @@ export default function SaudeHojePage() {
   const profile = profileQ.data ?? null;
 
   const concluirCadastro = async (respostas: RespostasSaude, metas: MetasSaude) => {
+    // Sem estado conhecido do perfil (carregando ou sem rede): nada é gravado, nem profiles nem o peso de hoje.
+    if (!podeEditar || salvandoCadastro) return;
     setSalvandoCadastro(true);
     setErroCadastro(null);
     try {
       await comTempoLimite(atualizarPerfil.mutateAsync(paraProfile(respostas, metas)));
       // O peso do cadastro vira o registro de hoje só se ainda não houver um (não corrige o que já existe).
       if (ultimo?.data !== hoje) await comTempoLimite(registrarPeso.mutateAsync({ peso: respostas.pesoKg, data: hoje }));
-      salvar({ ...perfilVazio('respondido'), ...(perfil ?? {}), estado: 'respondido', respostas, metas });
+      // Grava na conta (perfil_saude: só as colunas do cadastro); falha do banco cai no catch com a mesma mensagem.
+      await comTempoLimite(salvarCadastro(respostas, metas));
       setCadastroAberto(false);
     } catch {
       setErroCadastro(MENSAGEM_ERRO_CADASTRO_SAUDE);
@@ -81,9 +86,12 @@ export default function SaudeHojePage() {
           metasAnteriores={perfil?.metas ?? null}
           salvando={salvandoCadastro}
           erro={erroCadastro}
+          podeSalvar={podeEditar}
+          aviso={<AvisoPerfilSoLeitura fonte={fonte} onTentarDeNovo={recarregar} />}
           onConcluir={(r, m) => void concluirCadastro(r, m)}
           onAgoraNao={() => {
-            if (!perfil) salvar(perfilVazio('adiado'));
+            // Fecha na hora: 'adiado' no aparelho já; a conta só recebe a linha em segundo plano (usePerfilSaude.adiar).
+            if (!perfil) adiar();
             setCadastroAberto(false);
             setErroCadastro(null);
           }}
@@ -96,10 +104,10 @@ export default function SaudeHojePage() {
   const dia = totalDia(refeicoes.query.data ?? []);
   const entradas = refeicoes.entradas;
   const feitas = entradas.filter((e) => e.feita).length;
-  const dataCabecalho = format(new Date(), "EEE dd MMM", { locale: ptBR }).replace('.', '').toUpperCase();
+  const dataCabecalho = format(parseISO(hoje), "EEE dd MMM", { locale: ptBR }).replace('.', '').toUpperCase();
 
   // Treino de hoje
-  const diaSemana = getDay(new Date());
+  const diaSemana = diaSemanaDe(hoje);
   const doDia = (treinosQ.data ?? []).filter((t) => t.dia_semana === diaSemana);
   const treino = doDia.find((t) => t.tipo !== 'descanso') ?? null;
   const descanso = !treino ? doDia.find((t) => t.tipo === 'descanso') ?? null : null;
@@ -170,6 +178,10 @@ export default function SaudeHojePage() {
     <TelaCaderno>
       <Cabecalho titulo="Saúde" contexto={dataCabecalho} />
       <Subabas />
+
+      {fonte === 'indisponivel' && (
+        <AvisoPerfilSoLeitura fonte={fonte} onTentarDeNovo={recarregar} className="mx-5 mt-3 border-l-2 border-accent3 pl-3" />
+      )}
 
       {blocoTreino}
 

@@ -4,11 +4,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { dietaService } from '@meudia/api';
 import type { RefeicaoInsert } from '@meudia/shared';
 import { useAuth } from './useAuth';
-import { format } from 'date-fns';
+import { hojeSP } from '../lib/hoje';
 
 export function useRefeicoesDoDia(date?: string) {
   const { user } = useAuth();
-  const targetDate = date ?? format(new Date(), 'yyyy-MM-dd');
+  const targetDate = date ?? hojeSP();
 
   return useQuery({
     queryKey: ['refeicoes', user?.id, targetDate],
@@ -61,7 +61,7 @@ export function useExcluirRefeicao() {
 
 export function useAguaHoje(date?: string) {
   const { user } = useAuth();
-  const targetDate = date ?? format(new Date(), 'yyyy-MM-dd');
+  const targetDate = date ?? hojeSP();
 
   return useQuery({
     queryKey: ['agua', user?.id, targetDate],
@@ -112,7 +112,7 @@ export function useRegistrarPeso() {
 
 export function useResumoNutricional(date?: string) {
   const { user } = useAuth();
-  const targetDate = date ?? format(new Date(), 'yyyy-MM-dd');
+  const targetDate = date ?? hojeSP();
 
   return useQuery({
     queryKey: ['resumo-nutricional', user?.id, targetDate],

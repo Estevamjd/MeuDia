@@ -200,6 +200,7 @@ mídia, cada mensagem tem deduplicação no banco, e a memória por contato é a
 | Segredos do WAHA | VPS `/docker/waha/.env` (600) | `WAHA_API_KEY` (só o hash sha512), usuário e senha do painel, `WHATSAPP_HOOK_HMAC_KEY` |
 | Webhook | `apps/web/app/api/whatsapp/webhook/route.ts` + `apps/web/lib/whatsapp/` | Parser por regras, Claude opcional, RPC e resposta |
 | Banco | migrations `010_treino_dieta_whatsapp.sql`, `011_whatsapp_onboarding.sql`, `012_whatsapp_amigo.sql` e `013_whatsapp_lembretes.sql` (aplicadas em 19/11/2026) | `profiles.whatsapp`, `registros_treino`, `registros_refeicao`, `whatsapp_contatos` (com `fatos`), `private.*`, RPCs |
+| Banco v2 (016 pendente; exige OK do Estevam) | `014_cofrinho.sql`, `015_rpc_saldo_painel.sql`, `016_whatsapp_v2_saude.sql` | 014/015: finanças; 016: desfazer, conciliação, manutenção diária, cota IA e perfil de saúde. A 016 ainda não foi aplicada. |
 | Onboarding, persona e amigo | `apps/web/lib/whatsapp/{onboarding,persona,ganchos,contato,ia}.ts`, página `app/whatsapp/page.tsx` | Máquina de estados e ganchos testados com Haiku simulado |
 | Cópias dos segredos | Só no computador do assistente (`/workspace/secrets/`, 600) | `waha-api-key.txt`, `waha-dashboard.txt`, `whatsapp-hmac.txt`, `whatsapp-rpc-segredo.txt`. Nunca no git. |
 
@@ -244,7 +245,31 @@ sabendo do risco de banimento do chip.
 | Conta nova do WhatsApp chega como `@lid` | O app procura o número real nos campos alternativos do WAHA. Se não achar, ignora |
 | Número antigo, sem o 9 | Tanto a lista quanto o banco aceitam com e sem o 9 |
 
-## 7. Próximos passos (v2)
+## 7. Funcionalidades v2 e próximos passos
+
+**Desfazer (016).** "desfazer" / "apaga o último" atua somente no último registro criado pelo WhatsApp
+para a conta ligada, em até 30 minutos. Não percorre registros anteriores: outro comando depois do primeiro
+responde "Já desfiz o último registro.". Registro removido no app recebe "Esse registro já tinha sido apagado
+no app.". Registros criados pelo app e de outras contas ficam intactos. Pagamento conciliado desfaz a despesa
+e o vínculo juntos; pagamento substituído no app nunca é removido. Reentrega do mesmo id é ignorada.
+Se o RPC confirmar mas a resposta se perder, o bot pode mostrar falha; a reentrega será ignorada sem nova resposta.
+
+**Conciliação (016).** Um gasto pode pagar uma única conta ativa da competência corrente cujo nome normalizado
+seja exatamente igual ("Conta de luz" não é "Luz"). Sem pedido explícito, exige valor com tolerância de 1%
+(mínimo R$ 0,01). "paguei" explícito ignora essa tolerância; sem valor, usa o valor da conta. Ambiguidade não
+marca pagamento; sem valor e sem candidato único, pede esclarecimento sem gravar. Com valor, vira gasto simples
+e a conta permanece pendente, inclusive para competência passada. A transação conciliada usa categoria,
+descrição e `automatico=TRUE` da conta como `pagar_conta` (005), com uma única despesa e vínculo de pagamento.
+
+**Manutenção diária (016).** O cron de lembretes tenta `whatsapp_manutencao_diaria` a cada rodada entre
+03:00 e 05:59 BRT, mesmo com lembretes desligados (nunca em dry-run). `private.whatsapp_manutencoes` permite
+um sucesso por dia; erro reverte o marcador e a próxima rodada tenta novamente. Remove ids de mensagens após
+7 dias, ações após 30, envios após 60 e cotas após 90. Não há limpeza no caminho de registrar mensagens.
+
+**Ordem de implantação:** deploy do código primeiro, depois aplicar a 016 com OK do Estevam, em transação
+única. Até a 016, desfazer pode responder falha e pagamento sem valor pode ser recusado; o app mantém os
+fallbacks de perfil/cota. Aplicar a 016 antes do código deixaria a limpeza sem chamador. Veja o procedimento
+e os backups obrigatórios antes do down em [deploy-vps.md](deploy-vps.md#ordem-da-wave-2b-migration-016).
 
 ### 7.1 Lembretes proativos (LIGADOS, com travas)
 
@@ -301,6 +326,5 @@ Custo: ~US$ 0,0006 por lembrete, no máx. 2 por pessoa por dia.
 
 ### 7.2 Outros
 
-- "desfazer" / "apaga o último" pelo chat (recibo com desfazer, como no Meu Assessor).
 - Resumo do mês sob pedido ("como está meu mês?"), usando o mesmo cartão do Relatório.
 - API oficial (Cloud API) se o volume crescer: sem risco de banimento, mas com custo por conversa.

@@ -5,6 +5,8 @@ export interface Extras {
   categoria?: string;
   planejado?: number;
   gasto_mes?: number;
+  conta_paga?: string;
+  valor_registrado?: number;
   conta_descricao?: string;
   conta_valor?: number;
   conta_dia?: number;
@@ -70,7 +72,7 @@ export function registrarNoBanco(telefone: string, mensagemId: string | null, i:
       ? { tipo: i.refeicao, descricao: i.descricao, data: i.data }
       : i.tipo === 'treino'
         ? { descricao: i.descricao, duracao_min: i.duracao_min, data: i.data }
-        : { valor: i.valor, descricao: i.descricao, categoria: i.categoria, data: i.data };
+        : { valor: i.valor, descricao: i.descricao, categoria: i.categoria, data: i.data, ...(i.pagar ? { pagar: true } : {}) };
   return rpc<RespostaRpc>('whatsapp_registrar', { p_telefone: telefone, p_mensagem_id: mensagemId, p_tipo: i.tipo, p_dados: dados }, fetchFn);
 }
 
@@ -144,4 +146,15 @@ export async function digitando(chatId: string, ligar: boolean, fetchFn: typeof 
       method: 'POST', headers: w.headers, body: JSON.stringify({ session: w.sessao, chatId }), signal: AbortSignal.timeout(5000),
     });
   } catch { /* opcional */ }
+}
+
+/** Apenas o último registro feito pelo WhatsApp nos últimos 30 minutos (016). */
+export function desfazerUltimo(telefone: string, mensagemId: string | null, fetchFn: typeof fetch = fetch) {
+  return rpc<{ ok: boolean; erro?: string; duplicada?: boolean; desfeito?: boolean; ja_desfeito?: boolean; ja_apagado?: boolean; descricao?: string; valor?: number | null }>(
+    'whatsapp_desfazer', { p_telefone: telefone, p_mensagem_id: mensagemId }, fetchFn);
+}
+
+/** Melhor esforço; a própria função SQL garante idempotência diária. */
+export function executarManutencaoDiaria(fetchFn: typeof fetch = fetch) {
+  return rpc<{ ok: boolean; erro?: string }>('whatsapp_manutencao_diaria', {}, fetchFn);
 }

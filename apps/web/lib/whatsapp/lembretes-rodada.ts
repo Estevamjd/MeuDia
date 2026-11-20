@@ -1,7 +1,7 @@
 import 'server-only';
 import { candidatoDoRpc, escolherLembrete, relogioSP, type Lembrete } from './lembretes';
 import { escreverLembrete } from './lembretes-texto';
-import { buscarCandidatos, digitando, marcarLembrete, reservarLembrete, responder, statusSessao } from './servicos';
+import { buscarCandidatos, digitando, executarManutencaoDiaria, marcarLembrete, reservarLembrete, responder, statusSessao } from './servicos';
 
 /**
  * Uma rodada do agendador (o n8n chama a cada 15 min). Segurança, nesta ordem:
@@ -18,6 +18,7 @@ export interface OpcoesRodada {
 }
 
 export interface DepsRodada {
+  manutencao?: typeof executarManutencaoDiaria;
   candidatos?: typeof buscarCandidatos;
   reservar?: typeof reservarLembrete;
   marcar?: typeof marcarLembrete;
@@ -38,11 +39,18 @@ export const mascarar = (tel: string) => `••••${tel.slice(-4)}`;
 
 export async function rodarLembretes(op: OpcoesRodada, deps: DepsRodada = {}): Promise<ResultadoRodada> {
   const {
+    manutencao = executarManutencaoDiaria,
     candidatos = buscarCandidatos, reservar = reservarLembrete, marcar = marcarLembrete, enviar = responder,
     digitar = digitando, sessao = statusSessao, escrever = escreverLembrete,
     esperar = (ms) => new Promise((r) => setTimeout(r, ms)), aleatorio = Math.random,
   } = deps;
   const agora = op.agora ?? new Date();
+  const { minutos } = relogioSP(agora);
+  // n8n chama a cada 15 min: janela diária de faxina, mesmo com lembretes desligados.
+  // A função SQL também protege contra chamadas repetidas; falha nunca interrompe os lembretes.
+  if (!op.dry && minutos >= 180 && minutos < 360) {
+    try { await manutencao(); } catch { /* melhor esforço, sem bloquear a rodada */ }
+  }
   if (!op.dry && process.env.WHATSAPP_LEMBRETES_ATIVOS !== 'true') return { ok: true, desligado: true };
 
   const status = op.dry ? 'DRY_RUN' : await sessao();

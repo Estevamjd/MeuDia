@@ -18,6 +18,7 @@ import {
   useTotalMensal,
   useTransacoesMes,
 } from '../../../hooks';
+import { anoMesSP, dataCivilSP, diaSemanaSP, hojeSP } from '../../../lib/hoje';
 import { useAuth } from '../../../hooks/useAuth';
 import { SkeletonCard } from '../../../components/ui';
 import { AgentBanner } from '../../../components/agent';
@@ -32,7 +33,7 @@ export default function InicioPage() {
   const router = useRouter();
   const { user } = useAuth();
   const hoje = useMemo(() => new Date(), []);
-  const diaSemana = hoje.getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  const diaSemana = diaSemanaSP(hoje);
 
   // --- Data hooks ---
   const { data: profile, isLoading: loadingProfile } = useProfile();
@@ -40,10 +41,11 @@ export default function InicioPage() {
   const { data: sessoesSemana, isLoading: loadingSessoes } = useSessoesSemana();
   const { data: habitos, isLoading: loadingHabitos } = useHabitos();
   const { data: registrosHoje, isLoading: loadingRegistros } = useRegistrosHoje();
-  const { data: resumoMensal } = useResumoMensal(hoje.getFullYear(), hoje.getMonth() + 1);
+  const mesSP = anoMesSP(hoje);
+  const { data: resumoMensal } = useResumoMensal(mesSP.ano, mesSP.mes);
   const { data: assinaturas } = useAssinaturas();
   const { data: totalMensalAssinaturas } = useTotalMensal();
-  const { data: transacoesMes } = useTransacoesMes(hoje.getFullYear(), hoje.getMonth() + 1);
+  const { data: transacoesMes } = useTransacoesMes(mesSP.ano, mesSP.mes);
 
   const isLoading = loadingProfile || loadingTreinos || loadingSessoes || loadingHabitos || loadingRegistros;
 
@@ -95,7 +97,7 @@ export default function InicioPage() {
 
   // --- Contexto agente IA ---
   const contextoAgente: ContextoUsuario = useMemo(() => {
-    const hojeStr = format(hoje, 'yyyy-MM-dd');
+    const hojeStr = hojeSP(hoje);
     const treinoHojeConcluido = sessoesSemana?.some(
       (s) => s.treino_id === treinoHoje?.id && s.data === hojeStr && s.concluido,
     ) ?? false;
@@ -138,7 +140,7 @@ export default function InicioPage() {
   }
 
   const greeting = `Boa ${getPeriod(hoje.getHours())}! 👋`;
-  const dateStr = format(hoje, "EEE, dd MMM yyyy", { locale: ptBR });
+  const dateStr = format(dataCivilSP(hoje), "EEE, dd MMM yyyy", { locale: ptBR });
 
   return (
     <div className="animate-fadeSlide" style={{ padding: 0 }}>
@@ -343,7 +345,7 @@ export default function InicioPage() {
               </p>
             ) : (
               assinaturas.filter((a) => a.ativo).slice(0, 3).map((a) => {
-                const hoje2 = new Date();
+                const hoje2 = dataCivilSP();
                 const diaVenc = a.dia_vencimento;
                 const diaAtual = hoje2.getDate();
                 const diasRestantes = diaVenc >= diaAtual

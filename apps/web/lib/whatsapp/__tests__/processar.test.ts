@@ -48,6 +48,58 @@ describe('processarEvento', () => {
     expect(onboarding).not.toHaveBeenCalled();
   });
 
+  it('desfaz pelo RPC, confirma o item e ignora reentrega sem registrar outro gasto', async () => {
+    const desfazer = vi.fn().mockResolvedValue({ ok: true, desfeito: true, descricao: 'Mercado', valor: 45.9 });
+    const r = await processarEvento(msg('desfazer'), { ...deps(), desfazer });
+    expect(r).toMatchObject({ intencao: 'desfazer' });
+    expect(desfazer).toHaveBeenCalledWith('5511988887777', 'false_5511988887777@c.us_ABC');
+    expect(String(enviar.mock.calls[0]![1]).replace(/\u00a0/g, ' ')).toContain('Desfiz: Mercado R$ 45,90');
+    expect(registrar).not.toHaveBeenCalled();
+    expect(interpretarIA).not.toHaveBeenCalled();
+    desfazer.mockResolvedValue({ ok: true, duplicada: true });
+    expect(await processarEvento(msg('desfazer'), { ...deps(), desfazer })).toEqual({ status: 'ignorado', motivo: 'duplicada' });
+    expect(enviar).toHaveBeenCalledTimes(1);
+  });
+
+  it('nada recente para desfazer e erro do RPC têm respostas amigáveis', async () => {
+    const desfazer = vi.fn().mockResolvedValue({ ok: true, desfeito: false });
+    await processarEvento(msg('apaga o último'), { ...deps(), desfazer });
+    expect(enviar.mock.calls[0]![1]).toMatch(/WhatsApp.*30 minutos/);
+    desfazer.mockResolvedValue({ ok: false, erro: 'rede' });
+    await processarEvento(msg('desfaz'), { ...deps(), desfazer });
+    expect(enviar.mock.calls[1]![1]).toContain('Tente de novo');
+  });
+
+  it.each([
+    [{ ja_desfeito: true }, 'Já desfiz o último registro.'],
+    [{ ja_apagado: true }, 'Esse registro já tinha sido apagado no app.'],
+  ])('desfazer explica o estado %j', async (estado, texto) => {
+    const desfazer = vi.fn().mockResolvedValue({ ok: true, desfeito: false, ...estado });
+    await processarEvento(msg('desfazer'), { ...deps(), desfazer });
+    expect(enviar.mock.calls[0]![1]).toContain(texto);
+    expect(registrar).not.toHaveBeenCalled();
+  });
+
+  it('confirma a conta conciliada mesmo no estilo curto com outra dica disponível', async () => {
+    registrar.mockResolvedValue({ ok: true, extras: { conta_paga: 'Luz', categoria: 'Luz', planejado: 300, gasto_mes: 120 } });
+    await processarEvento(msg('paguei 120 de luz'), deps());
+    expect(registrar.mock.calls[0]![2]).toMatchObject({ pagar: true });
+    expect(enviar.mock.calls[0]![1]).toContain('marquei a conta Luz como paga');
+  });
+
+  it('paguei sem valor pede inferência ao banco; ambiguidade não confirma pagamento', async () => {
+    registrar.mockResolvedValue({ ok: true, extras: { conta_paga: 'Luz', valor_registrado: 120 } });
+    await processarEvento(msg('paguei luz'), deps());
+    expect(registrar.mock.calls[0]![2]).toEqual({ tipo: 'gasto', valor: null, descricao: 'Luz', categoria: 'Luz', pagar: true });
+    expect(enviar.mock.calls[0]![1]).toContain('marquei a conta Luz como paga');
+    expect(String(enviar.mock.calls[0]![1]).replace(/\u00a0/g, ' ')).toContain('R$ 120,00');
+    expect(enviar.mock.calls[0]![1]).not.toContain('R$ 0');
+    registrar.mockResolvedValue({ ok: false, erro: 'conta_nao_identificada' });
+    await processarEvento(msg('paguei luz'), deps());
+    expect(enviar.mock.calls[1]![1]).toMatch(/Não identifiquei uma única conta/);
+    expect(enviar.mock.calls[1]![1]).not.toContain('marquei');
+  });
+
   it('treino e refeição', async () => {
     await processarEvento(msg('treinei peito 40min'), deps());
     expect(registrar.mock.calls[0]![2]).toEqual({ tipo: 'treino', descricao: 'Peito', duracao_min: 40 });

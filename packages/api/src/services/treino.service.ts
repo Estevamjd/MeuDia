@@ -1,7 +1,7 @@
 import { usuarioAtualId } from './usuario-atual';
-import { AppError, seriesAnteriores } from '@meudia/shared';
+import { AppError, hojeSP, seriesAnteriores } from '@meudia/shared';
 import type { SerieRealizada } from '@meudia/shared';
-import { startOfWeek, endOfWeek, format } from 'date-fns';
+import { startOfWeek, endOfWeek, format, parseISO } from 'date-fns';
 import { treinoRepository, exercicioRepository, sessaoRepository, preferenciasAgenteRepository } from '../repositories';
 import { treinoInsertSchema, exercicioInsertSchema, serieRealizadaSchema, sessaoInsertSchema } from '../validators';
 
@@ -47,7 +47,7 @@ export async function reordenarExercicios(exercicios: { id: string; ordem: numbe
 }
 
 export async function iniciarSessao(userId: string, treinoId: string | null) {
-  const today = format(new Date(), 'yyyy-MM-dd');
+  const today = hojeSP();
   return sessaoRepository.create(userId, {
     treino_id: treinoId,
     data: today,
@@ -68,7 +68,7 @@ export async function registrarSerie(data: unknown) {
 }
 
 export async function obterSessoesSemana(userId: string) {
-  const now = new Date();
+  const now = parseISO(hojeSP());
   const start = format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
   const end = format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
   return sessaoRepository.findByUserAndDateRange(userId, start, end);

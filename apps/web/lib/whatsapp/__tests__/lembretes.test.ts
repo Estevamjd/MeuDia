@@ -190,6 +190,7 @@ describe('texto do lembrete (Haiku simulado)', () => {
 describe('rodarLembretes', () => {
   const cru = { telefone: '5511955554444', nome: 'Lia', metas: [], fatos: [], estilo_tamanho: 'curto', estilo_emoji: true, envios_hoje: 0, envios_total: 2, envios_sem_resposta: 0, chaves_7d: [], treino_hoje: { nome: 'Perna', hora: null }, treinou_hoje: false, gastos_hoje: 1, refeicoes_hoje: 1, contas: [] };
   const deps = () => ({
+    manutencao: vi.fn(async () => ({ ok: true })),
     candidatos: vi.fn(async () => ({ ok: true, candidatos: [cru, { ...cru, telefone: '5511955553333' }] })),
     reservar: vi.fn(async () => ({ ok: true, id: 1 })),
     marcar: vi.fn(async () => ({ ok: true })),
@@ -202,6 +203,23 @@ describe('rodarLembretes', () => {
   });
   const agora = SP(SEG, '19:00');
   afterEach(() => vi.unstubAllEnvs());
+
+  it('manutenção na janela diária roda mesmo desligado e falhas não impedem a rodada', async () => {
+    vi.stubEnv('WHATSAPP_LEMBRETES_ATIVOS', 'false');
+    const d = deps();
+    d.manutencao.mockRejectedValue(new Error('rede'));
+    expect(await rodarLembretes({ dry: false, agora: SP(SEG, '03:00') }, d)).toEqual({ ok: true, desligado: true });
+    expect(d.manutencao).toHaveBeenCalledOnce();
+    d.manutencao.mockResolvedValue({ ok: true });
+    await rodarLembretes({ dry: false, agora: SP(SEG, '03:15') }, d);
+    await rodarLembretes({ dry: false, agora: SP(SEG, '05:59') }, d);
+    expect(d.manutencao).toHaveBeenCalledTimes(3);
+    await rodarLembretes({ dry: false, agora: SP(SEG, '02:59') }, d);
+    await rodarLembretes({ dry: false, agora: SP(SEG, '06:00') }, d);
+    await rodarLembretes({ dry: true, agora: SP(SEG, '03:00') }, d);
+    expect(d.manutencao).toHaveBeenCalledTimes(3);
+    expect(d.candidatos).toHaveBeenCalledOnce(); // só o dry-run
+  });
 
   it('interruptor global desligado: não faz nada', async () => {
     vi.stubEnv('WHATSAPP_LEMBRETES_ATIVOS', 'false');

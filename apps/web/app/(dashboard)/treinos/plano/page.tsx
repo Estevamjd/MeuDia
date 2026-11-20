@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
-import { getDay } from 'date-fns';
-import { AlertCircle } from 'lucide-react';
+import Link from 'next/link';
+import { AlertCircle, ChevronRight } from 'lucide-react';
 import { DIAS_SEMANA } from '@meudia/shared';
 import type { Exercicio } from '@meudia/shared';
 import { calcularDescansoSugerido } from '@meudia/ai';
@@ -24,6 +24,7 @@ import {
   useLembreteTreino,
   useSalvarLembreteTreino,
 } from '../../../../hooks';
+import { diaSemanaSP } from '../../../../lib/hoje';
 import { ConfirmDialog } from '../../../../components/ui/ConfirmDialog';
 import { EmptyState } from '../../../../components/ui/EmptyState';
 import { SkeletonList } from '../../../../components/ui/Skeleton';
@@ -53,7 +54,7 @@ interface Descanso {
 
 export default function TreinosPage() {
   const toast = useToast();
-  const hoje = useMemo(() => getDay(new Date()), []);
+  const hoje = useMemo(() => diaSemanaSP(), []);
   const [dia, setDia] = useState<number>(hoje);
   const [abertos, setAbertos] = useState<Record<string, boolean>>({});
   const [criandoTreino, setCriandoTreino] = useState(false);
@@ -146,7 +147,7 @@ export default function TreinosPage() {
     const minutos = Math.max(1, Math.round((Date.now() - new Date(sessaoAtiva.created_at).getTime()) / 60000));
     try {
       await finalizarSessao.mutateAsync({ sessaoId: sessaoAtiva.id, duracao: minutos });
-      toast.success(`Treino salvo: ${minutos} min.`);
+      toast.success(`Treino salvo: ${minutos} min. Já conta na semana do Treino.`);
     } catch {
       toast.error('Não deu para concluir o treino. Tente de novo.');
     }
@@ -303,6 +304,18 @@ export default function TreinosPage() {
           salvarLembrete.mutate(ligado, { onError: () => toast.error('Não deu para salvar o lembrete. Tente de novo.') })
         }
       />
+
+      {/* Volta para a aba Treino: a sessão concluída aqui conta lá no dia dela (`unirTreinosDoDia`). */}
+      <Link
+        href="/treinos"
+        className="flex min-h-[56px] items-center justify-between gap-3 border-b border-text/[0.07] px-5 text-[15px] text-text"
+      >
+        <span>
+          Treino rápido e semana
+          <span className="block text-xs text-muted-text">Registrar sem plano e ver os dias que você treinou</span>
+        </span>
+        <ChevronRight size={18} className="text-muted-text" aria-hidden="true" />
+      </Link>
 
       <TimerDescanso
         isOpen={descanso.aberto}

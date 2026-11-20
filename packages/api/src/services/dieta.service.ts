@@ -1,6 +1,5 @@
 import { usuarioAtualId } from './usuario-atual';
-import { AGUA, AppError } from '@meudia/shared';
-import { format } from 'date-fns';
+import { AGUA, AppError, hojeSP } from '@meudia/shared';
 import { dietaRepository } from '../repositories';
 import { refeicaoInsertSchema, registroPesoInsertSchema, registroAguaSchema } from '../validators';
 
@@ -8,7 +7,7 @@ import { refeicaoInsertSchema, registroPesoInsertSchema, registroAguaSchema } fr
 
 export async function refeicoesDoDia(userId: string, date?: string) {
   if (!userId) throw new AppError('userId é obrigatório', 'VALIDATION_ERROR');
-  const targetDate = date ?? format(new Date(), 'yyyy-MM-dd');
+  const targetDate = date ?? hojeSP();
   return dietaRepository.findRefeicoesByDate(userId, targetDate);
 }
 
@@ -30,13 +29,13 @@ export async function excluirRefeicao(refeicaoId: string) {
 
 export async function aguaHoje(userId: string, date?: string) {
   if (!userId) throw new AppError('userId é obrigatório', 'VALIDATION_ERROR');
-  const targetDate = date ?? format(new Date(), 'yyyy-MM-dd');
+  const targetDate = date ?? hojeSP();
   return dietaRepository.findRegistroAguaByDate(userId, targetDate);
 }
 
 export async function registrarAgua(userId: string, date?: string) {
   if (!userId) throw new AppError('userId é obrigatório', 'VALIDATION_ERROR');
-  const targetDate = date ?? format(new Date(), 'yyyy-MM-dd');
+  const targetDate = date ?? hojeSP();
 
   const atual = await dietaRepository.findRegistroAguaByDate(userId, targetDate);
   const quantidadeAtual = atual?.quantidade_ml ?? 0;
@@ -71,14 +70,14 @@ export async function pesoDesde(userId: string, desde: string) {
 export async function registrarPesoDoDia(userId: string, data: unknown) {
   if (!userId) throw new AppError('userId é obrigatório', 'VALIDATION_ERROR');
   const parsed = registroPesoInsertSchema.parse(data);
-  return dietaRepository.upsertRegistroPeso(userId, { ...parsed, data: parsed.data ?? format(new Date(), 'yyyy-MM-dd') });
+  return dietaRepository.upsertRegistroPeso(userId, { ...parsed, data: parsed.data ?? hojeSP() });
 }
 
 // ── Resumo Nutricional ──
 
 export async function resumoNutricionalDia(userId: string, date?: string) {
   if (!userId) throw new AppError('userId é obrigatório', 'VALIDATION_ERROR');
-  const targetDate = date ?? format(new Date(), 'yyyy-MM-dd');
+  const targetDate = date ?? hojeSP();
   const refeicoes = await dietaRepository.findRefeicoesByDate(userId, targetDate);
 
   return refeicoes.reduce(

@@ -3,8 +3,14 @@
 // Endpoints de apoio: GET /__mock/state (dump), POST /__mock/reset, GET /__mock/health,
 // POST /__mock/clock {"now": ISO | null} (relógio injetável só do mock: datas default, JWT e now()),
 // GET /__mock/stats e POST /__mock/stats/reset (contagem de chamadas, para a medição de e2e/perf),
-// POST /__mock/seed {"email", "tables": {tabela: linhas[]}} (dados por teste do usuário já cadastrado; mesmos CHECKs/FKs).
+// POST /__mock/seed {"email", "tables": {tabela: linhas[]}} (dados por teste do usuário já cadastrado; mesmos CHECKs/FKs),
+// POST /__mock/ausentes {"tabelas": [...]} (essas tabelas respondem PGRST205, como migração não aplicada; reset limpa).
+// POST /__mock/atraso {"rota": "GET /rest/v1/perfil_saude", "ms": 4000} (atraso só nessa rota; ms 0 remove; reset limpa).
+// POST /__mock/falha {"rota": "GET /rest/v1/perfil_saude", "status": 503} (essa rota responde o erro; status 0 remove; reset limpa).
 // MOCK_LATENCY_MS (env): atraso artificial em cada chamada de Auth/PostgREST, simulando a rede até o Supabase.
+// Upsert: Prefer resolution=merge-duplicates mescla; resolution=ignore-duplicates = INSERT ... ON CONFLICT DO NOTHING
+// (a linha existente fica intocada e não volta na representação). UPDATE condicional = PATCH com mais filtros
+// (ex.: updated_at=eq.<ts>): 0 linhas casando = nada muda e a representação vem [].
 import http from 'node:http';
 import { corrigirSaldo } from './corrigir-saldo.mjs';
 import { rpcCofrinho } from './cofrinho.mjs';
@@ -26,10 +32,16 @@ resetStats();
 let users; // email -> user (com password)
 let refreshTokens; // refresh -> { userId, revoked }
 let tables; // nome -> rows[]
+let tabelasAusentes; // tabelas que respondem PGRST205 (migração ainda não aplicada), por POST /__mock/ausentes
+let atrasos; // "METODO /caminho" -> ms, por POST /__mock/atraso
+let falhasRota; // "METODO /caminho" -> status HTTP, por POST /__mock/falha
 function reset() {
   users = new Map();
   refreshTokens = new Map();
   tables = Object.create(null);
+  tabelasAusentes = new Set();
+  atrasos = new Map();
+  falhasRota = new Map();
 }
 reset();
 const rowsOf = (t) => (tables[t] ??= []);
@@ -69,9 +81,11 @@ const DEFAULTS = {
   // 010: registro rápido de treino/refeição (aba Treino/Dieta; também pelo WhatsApp).
   registros_treino: () => ({ data: hojeSP(), duracao_min: null, origem: 'app', created_at: nowIso() }),
   registros_refeicao: () => ({ data: hojeSP(), origem: 'app', created_at: nowIso() }),
+  // 016: perfil de saúde (1 linha por pessoa; user_id é a PK). updated_at pelo trigger set_updated_at.
+  perfil_saude: () => ({ respostas: null, metas: null, prazo_meta: null, created_at: nowIso(), updated_at: nowIso() }),
   preferencias_agente: () => ({ notif_treino: false, notif_refeicao: false, notif_suplemento: false, agenda_saude: 'nao', created_at: nowIso() }),
 };
-const COM_UPDATED_AT = new Set(['contas_pagar', 'rendas', 'orcamento_categorias', 'carteiras', 'transferencias', 'metas']);
+const COM_UPDATED_AT = new Set(['contas_pagar', 'rendas', 'orcamento_categorias', 'carteiras', 'transferencias', 'metas', 'perfil_saude']);
 
 /** Chaves únicas (além do PK `id`). Linhas com algum valor null não conflitam (semântica SQL). */
 const UNIQUES = {
@@ -86,6 +100,7 @@ const UNIQUES = {
   profiles: [['whatsapp']],
   scores_diarios: [['user_id', 'data']],
   preferencias_agente: [['user_id']],
+  perfil_saude: [['user_id']],
   registros_habito: [['habito_id', 'data']],
 };
 
@@ -164,6 +179,16 @@ function checkRow(table, r) {
   if (table === 'recebimentos_renda') {
     notNull('renda_id', 'user_id', 'competencia', 'recebido_em');
     if (!/^[0-9]{4}-(0[1-9]|1[0-2])$/.test(r.competencia)) fail('competencia');
+  }
+  if (table === 'perfil_saude') {
+    // Contrato da 016: estado NOT NULL CHECK, respostas/metas JSONB objeto ou NULL, ritmo_pct e formula_versao NOT NULL.
+    notNull('user_id', 'estado', 'ritmo_pct', 'formula_versao');
+    if (!['respondido', 'adiado'].includes(r.estado)) fail('estado');
+    const objetoOuNull = (v) => v === null || v === undefined || (typeof v === 'object' && !Array.isArray(v));
+    if (!objetoOuNull(r.respostas)) fail('respostas jsonb object');
+    if (!objetoOuNull(r.metas)) fail('metas jsonb object');
+    if (r.prazo_meta != null && !/^\d{4}-\d{2}-\d{2}$/.test(r.prazo_meta)) throw new PgError(400, '22007', 'invalid input syntax for type date');
+    if (!Number.isFinite(Number(r.ritmo_pct))) throw new PgError(400, '22P02', 'invalid input syntax for type numeric');
   }
   if (table === 'pagamentos_conta') {
     notNull('conta_id', 'user_id', 'competencia', 'pago_em');
@@ -559,6 +584,9 @@ function handleRest(req, res, url, body) {
   const prefer = parsePrefer(req);
 
   if (table.startsWith('rpc/')) return handleRpc(req, res, table.slice(4), body, uid);
+  if (tabelasAusentes.has(table)) {
+    throw new PgError(404, 'PGRST205', `Could not find the table 'public.${table}' in the schema cache`);
+  }
 
   const all = rowsOf(table);
   const filter = buildFilters(params);
@@ -846,6 +874,24 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
     if (url.pathname === '/__mock/stats') return send(res, 200, stats);
+    if (url.pathname === '/__mock/ausentes' && req.method === 'POST') {
+      tabelasAusentes = new Set(Array.isArray(body?.tabelas) ? body.tabelas.map(String) : []);
+      return send(res, 200, { ausentes: [...tabelasAusentes] });
+    }
+    if (url.pathname === '/__mock/atraso' && req.method === 'POST') {
+      const rota = String(body?.rota || '');
+      const ms = Number(body?.ms || 0);
+      if (ms > 0) atrasos.set(rota, ms);
+      else atrasos.delete(rota);
+      return send(res, 200, { atrasos: Object.fromEntries(atrasos) });
+    }
+    if (url.pathname === '/__mock/falha' && req.method === 'POST') {
+      const rota = String(body?.rota || '');
+      const status = Number(body?.status || 0);
+      if (status > 0) falhasRota.set(rota, status);
+      else falhasRota.delete(rota);
+      return send(res, 200, { falhas: Object.fromEntries(falhasRota) });
+    }
     if (url.pathname === '/__mock/seed' && req.method === 'POST') {
       const u = users.get(String(body?.email || '').toLowerCase());
       if (!u) return send(res, 404, { message: 'mock seed: usuário não encontrado' });
@@ -867,6 +913,10 @@ const server = http.createServer(async (req, res) => {
       const rota = `${req.method} ${url.pathname}`;
       stats.rotas[rota] = (stats.rotas[rota] ?? 0) + 1;
       if (LATENCY_MS) await new Promise((r) => setTimeout(r, LATENCY_MS));
+      const atraso = atrasos.get(rota);
+      if (atraso) await new Promise((r) => setTimeout(r, atraso));
+      const falha = falhasRota.get(rota);
+      if (falha) return send(res, falha, { code: 'MOCK', message: 'mock: falha injetada', details: null, hint: null });
     }
     // Recuperação de senha: último pedido em /recover e um link de recuperação (fluxo implícito) para o teste.
     if (url.pathname === '/__mock/recover') {

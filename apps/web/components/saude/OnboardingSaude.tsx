@@ -40,10 +40,14 @@ interface Props {
   erro: string | null;
   onConcluir: (respostas: RespostasSaude, metas: MetasSaude) => void;
   onAgoraNao: () => void;
+  /** Falso enquanto o perfil da conta não tem estado conhecido (carregando ou sem rede): "Salvar" desligado. */
+  podeSalvar?: boolean;
+  /** Explica por que não dá para salvar (e oferece "Tentar de novo"); aparece acima do botão. */
+  aviso?: ReactNode;
 }
 
 /** Cadastro de saúde (design-system B §5): 1/3 Sobre você, 2/3 Rotina, 3/3 Metas. */
-export function OnboardingSaude({ inicial, metasAnteriores, salvando, erro, onConcluir, onAgoraNao }: Props) {
+export function OnboardingSaude({ inicial, metasAnteriores, salvando, erro, onConcluir, onAgoraNao, podeSalvar = true, aviso }: Props) {
   const [passo, setPasso] = useState<1 | 2 | 3>(1);
   const [texto, setTexto] = useState({
     idade: inicial.idade ? String(inicial.idade) : '',
@@ -207,7 +211,8 @@ export function OnboardingSaude({ inicial, metasAnteriores, salvando, erro, onCo
             {erro}
           </p>
         )}
-        <button type="button" disabled={salvando} className={clsx(classeBotaoCheio, 'mt-6')} onClick={() => onConcluir(completas, metas)}>
+        {!podeSalvar && aviso}
+        <button type="button" disabled={salvando || !podeSalvar} className={clsx(classeBotaoCheio, 'mt-6')} onClick={() => podeSalvar && onConcluir(completas, metas)}>
           {salvando ? 'Salvando…' : 'Salvar e começar'}
         </button>
         {agoraNao}

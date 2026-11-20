@@ -1,21 +1,22 @@
-import { format, subDays } from 'date-fns';
+import { hojeSP } from '@meudia/shared';
+import { format, subDays, parseISO } from 'date-fns';
 import { scoreRepository, sessaoRepository } from '../repositories';
 import * as habitoService from './habito.service';
 
 export async function obterScoreHoje(userId: string) {
-  const today = format(new Date(), 'yyyy-MM-dd');
+  const today = hojeSP();
   return scoreRepository.findByDate(userId, today);
 }
 
 export async function obterHistorico(userId: string, days: number = 30) {
-  const today = new Date();
+  const today = parseISO(hojeSP());
   const start = format(subDays(today, days), 'yyyy-MM-dd');
   const end = format(today, 'yyyy-MM-dd');
   return scoreRepository.findByDateRange(userId, start, end);
 }
 
 export async function calcularStreak(userId: string) {
-  const today = new Date();
+  const today = parseISO(hojeSP());
   const start = format(subDays(today, 60), 'yyyy-MM-dd');
   const end = format(today, 'yyyy-MM-dd');
 
@@ -42,7 +43,7 @@ export async function calcularStreak(userId: string) {
 }
 
 export async function calcularScoreDiario(userId: string) {
-  const today = format(new Date(), 'yyyy-MM-dd');
+  const today = hojeSP();
 
   // Treino: 50 pts if any sessao concluida today
   const sessoes = await sessaoRepository.findByUserAndDateRange(userId, today, today);

@@ -1,11 +1,12 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { treinoService } from '@meudia/api';
+import { sessaoRepository, treinoService } from '@meudia/api';
 import type { TreinoInsert, ExercicioInsert, SerieRealizadaInsert } from '@meudia/shared';
 import { useAuth } from './useAuth';
 import { withOfflineSupport } from '../lib/offline-mutation';
 import { useAppMode } from '../components/AppModeProvider';
+import { hojeSP } from '../lib/hoje';
 
 export function useTreinos() {
   const { user } = useAuth();
@@ -150,6 +151,20 @@ export function useSessoesSemana({ noModoFinancas = false }: { noModoFinancas?: 
   });
 }
 
+/**
+ * Sessões do Plano de `desdeISO` até hoje (SP), para a aba Treino (/treinos) contar a sessão concluída no dia
+ * (`unirTreinosDoDia`). Só a tela /treinos usa; `useFinalizarSessao` invalida o prefixo.
+ */
+export function useSessoesTreinoDesde(desdeISO: string) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['sessoes-treino-desde', user?.id, desdeISO],
+    queryFn: () => sessaoRepository.findByUserAndDateRange(user!.id, desdeISO, hojeSP()),
+    enabled: !!user?.id,
+  });
+}
+
 /** Coluna ANTERIOR: última vez de cada exercício, sem a sessão em andamento. */
 export function useSeriesAnteriores(exercicioIds: string[], sessaoAtualId: string | null) {
   const { user } = useAuth();
@@ -228,6 +243,8 @@ export function useFinalizarSessao() {
       treinoService.finalizarSessao(sessaoId, duracao),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['sessoes-semana'] });
+      // A aba Treino (/treinos) conta a sessão concluída no dia.
+      void queryClient.invalidateQueries({ queryKey: ['sessoes-treino-desde'] });
       void queryClient.invalidateQueries({ queryKey: ['series-anteriores'] });
       void queryClient.invalidateQueries({ queryKey: ['score'] });
     },
