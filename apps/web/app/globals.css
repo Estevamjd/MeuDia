@@ -517,3 +517,32 @@ html[data-trocando-tema] *, html[data-trocando-tema] *::before, html[data-trocan
 /* Carrossel do cartão da Início: rola com o dedo, sem barra visível. */
 .sem-barra { scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .sem-barra::-webkit-scrollbar { display: none; }
+
+/* ── Início v5: cartãozinho em maço (formato ID-1, 85,6 × 53,98 mm → 1,586) ──────────────────────────────
+   Reaproveita o material .lap-heroi (tokens escuros dentro do cartão, grão, luz) e troca só a "pele" de cada
+   cartão, como cartões diferentes na carteira. Igual no claro e no escuro; muda só a sombra. */
+.lap-heroi.cartao-cc { border-radius: 18px; transition: box-shadow 0.2s ease, translate 0.2s ease; }
+.lap-heroi.cartao-cc { box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.25), inset 0 0 0 1px oklch(1 0 0 / 0.08), 0 18px 36px -18px oklch(0 0 0 / 0.85), 0 2px 4px oklch(0 0 0 / 0.5); }
+html[data-mode='light'] .lap-heroi.cartao-cc { box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.25), inset 0 0 0 1px oklch(1 0 0 / 0.08), 0 22px 40px -22px oklch(0.35 0.08 230 / 0.55), 0 2px 6px oklch(0.25 0.05 235 / 0.18); }
+.lap-heroi.cartao-pele-conta {
+  background:
+    radial-gradient(50% 80% at 90% 10%, oklch(0.68 0.15 275 / 0.35), transparent 65%),
+    radial-gradient(70% 90% at 10% 120%, oklch(0.38 0.14 265 / 0.8), transparent 66%),
+    linear-gradient(135deg, #141a3a, #0b0f24);
+  background-color: #0f1430;
+  --lap-h-positivo: oklch(0.82 0.1 280);
+}
+.lap-heroi.cartao-pele-meta {
+  background:
+    radial-gradient(45% 75% at 88% 20%, oklch(0.78 0.15 165 / 0.35), transparent 68%),
+    radial-gradient(70% 90% at 20% 125%, oklch(0.42 0.09 170 / 0.8), transparent 66%),
+    linear-gradient(135deg, #0a2f2a, #071a18);
+  background-color: #082420;
+  --lap-h-positivo: oklch(0.88 0.14 155);
+}
+/* Segurando o cartão da frente: ele sobe um pouco, como o cartão do funil do CRM. */
+.maco-segurando .cartao-frente > .cartao-cc { translate: 0 -3px; }
+.maco-segurando .cartao-frente > .cartao-cc { box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.25), 0 28px 44px -20px oklch(0 0 0 / 0.75), 0 4px 10px oklch(0 0 0 / 0.35); }
+.cartao-chip { width: 30px; height: 22px; border-radius: 5px; flex: none; position: relative; background: linear-gradient(135deg, #e9d8a6, #b9975b 55%, #e2c98f); box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.18); }
+.cartao-chip::before { content: ''; position: absolute; inset: 5px 9px; border: 1px solid rgb(0 0 0 / 0.25); border-radius: 3px; }
+@media (prefers-reduced-motion: reduce) { .lap-heroi.cartao-cc { transition: none; } .maco-segurando .cartao-frente > .cartao-cc { translate: none; } }

@@ -112,7 +112,6 @@ export function FinancasHomeView({
         <CardResumoDeslizante
           sobra={d.sobraMes}
           cofrinho={d.cofrinho}
-          carteiras={d.saldo.carteiras}
           metas={metas}
           hojeISO={hojeISO}
           escondido={escondido}

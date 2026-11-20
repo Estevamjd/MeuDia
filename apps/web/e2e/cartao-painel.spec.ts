@@ -4,7 +4,7 @@ import { test, expect } from './mock-guard';
 import { pastaEvidencias } from './evidencias';
 
 /**
- * Início v4 (cartão deslizante: Resumo · A conta · Meta só se houver meta) e Relatório → Painel, iPhone 13 contra o
+ * Início v5 (maço de cartões: Resumo · A conta · Meta só se houver meta) e Relatório → Painel, iPhone 13 contra o
  * mock do Supabase, no claro e no escuro. Relógio fixo em 18/10/2026 12:00 (SP); dados semeados por POST /__mock/seed.
  */
 
@@ -13,7 +13,7 @@ const AGORA = '2026-10-18T15:00:00.000Z';
 const SENHA = 'senhaForte123';
 const run = Date.now().toString(36);
 const brl = (valor: string) => new RegExp(`^R\\$\\s${valor.replace('.', '\\.')}$`);
-const pasta = pastaEvidencias('cartao-painel');
+const pasta = pastaEvidencias('cartao-maco');
 
 test.describe.configure({ mode: 'serial' });
 const relogio = (now: string | null) =>
@@ -58,22 +58,39 @@ async function escolherModo(page: Page, nome: 'Claro' | 'Escuro') {
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.mode)).toBe(nome === 'Claro' ? 'light' : 'dark');
 }
 
-/** A página do cartão está "na vez": inteira na largura da tela (a última encosta à direita, com a anterior espiando). */
-const naVez = (page: Page, testid: string) =>
-  expect
+/** O cartão está na frente do maço: marcado como frente e assentado no centro do palco (sem giro, escala 1). */
+const naFrente = async (page: Page, testid: string) => {
+  const c = page.getByTestId(testid);
+  await expect(c).toHaveClass(/cartao-frente/);
+  await expect
     .poll(async () => {
-      const b = await page.getByTestId(testid).boundingBox();
+      const b = await c.boundingBox();
       const largura = page.viewportSize()!.width;
-      return !!b && b.x >= 0 && b.x + b.width <= largura + 0.5;
-    }, { message: `${testid} na vez` })
+      return !!b && Math.abs(b.x + b.width / 2 - largura / 2) < 2 && b.width <= 341;
+    }, { message: `${testid} na frente` })
     .toBe(true);
-const foraDaVez = async (page: Page, testid: string) =>
-  expect(Math.round((await page.getByTestId(testid).boundingBox())!.x)).toBeGreaterThan(300);
+};
+
+/** Arrasta com o dedo (touch de verdade via CDP; só no Chromium), conferindo o maço no meio do gesto. */
+async function arrastarCartao(page: Page, deX: number, ateX: number, y: number, noMeio: () => Promise<void>) {
+  const cdp = await page.context().newCDPSession(page);
+  const toque = (type: 'touchStart' | 'touchMove' | 'touchEnd', x: number) =>
+    cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1, radiusX: 4, radiusY: 4, force: 1 }] });
+  await toque('touchStart', deX);
+  const passos = 12;
+  for (let i = 1; i <= passos; i++) {
+    await toque('touchMove', deX + ((ateX - deX) * i) / passos);
+    await page.waitForTimeout(16);
+    if (i === Math.round(passos * 0.6)) await noMeio();
+  }
+  await toque('touchEnd', ateX);
+  await cdp.detach();
+}
 
 const semRolagemLateral = async (page: Page) =>
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
 
-test('cartão deslizante: 2 páginas sem meta, 3 com meta; botões, setas e anúncio; Painel com os 4 blocos; claro e escuro', async ({ page }) => {
+test('maço de cartões: 2 sem meta, 3 com meta; formato de cartão (≤ 240px); arrastar, botões, setas e anúncio; Painel; claro e escuro', async ({ page, browserName }) => {
   const erros: string[] = [];
   page.on('pageerror', (err) => erros.push(`${err.name}: ${err.message}`));
   page.on('response', (res) => { if (res.status() >= 400) erros.push(`${res.request().method()} ${res.url()} → ${res.status()}`); });
@@ -90,20 +107,49 @@ test('cartão deslizante: 2 páginas sem meta, 3 com meta; botões, setas e anú
   await page.reload();
   await fecharBanner(page);
 
-  // ── Sem meta: 2 páginas (Resumo, A conta); a conta continua com os mesmos testids ──
+  // ── Sem meta: 2 cartões (Resumo, A conta); a conta continua com os mesmos testids ──
   const cartao = page.getByTestId('cartao-resumo');
+  const anuncio = cartao.locator('[aria-live="polite"]');
   await expect(cartao).toHaveAttribute('data-paginas', '2');
   await expect(page.getByTestId('cartao-pagina-meta')).toHaveCount(0);
   await expect(page.getByTestId('cartao-sobra-valor')).toHaveText(brl('139,10'));
   await expect(page.getByTestId('previsao-fim-mes-valor')).toHaveText(brl('139,10'));
   await expect(page.getByTestId('linha-cofrinho')).toBeVisible();
-  await naVez(page, 'cartao-pagina-resumo');
-  await foraDaVez(page, 'cartao-pagina-conta');
+  await naFrente(page, 'cartao-pagina-resumo');
+  // Formato de cartão de crédito: ≤ 240px de altura, razão ~1,586, e o maço inteiro cabe sem empurrar a Início.
+  const caixa = (await page.getByTestId('cartao-pagina-resumo').boundingBox())!;
+  expect(caixa.height).toBeLessThanOrEqual(240);
+  expect(caixa.width / caixa.height).toBeGreaterThan(1.55);
+  expect(caixa.width / caixa.height).toBeLessThan(1.62);
+  expect((await page.getByTestId('cartao-maco').boundingBox())!.height).toBeLessThanOrEqual(250);
+  await expect(page.getByRole('region', { name: 'Contas a vencer' })).toBeInViewport();
   await semRolagemLateral(page);
-  await page.getByRole('button', { name: 'Ver a conta' }).click();
-  await naVez(page, 'cartao-pagina-conta');
-  await expect(cartao.locator('[aria-live="polite"]')).toHaveText('Página 2 de 2: A conta');
-  await expect(cartao.getByRole('button', { name: 'Resumo' })).toBeVisible();
+
+  // Arrastar com o dedo: no meio do gesto o cartão da frente está "na mão" (sobe e gira) e o de trás aparece.
+  if (browserName === 'chromium') {
+    const y = caixa.y + caixa.height / 2;
+    await arrastarCartao(page, 330, 70, y, async () => {
+      await expect(cartao).toHaveClass(/maco-segurando/);
+      const giro = await page.getByTestId('cartao-pagina-resumo').evaluate((el) => (el as HTMLElement).style.transform);
+      expect(giro).toMatch(/rotate\(-\d/);
+      await page.screenshot({ path: path.join(pasta, '00-arrastando-escuro.png'), animations: 'disabled' });
+    });
+    await naFrente(page, 'cartao-pagina-conta');
+    await expect(anuncio).toHaveText('Cartão 2 de 2: A conta');
+    await expect(cartao).not.toHaveClass(/maco-segurando/);
+    await page.getByRole('button', { name: 'Cartão anterior: Resumo' }).click();
+    await naFrente(page, 'cartao-pagina-resumo');
+  }
+
+  await page.getByRole('button', { name: 'Próximo cartão: A conta' }).click();
+  await naFrente(page, 'cartao-pagina-conta');
+  await expect(anuncio).toHaveText('Cartão 2 de 2: A conta');
+  await expect(page.getByTestId('cartao-posicao')).toHaveText('2 de 2 · A conta');
+  await expect(page.getByRole('button', { name: 'Próximo cartão' })).toBeDisabled();
+  // Contas fixas do cartão abrem a lista abaixo do maço.
+  await page.getByRole('button', { name: /Contas fixas/ }).click();
+  await expect(page.getByRole('list', { name: 'Contas fixas de outubro' })).toContainText('Curso');
+  await page.getByRole('button', { name: /Contas fixas/ }).click();
   await page.screenshot({ path: path.join(pasta, '01-sem-meta-p2-escuro.png'), animations: 'disabled' });
 
   // ── Com meta: 3 páginas; linha da meta na página 1 e página Meta com os números ──
@@ -121,17 +167,17 @@ test('cartão deslizante: 2 páginas sem meta, 3 com meta; botões, setas e anú
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: path.join(pasta, `02-inicio-p1-${sufixo}.png`), animations: 'disabled' });
 
-    await page.getByRole('button', { name: 'Ver a conta' }).click();
-    await naVez(page, 'cartao-pagina-conta');
-    await expect(page.getByTestId('cartao-bancos-hoje')).toContainText('Nubank');
+    await naFrente(page, 'cartao-pagina-resumo');
+    await page.getByRole('button', { name: 'Próximo cartão: A conta' }).click();
+    await naFrente(page, 'cartao-pagina-conta');
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: path.join(pasta, `03-inicio-p2-${sufixo}.png`), animations: 'disabled' });
 
     // Setas do teclado no trilho levam à página Meta.
-    await page.getByLabel('Páginas do resumo do mês. Deslize ou use as setas.').focus();
+    await page.getByLabel('Cartões do resumo do mês. Deslize para o lado ou use as setas.').focus();
     await page.keyboard.press('ArrowRight');
-    await naVez(page, 'cartao-pagina-meta');
-    await expect(cartao.locator('[aria-live="polite"]')).toHaveText('Página 3 de 3: Meta');
+    await naFrente(page, 'cartao-pagina-meta');
+    await expect(anuncio).toHaveText('Cartão 3 de 3: Meta');
     await expect(page.getByTestId('cartao-meta-pct')).toContainText('42');
     await expect(page.getByTestId('cartao-meta-valores')).toHaveText(/R\$\s840,00 guardados de R\$\s2\.000,00/);
     await expect(page.getByRole('progressbar', { name: 'Meta Celular novo' })).toHaveAttribute('aria-valuenow', '42');

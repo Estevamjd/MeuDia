@@ -203,18 +203,19 @@ describe('montarHome (Início resumida)', () => {
 describe('FinancasHomeView (Início, design v2)', () => {
   const regioes = () => screen.getAllByRole('region').map((r) => (r.getAttribute('aria-labelledby') ? document.getElementById(r.getAttribute('aria-labelledby')!)?.textContent : r.getAttribute('aria-label')));
 
-  it('cartão deslizante (Resumo → Resumo de outubro, a conta explícita) → Contas a vencer → Para onde foi → Últimos lançamentos; Cofrinho é uma linha do cartão', () => {
+  it('maço de cartões (Resumo → A conta de outubro) → Contas a vencer → Para onde foi → Últimos lançamentos; Cofrinho no rodapé do cartão', () => {
     render(<FinancasHomeView {...viewProps()} />);
-    expect(regioes()).toEqual(['Resumo do mês', 'Resumo de outubro', 'Contas a vencer', 'Para onde foi', 'Últimos lançamentos']);
+    expect(regioes()).toEqual(['Resumo do mês', 'A conta de outubro', 'Contas a vencer', 'Para onde foi', 'Últimos lançamentos']);
     const linha = screen.getByTestId('linha-cofrinho');
     expect(linha.getAttribute('href')).toBe('/financas/carteiras');
-    expect(texto(linha)).toContain('Cofrinho: R$ 150,00');
+    expect(texto(linha)).toContain('Cofrinho');
+    expect(texto(screen.getByTestId('linha-cofrinho-valor'))).toBe('R$ 150,00');
     expect(texto()).not.toMatch(/Renda comprometida|Pagas em dia|Evolução do mês|Ative os lembretes|pedem atenção|Orçamento|Sobra do mês/);
     expect(screen.queryByRole('alert')).toBeNull();
     semTransacaoSemAcento();
   });
 
-  it('a conta fecha: Você recebe (previsão) − Contas fixas − Gastos do mês = Deve sobrar; barra da renda comprometida', () => {
+  it('a conta fecha: Você recebe (previsão) − Contas fixas − Gastos do mês = Deve sobrar; barra da renda com destino', () => {
     const { rerender } = render(<FinancasHomeView {...viewProps()} />);
     const val = (id: string) => screen.getByTestId(id).textContent?.replace(/\s/g, ' ');
     expect(val('resumo-renda')).toBe('R$ 2.000,00');
@@ -222,27 +223,26 @@ describe('FinancasHomeView (Início, design v2)', () => {
     expect(val('resumo-contas-fixas')).toBe('− R$ 1.200,00');
     expect(val('resumo-gastos')).toBe('− R$ 300,00');
     expect(val('previsao-fim-mes-valor')).toBe('R$ 500,00');
-    expect(screen.getByRole('progressbar', { name: 'Renda do mês comprometida' }).getAttribute('aria-valuenow')).toBe('75');
-    expect(val('resumo-comprometida')).toBe('75% da renda já está comprometida · R$ 1.500,00 de R$ 2.000,00');
+    expect(screen.getByRole('progressbar', { name: 'Renda do mês com destino' }).getAttribute('aria-valuenow')).toBe('75');
+    expect(texto(screen.getByTestId('cartao-pagina-resumo'))).toContain('75% da renda já tem destino');
     expect(texto()).toContain('No controle');
-    expect(texto()).toContain('toque em Recebi');
     const recebido = { ...sobra, previsao: false, renda: { lancada: 2000, aReceber: 0, total: 2000 } };
     rerender(<FinancasHomeView {...viewProps({ dashboard: dashboard({ sobraMes: recebido }) })} />);
     expect(screen.queryByTestId('renda-previsao')).toBeNull();
     const estourado = dashboard({ sobraMes: { ...sobra, gastosExtras: 1800, despesas: 3000, valor: -1000 } });
     rerender(<FinancasHomeView {...viewProps({ dashboard: estourado })} />);
-    expect(screen.getByRole('progressbar', { name: 'Renda do mês comprometida' }).getAttribute('aria-valuenow')).toBe('100');
+    expect(screen.getByRole('progressbar', { name: 'Renda do mês com destino' }).getAttribute('aria-valuenow')).toBe('100');
     expect(texto()).toContain('150% da renda');
     expect(texto()).toContain('Passou da renda');
   });
 
   it('Contas fixas: resumo pagas/a pagar e lista com "pago" / "a pagar" ao tocar', () => {
     render(<FinancasHomeView {...viewProps()} />);
-    expect(texto()).toContain('1 paga · 1 a pagar');
     const botao = screen.getByRole('button', { name: /Contas fixas/ });
     expect(botao.getAttribute('aria-expanded')).toBe('false');
     fireEvent.click(botao);
     expect(botao.getAttribute('aria-expanded')).toBe('true');
+    expect(texto(screen.getByTestId('resumo-contas-fixas-status'))).toContain('1 paga · 1 a pagar');
     const lista = screen.getByRole('list', { name: 'Contas fixas de outubro' });
     const itens = Array.from(lista.querySelectorAll('li')).map((li) => texto(li));
     expect(itens[0]).toMatch(/Aluguel.*pago em 04\/10.*R\$ 1\.000,00.*pago/);
@@ -313,7 +313,7 @@ describe('FinancasHomeView (Início, design v2)', () => {
   it('renda cadastrada sem contas: card no passo 2 acima do resumo', () => {
     render(<FinancasHomeView {...viewProps({ boasVindas: { rendaCadastrada: true, onCadastrarRenda: vi.fn() } })} />);
     expect(texto()).toContain('Passo 2 de 2');
-    expect(texto()).toContain('Resumo de outubro');
+    expect(texto()).toContain('A conta de outubro');
   });
 
   it('usuária nova (vazio, sem banco): só o convite e as boas-vindas, sem "R$ 0,00"', () => {

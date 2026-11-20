@@ -1,18 +1,19 @@
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import { clsx } from 'clsx';
-import { ChevronLeft, ChevronRight, PiggyBank } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, PiggyBank } from 'lucide-react';
 import type { SobraDoMes } from '@meudia/shared';
-import { metaDoCartao, progressoMeta, rotuloMesAno, sugestaoMeta, type MetaParaCartao } from '@meudia/shared';
+import { metaDoCartao, progressoMeta, sugestaoMeta, type MetaParaCartao } from '@meudia/shared';
 import { formatBRL, formatBRLSinal, formatDiaMes, nomeMes } from '../../../lib/financas-ui';
 import { VALOR_OCULTO } from '../../../lib/carteiras-ui';
 import { NumeroAnimado } from '../../ui/NumeroAnimado';
 import { IconeMeta } from '../metas/IconeMeta';
-import { ResumoMesConta, SITUACAO, pctComprometida } from '../resumo/ResumoMesConta';
+import { SITUACAO, pctComprometida } from '../resumo/ResumoMesConta';
 import { situacaoDo } from '../resumo/montarResumoMes';
-import { BANCOS_PATH, type ChipCarteira } from './CardSaldoHoje';
+import { BANCOS_PATH } from './CardSaldoHoje';
+import { poseDoCartao, transformDaPose } from './poseDoMaco';
 
 export const METAS_PATH = '/financas/metas';
 
@@ -24,9 +25,7 @@ export interface CardResumoDeslizanteProps {
   sobra: SobraDoMes;
   /** Dinheiro guardado (Cofrinho). */
   cofrinho: number;
-  /** Bancos ativos com saldo de hoje (página "A conta"). */
-  carteiras: Pick<ChipCarteira, 'id' | 'nome' | 'saldo'>[];
-  /** Metas da pessoa; sem metas, o cartão fica com 2 páginas. */
+  /** Metas da pessoa; sem metas, o maço fica com 2 cartões. */
   metas?: readonly MetaDoCartao[];
   hojeISO: string;
   escondido?: boolean;
@@ -37,7 +36,7 @@ interface Pagina {
   titulo: string;
 }
 
-/** Páginas do cartão: a "Meta" só existe se houver meta. */
+/** Cartões do maço: o "Meta" só existe se houver meta. */
 export function paginasDoCartao(temMeta: boolean): Pagina[] {
   return [
     { id: 'resumo', titulo: 'Resumo' },
@@ -48,60 +47,110 @@ export function paginasDoCartao(temMeta: boolean): Pagina[] {
 
 const reduzMovimento = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const MESES_CURTOS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-const mesCurto = (iso: string) => `${MESES_CURTOS[Number(iso.slice(5, 7)) - 1]}/${iso.slice(0, 4)}`;
+const mesCurto = (iso: string) => `${MESES_CURTOS[Number(iso.slice(5, 7)) - 1]}/${iso.slice(2, 4)}`;
+const PILULA = 'inline-flex h-[22px] shrink-0 items-center whitespace-nowrap rounded-full border px-2 text-[11px] font-medium';
 
 /**
- * Início (v4, aprovado em 19/11/2026): cartão deslizante com 2 ou 3 páginas.
- * 1 "Resumo": quanto deve sobrar, barra, a meta em uma linha e o Cofrinho. 2 "A conta": a conta explícita (Você recebe −
- * Contas fixas − Gastos do mês) e os bancos. 3 "Meta" (só com meta): progresso, falta, prazo, ritmo e quanto guardar.
- * Scroll-snap nativo (desliza com o dedo) + botões e setas do teclado (WCAG 2.5.1); o próximo cartão aparece na borda.
+ * Início v5 (aprovado em 19/11/2026): cartõezinhos no formato de cartão de crédito, em maço, que a pessoa segura e
+ * passa para o lado. 1 "Resumo" (deve sobrar, Cofrinho, meta), 2 "A conta" (recebe − contas fixas − gastos), 3 "Meta"
+ * (só com meta). Por baixo, um trilho invisível com scroll-snap nativo cuida do dedo, da inércia e do teclado; por cima,
+ * os cartões ganham a pose do maço a cada quadro (poseDoMaco). Botões ‹ ›, pontos e anúncio (WCAG 2.5.1); com
+ * "reduzir movimento" vira um carrossel simples, sem giro.
  */
-export function CardResumoDeslizante({ sobra, cofrinho, carteiras, metas = [], hojeISO, escondido = false }: CardResumoDeslizanteProps) {
+export function CardResumoDeslizante({ sobra, cofrinho, metas = [], hojeISO, escondido = false }: CardResumoDeslizanteProps) {
   const meta = metaDoCartao(metas);
-  const paginas = paginasDoCartao(!!meta);
+  const temMeta = !!meta;
+  const paginas = useMemo(() => paginasDoCartao(temMeta), [temMeta]);
+  const total = paginas.length;
   const [atual, setAtual] = useState(0);
   const [anuncio, setAnuncio] = useState('');
+  const [segurando, setSegurando] = useState(false);
+  const [contasAbertas, setContasAbertas] = useState(false);
   const trilhoRef = useRef<HTMLDivElement>(null);
+  const cartoesRef = useRef<(HTMLDivElement | null)[]>([]);
+  const atualRef = useRef(0);
   const idTrilho = useId();
+  const idListaContas = useId();
+  const mes = nomeMes(sobra.competencia);
 
-  const passo = useCallback(() => {
+  // Pose do maço a partir da rolagem do trilho (escreve direto no DOM, sem re-render por quadro).
+  const aplicarPoses = useCallback((acompanharRolagem = true) => {
     const el = trilhoRef.current;
-    const s = el?.children;
-    if (!el || !s || s.length < 2) return el?.clientWidth || 1;
-    return (s[1] as HTMLElement).offsetLeft - (s[0] as HTMLElement).offsetLeft || 1;
-  }, []);
+    if (!el) return;
+    const largura = el.clientWidth || 1;
+    const p = el.scrollLeft / largura;
+    const reduzir = reduzMovimento();
+    cartoesRef.current.forEach((c, i) => {
+      if (!c) return;
+      const pose = poseDoCartao(i - p, largura, reduzir);
+      c.style.transform = transformDaPose(pose);
+      c.style.zIndex = String(pose.z);
+      c.style.visibility = pose.visivel ? 'visible' : 'hidden';
+    });
+    const novo = Math.max(0, Math.min(total - 1, Math.round(p)));
+    if (acompanharRolagem && novo !== atualRef.current) {
+      atualRef.current = novo;
+      setAtual(novo);
+      setAnuncio(`Cartão ${novo + 1} de ${total}: ${paginas[novo]!.titulo}`);
+    }
+  }, [paginas, total]);
 
-  // Página atual pela posição do scroll (dedo, botão ou teclado).
+  // Mede e posiciona (montagem, meta nova); a página atual só muda pela rolagem ou pelos botões.
+  useEffect(() => {
+    aplicarPoses(false);
+  }, [aplicarPoses]);
+
   useEffect(() => {
     const el = trilhoRef.current;
     if (!el) return;
     let quadro = 0;
     const aoRolar = () => {
       cancelAnimationFrame(quadro);
-      quadro = requestAnimationFrame(() => setAtual(Math.max(0, Math.min(paginas.length - 1, Math.round(el.scrollLeft / passo())))));
+      quadro = requestAnimationFrame(() => aplicarPoses());
     };
+    const pegar = () => setSegurando(true);
+    const soltar = () => setSegurando(false);
     el.addEventListener('scroll', aoRolar, { passive: true });
+    el.addEventListener('touchstart', pegar, { passive: true });
+    el.addEventListener('touchend', soltar, { passive: true });
+    el.addEventListener('touchcancel', soltar, { passive: true });
+    window.addEventListener('resize', aoRolar);
     return () => {
       el.removeEventListener('scroll', aoRolar);
+      el.removeEventListener('touchstart', pegar);
+      el.removeEventListener('touchend', soltar);
+      el.removeEventListener('touchcancel', soltar);
+      window.removeEventListener('resize', aoRolar);
       cancelAnimationFrame(quadro);
     };
-  }, [paginas.length, passo]);
+  }, [aplicarPoses]);
 
-  // Meta apagada estando na página 3: volta para a última que existe.
+  // Cartões de trás não recebem foco nem toque (o da frente é o que vale); `inert` via DOM por compatibilidade.
   useEffect(() => {
-    if (atual > paginas.length - 1) setAtual(paginas.length - 1);
-  }, [atual, paginas.length]);
+    cartoesRef.current.forEach((c, i) => {
+      if (c) (c as HTMLDivElement & { inert: boolean }).inert = i !== atual;
+    });
+  }, [atual, total]);
+
+  // Meta apagada estando no cartão 3: volta para o último que existe.
+  useEffect(() => {
+    if (atual > total - 1) {
+      atualRef.current = total - 1;
+      setAtual(total - 1);
+    }
+  }, [atual, total]);
 
   const irPara = useCallback(
     (i: number) => {
       const el = trilhoRef.current;
-      const alvo = Math.max(0, Math.min(paginas.length - 1, i));
+      const alvo = Math.max(0, Math.min(total - 1, i));
       if (!el) return;
-      el.scrollTo?.({ left: alvo * passo(), behavior: reduzMovimento() ? 'auto' : 'smooth' });
+      el.scrollTo?.({ left: alvo * (el.clientWidth || 1), behavior: reduzMovimento() ? 'auto' : 'smooth' });
+      atualRef.current = alvo;
       setAtual(alvo);
-      setAnuncio(`Página ${alvo + 1} de ${paginas.length}: ${paginas[alvo]!.titulo}`);
+      setAnuncio(`Cartão ${alvo + 1} de ${total}: ${paginas[alvo]!.titulo}`);
     },
-    [paginas, passo],
+    [paginas, total],
   );
 
   const aoTeclar = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -109,66 +158,81 @@ export function CardResumoDeslizante({ sobra, cofrinho, carteiras, metas = [], h
     if (e.key === 'ArrowLeft') { e.preventDefault(); irPara(atual - 1); }
   };
 
-  const total = paginas.length;
-  const rotuloSlide = (i: number) => `${i + 1} de ${total}: ${paginas[i]!.titulo}`;
+  const rotulo = (i: number) => `${i + 1} de ${total}: ${paginas[i]!.titulo}`;
+  // Pose inicial (antes do JS medir): o 1º na frente, os outros atrás à direita.
+  const poseInicial = (i: number) => {
+    const pose = poseDoCartao(i, 340);
+    return { transform: transformDaPose(pose), zIndex: pose.z, visibility: pose.visivel ? ('visible' as const) : ('hidden' as const) };
+  };
+  const refCartao = (i: number) => (el: HTMLDivElement | null) => {
+    cartoesRef.current[i] = el;
+  };
+  cartoesRef.current.length = total;
 
   return (
-    <section aria-roledescription="carrossel" aria-label="Resumo do mês" data-testid="cartao-resumo" data-paginas={total}>
-      <div
-        id={idTrilho}
-        ref={trilhoRef}
-        tabIndex={0}
-        onKeyDown={aoTeclar}
-        aria-label="Páginas do resumo do mês. Deslize ou use as setas."
-        className="sem-barra -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto overscroll-x-contain px-4 pb-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:mx-0 md:scroll-px-0 md:px-0"
-      >
-        <Slide rotulo={rotuloSlide(0)} testid="cartao-pagina-resumo">
-          <PaginaResumo sobra={sobra} cofrinho={cofrinho} meta={meta} hojeISO={hojeISO} escondido={escondido} />
-        </Slide>
-        <Slide rotulo={rotuloSlide(1)} testid="cartao-pagina-conta" semMaterial>
-          <ResumoMesConta sobra={sobra} escondido={escondido} className="h-full">
-            {carteiras.length > 0 && <BancosHoje carteiras={carteiras} cofrinho={cofrinho} escondido={escondido} />}
-          </ResumoMesConta>
-        </Slide>
-        {meta && (
-          <Slide rotulo={rotuloSlide(2)} testid="cartao-pagina-meta">
-            <PaginaMeta meta={meta} sobraMensal={sobra.valor} hojeISO={hojeISO} escondido={escondido} />
-          </Slide>
-        )}
+    <section aria-roledescription="carrossel" aria-label="Resumo do mês" data-testid="cartao-resumo" data-paginas={total} className={clsx(segurando && 'maco-segurando')}>
+      <div className="relative -mx-4 h-[248px] md:mx-0" data-testid="cartao-maco">
+        {/* Trilho invisível: é ele que rola (dedo, inércia, teclado); os cartões só desenham a pose. */}
+        <div
+          id={idTrilho}
+          ref={trilhoRef}
+          tabIndex={0}
+          onKeyDown={aoTeclar}
+          aria-label="Cartões do resumo do mês. Deslize para o lado ou use as setas."
+          className="sem-barra absolute inset-0 flex snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-[20px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          {paginas.map((p) => (
+            <div key={p.id} className="h-full w-full shrink-0 snap-center snap-always" aria-hidden="true" />
+          ))}
+        </div>
+        <div className="pointer-events-none absolute inset-0 z-10">
+          <Cartao i={0} total={total} atual={atual} refEl={refCartao(0)} estilo={poseInicial(0)} rotulo={rotulo(0)} testid="cartao-pagina-resumo">
+            <CartaoResumo sobra={sobra} cofrinho={cofrinho} meta={meta} hojeISO={hojeISO} escondido={escondido} />
+          </Cartao>
+          <Cartao i={1} total={total} atual={atual} refEl={refCartao(1)} estilo={poseInicial(1)} rotulo={rotulo(1)} testid="cartao-pagina-conta" pele="cartao-pele-conta">
+            <CartaoConta sobra={sobra} escondido={escondido} contasAbertas={contasAbertas} onContas={() => setContasAbertas((a) => !a)} idLista={idListaContas} />
+          </Cartao>
+          {meta && (
+            <Cartao i={2} total={total} atual={atual} refEl={refCartao(2)} estilo={poseInicial(2)} rotulo={rotulo(2)} testid="cartao-pagina-meta" pele="cartao-pele-meta">
+              <CartaoMeta meta={meta} sobraMensal={sobra.valor} hojeISO={hojeISO} escondido={escondido} />
+            </Cartao>
+          )}
+        </div>
       </div>
 
-      <div className="mt-2.5 flex min-h-[44px] items-center justify-between gap-2">
-        {atual > 0 ? (
-          <BotaoPagina onClick={() => irPara(atual - 1)} controla={idTrilho} fantasma>
-            <ChevronLeft size={16} aria-hidden="true" /> {paginas[atual - 1]!.titulo}
-          </BotaoPagina>
-        ) : (
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <BotaoRedondo onClick={() => irPara(atual - 1)} controla={idTrilho} rotulo={atual > 0 ? `Cartão anterior: ${paginas[atual - 1]!.titulo}` : 'Cartão anterior'} desligado={atual === 0}>
+          <ChevronLeft size={18} aria-hidden="true" />
+        </BotaoRedondo>
+        <div className="flex flex-col items-center gap-1.5">
           <Pontos total={total} atual={atual} />
-        )}
-        {atual > 0 && <Pontos total={total} atual={atual} />}
-        {atual < total - 1 ? (
-          <BotaoPagina onClick={() => irPara(atual + 1)} controla={idTrilho}>
-            {atual === 0 ? 'Ver a conta' : paginas[atual + 1]!.titulo} <ChevronRight size={16} aria-hidden="true" />
-          </BotaoPagina>
-        ) : paginas[atual]?.id === 'meta' ? (
-          <Link href={METAS_PATH} className={clsx(CLASSE_BOTAO, 'text-accent')}>
+          <span className="text-[11.5px] text-muted" data-testid="cartao-posicao">
+            {atual + 1} de {total} · {paginas[atual]?.titulo}
+          </span>
+        </div>
+        {atual === total - 1 && paginas[atual]?.id === 'meta' ? (
+          <Link href={METAS_PATH} className={clsx(CLASSE_REDONDO, 'w-auto px-3.5 text-[13px] font-medium text-accent')}>
             Guardar <ChevronRight size={16} aria-hidden="true" />
           </Link>
         ) : (
-          <span className="w-[88px]" aria-hidden="true" />
+          <BotaoRedondo onClick={() => irPara(atual + 1)} controla={idTrilho} rotulo={atual < total - 1 ? `Próximo cartão: ${paginas[atual + 1]!.titulo}` : 'Próximo cartão'} desligado={atual === total - 1}>
+            <ChevronRight size={18} aria-hidden="true" />
+          </BotaoRedondo>
         )}
       </div>
+
+      {contasAbertas && <ListaContasFixas sobra={sobra} escondido={escondido} id={idListaContas} mes={mes} />}
       <p className="sr-only" aria-live="polite" aria-atomic="true">{anuncio}</p>
     </section>
   );
 }
 
-const CLASSE_BOTAO =
-  'lap-cartao inline-flex min-h-[44px] items-center gap-1 rounded-xl px-3 text-[13px] font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
+const CLASSE_REDONDO =
+  'lap-cartao inline-flex h-11 min-w-[44px] items-center justify-center gap-1 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
 
-function BotaoPagina({ children, onClick, controla, fantasma = false }: { children: ReactNode; onClick: () => void; controla: string; fantasma?: boolean }) {
+function BotaoRedondo({ children, onClick, controla, rotulo, desligado }: { children: ReactNode; onClick: () => void; controla: string; rotulo: string; desligado: boolean }) {
   return (
-    <button type="button" onClick={onClick} aria-controls={controla} className={clsx(CLASSE_BOTAO, fantasma ? 'text-muted' : 'text-accent')}>
+    <button type="button" onClick={onClick} aria-controls={controla} aria-label={rotulo} disabled={desligado} className={clsx(CLASSE_REDONDO, 'w-11 text-accent disabled:text-muted disabled:opacity-45')}>
       {children}
     </button>
   );
@@ -184,113 +248,196 @@ function Pontos({ total, atual }: { total: number; atual: number }) {
   );
 }
 
-function Slide({ children, rotulo, testid, semMaterial = false }: { children: ReactNode; rotulo: string; testid: string; semMaterial?: boolean }) {
+function Cartao({ children, i, atual, refEl, estilo, rotulo, testid, pele }: {
+  children: ReactNode; i: number; total: number; atual: number; refEl: (el: HTMLDivElement | null) => void;
+  estilo: { transform: string; zIndex: number; visibility: 'visible' | 'hidden' }; rotulo: string; testid: string; pele?: string;
+}) {
+  // O estilo inicial é passado uma vez só (useState): depois quem move o cartão é o trilho, direto no DOM.
+  const [inicial] = useState(estilo);
   return (
     <div
+      ref={refEl}
       role="group"
-      aria-roledescription="página"
+      aria-roledescription="cartão"
       aria-label={rotulo}
       data-testid={testid}
-      className={clsx('flex w-[calc(100%-2.25rem)] shrink-0 snap-start flex-col md:w-[calc(100%-3rem)]', !semMaterial && 'lap-heroi px-5 pb-[18px] pt-5')}
+      style={inicial}
+      className={clsx('absolute inset-x-0 top-[17px] mx-auto aspect-[1.586] w-[min(340px,calc(100%-3rem))] origin-[50%_120%] will-change-transform', i === atual && 'cartao-frente')}
     >
-      {children}
+      <div className={clsx('lap-heroi cartao-cc flex h-full flex-col px-4 pb-3.5 pt-[15px]', pele)}>{children}</div>
     </div>
   );
 }
 
-function PaginaResumo({ sobra, cofrinho, meta, hojeISO, escondido }: { sobra: SobraDoMes; cofrinho: number; meta: MetaDoCartao | null; hojeISO: string; escondido: boolean }) {
+function Cabeca({ children, direita }: { children: ReactNode; direita?: ReactNode }) {
+  return (
+    <div className="flex min-h-[22px] items-center justify-between gap-2">
+      {children}
+      {direita}
+    </div>
+  );
+}
+
+const ROTULO = 'lap-rotulo lap-texto-3 flex min-w-0 items-center gap-2 text-[10.5px] font-normal tracking-[0.09em]';
+const ROTULO_PEQ = 'lap-rotulo lap-texto-3 text-[9.5px] tracking-[0.09em]';
+const MARCA = <span className="lap-texto-3 font-mono text-[11px] tracking-[0.16em]" aria-hidden="true">MEUDIA</span>;
+
+function CartaoResumo({ sobra, cofrinho, meta, hojeISO, escondido }: { sobra: SobraDoMes; cofrinho: number; meta: MetaDoCartao | null; hojeISO: string; escondido: boolean }) {
   const pct = pctComprometida(sobra);
   const pctBarra = pct === null ? 0 : Math.min(Math.max(pct, 0), 100);
   const situacao = SITUACAO[situacaoDo(pct, sobra.valor) ?? 'no-controle'];
-  const mes = nomeMes(sobra.competencia);
   const fimMes = formatDiaMes(fimDoMes(sobra.competencia));
   const valorCofrinho = escondido ? VALOR_OCULTO : formatBRLSinal(cofrinho);
   const progresso = meta ? progressoMeta(meta, hojeISO) : null;
   return (
     <>
-      <div className="flex min-h-6 items-center justify-between gap-2">
-        <h2 className="lap-rotulo lap-texto-3 font-normal tracking-[0.08em]">
-          <span className="capitalize">{mes}</span> · deve sobrar
+      <Cabeca direita={pct !== null && <span className={clsx(PILULA, situacao.classe)}>{situacao.texto}</span>}>
+        <h2 className={ROTULO}>
+          <i className="cartao-chip" aria-hidden="true" />
+          <span className="truncate"><span className="capitalize">{nomeMes(sobra.competencia)}</span> · deve sobrar</span>
         </h2>
-        {pct !== null && (
-          <span className={clsx('inline-flex h-[22px] shrink-0 items-center whitespace-nowrap rounded-full border px-2 text-[11px] font-medium', situacao.classe)}>
-            {situacao.texto}
-          </span>
-        )}
-      </div>
+      </Cabeca>
       <p
         data-testid="cartao-sobra-valor"
         className={clsx(
-          'mt-4 whitespace-nowrap text-[clamp(2.5rem,13vw,3.25rem)] font-light leading-none tracking-[-0.04em] tabular-nums',
+          'mt-3 whitespace-nowrap text-[40px] font-light leading-none tracking-[-0.04em] tabular-nums',
           sobra.valor < 0 && !escondido ? 'text-[var(--lap-h-alerta)]' : 'text-[var(--lap-h-positivo)]',
         )}
       >
         {escondido ? VALOR_OCULTO : <NumeroAnimado valor={sobra.valor} formatar={formatBRLSinal} />}
       </p>
-      <p className="lap-texto-2 mt-1.5 text-[14px]">
-        {sobra.valor < 0 ? `passou da renda; o mês fecha em ${fimMes}` : `é o que deve sobrar até ${fimMes}`}
+      <p className="lap-texto-2 mt-1 truncate text-[12.5px]" data-testid="resumo-comprometida">
+        {pct === null ? 'Cadastre sua renda para ver quanto sobra.' : sobra.valor < 0 ? `${pct}% da renda já foi · fecha em ${fimMes}` : `até ${fimMes} · ${pct}% da renda já tem destino`}
       </p>
       <div
-        className="mt-4 h-1.5 overflow-hidden rounded-full bg-text/10"
+        className="mt-2 h-1 overflow-hidden rounded-full bg-text/15"
         role="progressbar"
         aria-label="Renda do mês com destino"
         aria-valuenow={pctBarra}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuetext={pct === null ? 'sem renda no mês' : `${pct}% da renda já tem destino`}
+        aria-valuetext={pct === null ? 'sem renda no mês' : `${pct}% da renda já tem destino (contas fixas e gastos)`}
       >
         <span className="lap-barra-luz block h-full rounded-full" style={{ width: `${pctBarra}%` }} />
       </div>
-      <p className="lap-texto-3 mt-2 text-[12.5px]">
-        {pct === null ? 'Cadastre sua renda para ver quanto sobra.' : `${pct}% da renda já tem destino (contas fixas e gastos)`}
-      </p>
-
-      {meta && progresso && (
-        <div className="lap-vidro mt-3 flex items-center gap-2.5 px-3 py-2.5 text-[13px]" data-testid="cartao-meta-mini">
-          <IconeMeta icone={meta.icone} className="h-6 w-6 rounded-lg [&>svg]:h-3.5 [&>svg]:w-3.5" />
-          <span className="lap-texto-2 min-w-0 truncate font-medium text-text">{meta.nome}</span>
-          <span className="h-1 min-w-[48px] flex-1 overflow-hidden rounded-full bg-text/15" aria-hidden="true">
-            <span className="block h-full rounded-full bg-[var(--lap-h-positivo)]" style={{ width: `${progresso.pct}%` }} />
+      <div className="mt-auto flex items-end justify-between gap-3">
+        <Link
+          href={BANCOS_PATH}
+          data-testid="linha-cofrinho"
+          aria-label={`Cofrinho: ${escondido ? 'valor oculto' : valorCofrinho}. Abrir Bancos para guardar, tirar ou corrigir`}
+          className="pointer-events-auto -mb-1.5 flex min-h-[44px] min-w-0 flex-col justify-end pb-1.5"
+        >
+          <span className={clsx(ROTULO_PEQ, 'flex items-center gap-1')}>
+            <PiggyBank size={12} aria-hidden="true" className="text-[var(--lap-h-positivo)]" /> Cofrinho <ChevronRight size={11} aria-hidden="true" />
           </span>
-          <span className="tabular-nums">{progresso.pct}%</span>
-        </div>
-      )}
-
-      <Link
-        href={BANCOS_PATH}
-        data-testid="linha-cofrinho"
-        aria-label={`Cofrinho: ${escondido ? 'valor oculto' : valorCofrinho}. Abrir Bancos para guardar, tirar ou corrigir`}
-        className="lap-texto-2 mt-auto flex min-h-[44px] items-center gap-2 border-t border-text/10 pt-3 text-[14px]"
-      >
-        <PiggyBank size={17} aria-hidden="true" className="shrink-0 text-[var(--lap-h-positivo)]" />
-        <span className="flex-1">
-          Cofrinho: <span data-testid="linha-cofrinho-valor" className="font-semibold tabular-nums text-text">{valorCofrinho}</span>
-        </span>
-        <ChevronRight size={17} aria-hidden="true" className="shrink-0" />
-      </Link>
+          <span data-testid="linha-cofrinho-valor" className="text-[14px] font-medium tabular-nums text-text">{valorCofrinho}</span>
+        </Link>
+        {meta && progresso ? (
+          <div className="min-w-0 text-right" data-testid="cartao-meta-mini">
+            <p className={clsx(ROTULO_PEQ, 'truncate')}>Meta · {meta.nome}</p>
+            <p className="text-[14px] font-medium tabular-nums">{progresso.pct}%</p>
+          </div>
+        ) : (
+          MARCA
+        )}
+      </div>
     </>
   );
 }
 
-function BancosHoje({ carteiras, cofrinho, escondido }: { carteiras: CardResumoDeslizanteProps['carteiras']; cofrinho: number; escondido: boolean }) {
+function CartaoConta({ sobra, escondido, contasAbertas, onContas, idLista }: { sobra: SobraDoMes; escondido: boolean; contasAbertas: boolean; onContas: () => void; idLista: string }) {
   const v = (n: number) => (escondido ? VALOR_OCULTO : formatBRL(n));
+  const mes = nomeMes(sobra.competencia);
+  const linha = 'flex min-h-[26px] items-center justify-between gap-2 text-[13.5px]';
   return (
-    <div className="mt-3 border-t border-text/10 pt-3" data-testid="cartao-bancos-hoje">
-      <p className="lap-rotulo lap-texto-3">Nos bancos hoje</p>
-      <ul className="mt-1.5 space-y-1 text-[14px]">
-        {carteiras.map((c) => (
-          <li key={c.id} className="flex items-center justify-between gap-2">
-            <span className="lap-texto-2 min-w-0 truncate">{c.nome}</span>
-            <span className="whitespace-nowrap font-medium tabular-nums">{v(c.saldo)}</span>
-          </li>
-        ))}
-        <li className="flex items-center justify-between gap-2">
-          <span className="lap-texto-2">
-            Cofrinho <span className="lap-texto-3 text-[12px]">· guardado à parte</span>
-          </span>
-          <span className="whitespace-nowrap font-medium tabular-nums">{v(cofrinho)}</span>
-        </li>
-      </ul>
+    <section aria-labelledby="resumo-mes" data-testid="resumo-mes-conta" className="flex h-full flex-col">
+      <Cabeca direita={MARCA}>
+        <h2 id="resumo-mes" className={ROTULO}>
+          <i className="cartao-chip" aria-hidden="true" />
+          <span className="truncate">A conta de {mes}</span>
+        </h2>
+      </Cabeca>
+      <dl className="mt-2">
+        <div className={linha}>
+          <dt className="lap-texto-2 flex items-center gap-1.5">
+            Você recebe
+            {sobra.previsao && (
+              <span data-testid="renda-previsao" className="lap-texto-3 rounded-full border border-text/20 px-1.5 text-[10.5px] leading-[16px]">previsão</span>
+            )}
+          </dt>
+          <dd data-testid="resumo-renda" className="whitespace-nowrap font-medium tabular-nums text-text">{v(sobra.renda.total)}</dd>
+        </div>
+        <div>
+          <dt>
+            <button
+              type="button"
+              onClick={onContas}
+              aria-expanded={contasAbertas}
+              aria-controls={contasAbertas ? idLista : undefined}
+              className={clsx(linha, 'lap-texto-2 pointer-events-auto -mx-1 w-[calc(100%+0.5rem)] rounded-md px-1 text-left')}
+            >
+              <span className="flex items-center gap-0.5">
+                Contas fixas
+                <ChevronDown size={14} aria-hidden="true" className={clsx('transition-transform motion-reduce:transition-none', contasAbertas && 'rotate-180')} />
+                <span className="sr-only">{contasAbertas ? '(esconder lista)' : '(ver lista)'}</span>
+              </span>
+              <span data-testid="resumo-contas-fixas" className="whitespace-nowrap font-medium tabular-nums text-text">
+                {escondido ? VALOR_OCULTO : `− ${formatBRL(sobra.totalContasFixas)}`}
+              </span>
+            </button>
+          </dt>
+        </div>
+        <div className={linha}>
+          <dt className="lap-texto-2">Gastos do mês</dt>
+          <dd data-testid="resumo-gastos" className="whitespace-nowrap font-medium tabular-nums text-text">
+            {escondido ? VALOR_OCULTO : `− ${formatBRL(sobra.gastosExtras)}`}
+          </dd>
+        </div>
+      </dl>
+      <div className="mt-auto flex items-end justify-between gap-2 border-t border-text/15 pt-2">
+        <p className="lap-texto-2 pb-1 text-[13.5px]">Deve sobrar</p>
+        <p
+          data-testid="previsao-fim-mes-valor"
+          className={clsx(
+            'whitespace-nowrap text-[26px] font-light leading-[1.1] tracking-[-0.03em] tabular-nums',
+            sobra.valor < 0 && !escondido ? 'text-[var(--lap-h-alerta)]' : 'text-[var(--lap-h-positivo)]',
+          )}
+        >
+          {escondido ? VALOR_OCULTO : <NumeroAnimado valor={sobra.valor} formatar={formatBRLSinal} />}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+/** A lista das contas fixas abre logo abaixo do maço (no cartão não cabe). */
+function ListaContasFixas({ sobra, escondido, id, mes }: { sobra: SobraDoMes; escondido: boolean; id: string; mes: string }) {
+  const v = (n: number) => (escondido ? VALOR_OCULTO : formatBRL(n));
+  const pagas = sobra.contasFixas.filter((c) => c.paga).length;
+  const aPagar = sobra.contasFixas.length - pagas;
+  return (
+    <div className="lap-cartao mt-2 px-4 py-3" data-testid="cartao-contas-fixas">
+      <p className="text-[12px] text-muted" data-testid="resumo-contas-fixas-status">
+        {sobra.contasFixas.length === 0 ? 'Nenhuma conta fixa cadastrada' : `${pagas} paga${pagas === 1 ? '' : 's'} · ${aPagar} a pagar · pagas ou não, já contam na conta`}
+      </p>
+      {sobra.contasFixas.length > 0 && (
+        <ul id={id} aria-label={`Contas fixas de ${mes}`} className="mt-1 divide-y divide-border">
+          {sobra.contasFixas.map((c) => (
+            <li key={c.id} className="flex items-center justify-between gap-2 py-2 text-[13px]">
+              <span className="min-w-0">
+                <span className="block truncate text-text">{c.descricao}</span>
+                <span className="text-[11px] text-muted">{c.paga && c.pagoEm ? `pago em ${formatDiaMes(c.pagoEm)}` : `vence ${formatDiaMes(c.vencimento)}`}</span>
+              </span>
+              <span className="flex shrink-0 items-center gap-2">
+                <span className="tabular-nums text-text">{v(c.valor)}</span>
+                <span className={clsx('rounded-full border px-1.5 text-[11px] leading-[18px]', c.paga ? 'border-green/40 text-green' : 'border-yellow/40 text-yellow')}>
+                  {c.paga ? 'pago' : 'a pagar'}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -301,47 +448,46 @@ const RITMO: Record<'a_frente' | 'no_ritmo' | 'atras', { texto: string; classe: 
   atras: { texto: 'atrás do ritmo', classe: 'border-yellow/30 bg-yellow/[0.12] text-yellow' },
 };
 
-function PaginaMeta({ meta, sobraMensal, hojeISO, escondido }: { meta: MetaDoCartao; sobraMensal: number; hojeISO: string; escondido: boolean }) {
+function CartaoMeta({ meta, sobraMensal, hojeISO, escondido }: { meta: MetaDoCartao; sobraMensal: number; hojeISO: string; escondido: boolean }) {
   const v = (n: number) => (escondido ? VALOR_OCULTO : formatBRL(n));
+  const vCurto = (n: number) => (escondido ? VALOR_OCULTO : formatBRL(n).replace(/,00$/, ''));
   const p = progressoMeta(meta, hojeISO);
   const s = sugestaoMeta({ hojeISO, sobraMensal, valorAlvo: meta.valor_alvo, valorGuardado: meta.valor_guardado, dataLimite: meta.data_limite });
   const ritmo = p.ritmo && !p.alcancada ? RITMO[p.ritmo] : null;
-  const meses = s.mesesAtePrazo;
   let guardar: { valor: string; nota: string };
   if (p.alcancada) guardar = { valor: '—', nota: 'meta alcançada' };
-  else if (s.porMes !== null) guardar = { valor: v(s.porMes), nota: s.tipo === 'cabe' ? 'cabe na sobra' : 'mais que a sobra do mês' };
-  else if (s.metadeDaSobra) guardar = { valor: v(s.metadeDaSobra.porMes), nota: `metade da sobra · ${rotuloMesAno(s.metadeDaSobra.competencia)}` };
-  else if (s.sobraInteira) guardar = { valor: v(s.sobraInteira.porMes), nota: 'a sobra do mês' };
-  else guardar = { valor: '—', nota: 'sem sobra este mês' };
+  else if (s.porMes !== null) guardar = { valor: vCurto(s.porMes), nota: s.tipo === 'cabe' ? 'cabe na sobra' : 'acima da sobra' };
+  else if (s.metadeDaSobra) guardar = { valor: vCurto(s.metadeDaSobra.porMes), nota: 'metade da sobra' };
+  else if (s.sobraInteira) guardar = { valor: vCurto(s.sobraInteira.porMes), nota: 'a sobra do mês' };
+  else guardar = { valor: '—', nota: 'sem sobra no mês' };
 
   return (
     <>
-      <div className="flex min-h-6 items-center justify-between gap-2">
-        <h2 className="lap-rotulo lap-texto-3 flex min-w-0 items-center gap-1.5 font-normal tracking-[0.08em]">
-          <IconeMeta icone={meta.icone} className="h-[22px] w-[22px] rounded-md [&>svg]:h-3 [&>svg]:w-3" />
+      <Cabeca
+        direita={
+          p.alcancada ? (
+            <span className={clsx(PILULA, RITMO.a_frente.classe)}>alcançada 🎉</span>
+          ) : ritmo ? (
+            <span data-testid="cartao-meta-ritmo" className={clsx(PILULA, ritmo.classe)}>{ritmo.texto}</span>
+          ) : null
+        }
+      >
+        <h2 className={ROTULO}>
+          <IconeMeta icone={meta.icone} className="h-[22px] w-[22px] shrink-0 rounded-md [&>svg]:h-3 [&>svg]:w-3" />
           <span className="truncate">Meta · {meta.nome}</span>
         </h2>
-        {p.alcancada ? (
-          <span className={clsx('inline-flex h-[22px] shrink-0 items-center whitespace-nowrap rounded-full border px-2 text-[11px] font-medium', RITMO.a_frente.classe)}>alcançada 🎉</span>
-        ) : ritmo ? (
-          <span data-testid="cartao-meta-ritmo" className={clsx('inline-flex h-[22px] shrink-0 items-center whitespace-nowrap rounded-full border px-2 text-[11px] font-medium', ritmo.classe)}>{ritmo.texto}</span>
-        ) : null}
-      </div>
-      <p data-testid="cartao-meta-pct" className="mt-4 text-[52px] font-light leading-none tracking-[-0.04em] tabular-nums">
-        {p.pct}
-        <span className="ml-0.5 text-2xl text-[var(--lap-h-positivo)]">%</span>
-      </p>
-      <p className="lap-texto-2 mt-1.5 text-[14px]" data-testid="cartao-meta-valores">
-        {v(meta.valor_guardado)} guardados de {v(meta.valor_alvo)}
-      </p>
-      <div className="lap-texto-3 mt-4 flex items-baseline justify-between gap-2 text-[12.5px]">
-        <span data-testid="cartao-meta-falta">
-          {p.alcancada ? 'Nada faltando' : <>Faltam <b className="font-medium text-text">{v(p.falta)}</b></>}
-        </span>
-        {meta.data_limite && <span>prazo {formatDiaMes(meta.data_limite)}/{meta.data_limite.slice(0, 4)}</span>}
+      </Cabeca>
+      <div className="mt-2.5 flex items-baseline gap-2.5">
+        <p data-testid="cartao-meta-pct" className="text-[40px] font-light leading-none tracking-[-0.04em] tabular-nums text-[var(--lap-h-positivo)]">
+          {p.pct}
+          <span className="ml-0.5 text-xl">%</span>
+        </p>
+        <p className="lap-texto-2 min-w-0 truncate text-[12.5px]" data-testid="cartao-meta-valores">
+          {v(meta.valor_guardado)} guardados de {v(meta.valor_alvo)}
+        </p>
       </div>
       <div
-        className="relative mb-6 mt-2.5 h-2 rounded-full bg-text/15"
+        className="relative mt-3 h-1.5 rounded-full bg-text/15"
         role="progressbar"
         aria-label={`Meta ${meta.nome}`}
         aria-valuenow={p.pct}
@@ -349,43 +495,29 @@ function PaginaMeta({ meta, sobraMensal, hojeISO, escondido }: { meta: MetaDoCar
         aria-valuemax={100}
         aria-valuetext={`${p.pct}% guardado${p.pctEsperado !== null ? `; pelo ritmo, hoje seria ${p.pctEsperado}%` : ''}`}
       >
-        <span className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[color-mix(in_oklch,var(--lap-h-positivo)_55%,transparent)] to-[var(--lap-h-positivo)]" style={{ width: `${p.pct}%` }} />
+        <span className="absolute inset-y-0 left-0 rounded-full bg-[var(--lap-h-positivo)]" style={{ width: `${p.pct}%` }} />
         {p.pctEsperado !== null && !p.alcancada && (
-          <span className="absolute -bottom-[5px] -top-[5px] w-0.5 -translate-x-1/2 rounded bg-text/55" style={{ left: `${p.pctEsperado}%` }} data-testid="cartao-meta-hoje">
-            <em
-              className={clsx(
-                'lap-rotulo lap-texto-3 absolute top-4 whitespace-nowrap not-italic text-[9.5px]',
-                // Perto das pontas o rótulo encosta para dentro da barra, sem cortar ("hoje 0%", "hoje 100%").
-                p.pctEsperado < 12 ? 'left-0' : p.pctEsperado > 88 ? 'right-0' : 'left-1/2 -translate-x-1/2',
-              )}
-            >
-              hoje {p.pctEsperado}%
-            </em>
+          <span className="absolute -bottom-1 -top-1 w-0.5 -translate-x-1/2 rounded bg-text/70" style={{ left: `${p.pctEsperado}%` }} data-testid="cartao-meta-hoje" title={`hoje ${p.pctEsperado}%`}>
+            <span className="sr-only">hoje {p.pctEsperado}%</span>
           </span>
         )}
-        <span
-          className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_0_4px_rgb(var(--c-brilho)/0.25),0_0_14px_rgb(var(--c-brilho)/0.8)]"
-          style={{ left: `${p.pct}%` }}
-          aria-hidden="true"
-        />
       </div>
-      <div className="mt-auto grid grid-cols-2 gap-2">
-        <div className="lap-vidro px-3 py-2.5">
-          <p className="lap-rotulo lap-texto-3 text-[10px]">Prazo</p>
-          <p className="mt-0.5 text-[15px] font-medium tabular-nums">{meta.data_limite ? mesCurto(meta.data_limite) : 'Sem prazo'}</p>
-          <p className="lap-texto-3 text-[11.5px]">
-            {meta.data_limite && meses !== null && p.diasAtePrazo !== null
-              ? p.diasAtePrazo < 0 ? 'o prazo passou' : `${meses <= 0 ? 'este mês' : `${meses} ${meses === 1 ? 'mês' : 'meses'}`} · ${p.diasAtePrazo} ${p.diasAtePrazo === 1 ? 'dia' : 'dias'}`
-              : 'quando der'}
-          </p>
-        </div>
-        <div className="lap-vidro px-3 py-2.5" data-testid="cartao-meta-guardar">
-          <p className="lap-rotulo lap-texto-3 text-[10px]">Guardar por mês</p>
-          <p className="mt-0.5 text-[15px] font-medium tabular-nums">{guardar.valor}</p>
-          <p className="lap-texto-3 text-[11.5px] leading-snug">{guardar.nota}</p>
-        </div>
+      <div className="mt-auto grid grid-cols-3 gap-1.5">
+        <Celula rotulo="Faltam" testid="cartao-meta-falta" valor={p.alcancada ? 'nada' : vCurto(p.falta)} />
+        <Celula rotulo="Por mês" testid="cartao-meta-guardar" valor={guardar.valor} nota={guardar.nota} />
+        <Celula rotulo="Até" valor={meta.data_limite ? mesCurto(meta.data_limite) : 'sem prazo'} />
       </div>
     </>
+  );
+}
+
+function Celula({ rotulo, valor, nota, testid }: { rotulo: string; valor: string; nota?: string; testid?: string }) {
+  return (
+    <div className="lap-vidro min-w-0 px-2 py-1.5" data-testid={testid}>
+      <p className={ROTULO_PEQ}>{rotulo}</p>
+      <p className="truncate text-[13px] font-medium tabular-nums text-text">{valor}</p>
+      {nota && <p className="lap-texto-3 truncate text-[10px] leading-tight">{nota}</p>}
+    </div>
   );
 }
 
