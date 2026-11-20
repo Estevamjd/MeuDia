@@ -2,7 +2,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { SobraDoMes } from '@meudia/shared';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { CardResumoDeslizante, paginasDoCartao, type MetaDoCartao } from '../CardResumoDeslizante';
+import { poseDoCartao, transformDaPose } from '../poseDoMaco';
 
 afterEach(cleanup);
 
@@ -153,5 +156,79 @@ describe('CardResumoDeslizante (Início v5, maço)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('caminho em JS (iOS < 26): o quadro só lê scrollLeft (largura vem do ResizeObserver), escreve a pose e z-index só na virada', () => {
+    let aoRedimensionar: ((e: { contentRect: { width: number } }[]) => void) | undefined;
+    vi.stubGlobal('ResizeObserver', class { constructor(cb: typeof aoRedimensionar) { aoRedimensionar = cb; } observe() {} disconnect() {} });
+    vi.useFakeTimers();
+    try {
+      render(<CardResumoDeslizante {...base} metas={[meta]} />);
+      const trilho = screen.getByLabelText(/Cartões do resumo do mês/);
+      act(() => aoRedimensionar!([{ contentRect: { width: 390 } }]));
+      let leiturasLargura = 0;
+      Object.defineProperty(trilho, 'clientWidth', { configurable: true, get: () => { leiturasLargura++; return 390; } });
+      let rolagem = 0;
+      Object.defineProperty(trilho, 'scrollLeft', { configurable: true, get: () => rolagem });
+      // Conta as escritas no cartão 1 (o que sai em arco).
+      const cartao = screen.getByTestId('cartao-pagina-resumo');
+      const proto = Object.getPrototypeOf(cartao.style) as object;
+      const escritas: Record<'transform' | 'zIndex', string[]> = { transform: [], zIndex: [] };
+      for (const prop of ['transform', 'zIndex'] as const) {
+        const d = Object.getOwnPropertyDescriptor(proto, prop)!;
+        Object.defineProperty(cartao.style, prop, { configurable: true, get() { return d.get!.call(this); }, set(v: string) { escritas[prop].push(v); d.set!.call(this, v); } });
+      }
+      const rolarPara = (px: number) => { rolagem = px; fireEvent.scroll(trilho); act(() => { vi.advanceTimersByTime(16); }); };
+
+      rolarPara(39); // p = 0,1: cartão 1 vai por cima (z 30)
+      expect(cartao.style.transform).toBe(transformDaPose(poseDoCartao(-0.1, 390)));
+      rolarPara(78);
+      rolarPara(117);
+      rolarPara(117); // mesma posição: nada a escrever
+      rolarPara(234); // p = 0,6: passou da metade, vai para trás (z 18)
+      expect(cartao.style.transform).toBe(transformDaPose(poseDoCartao(-0.6, 390)));
+      expect(escritas.transform).toHaveLength(4);
+      expect(escritas.zIndex).toEqual(['30', '18']);
+      expect(leiturasLargura).toBe(0);
+    } finally {
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('sem scrollend (iOS < 26): dedo parado no meio do gesto não troca de cartão; ao soltar, assenta', () => {
+    // Tira `onscrollend` de toda a cadeia de protótipos do window (o jsdom tem).
+    const removidos: [object, PropertyDescriptor][] = [];
+    for (let o: object | null = window; o; o = Object.getPrototypeOf(o)) {
+      const d = Object.getOwnPropertyDescriptor(o, 'onscrollend');
+      if (d) { removidos.push([o, d]); Reflect.deleteProperty(o, 'onscrollend'); }
+    }
+    vi.useFakeTimers();
+    try {
+      expect('onscrollend' in window).toBe(false);
+      render(<CardResumoDeslizante {...base} metas={[meta]} />);
+      const trilho = screen.getByLabelText(/Cartões do resumo do mês/);
+      Object.defineProperty(trilho, 'clientWidth', { configurable: true, value: 390 });
+      Object.defineProperty(trilho, 'scrollLeft', { configurable: true, value: 300 });
+      fireEvent.touchStart(trilho);
+      fireEvent.scroll(trilho);
+      act(() => { vi.advanceTimersByTime(500); });
+      expect(t(screen.getByTestId('cartao-posicao'))).toBe('1 de 3 · Resumo');
+      fireEvent.touchEnd(trilho);
+      act(() => { vi.advanceTimersByTime(200); });
+      expect(t(screen.getByTestId('cartao-posicao'))).toBe('2 de 3 · A conta');
+      expect(screen.getByText('Cartão 2 de 3: A conta')).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+      for (const [o, d] of removidos) Object.defineProperty(o, 'onscrollend', d);
+    }
+  });
+});
+
+describe('material do maço em camada fixa (globals.css)', () => {
+  const css = readFileSync(resolve(__dirname, '../../../../app/globals.css'), 'utf8');
+  it('o .cartao-cc tem camada própria permanente: o "segurar" (translate com transição) não promove nem repinta o cartão', () => {
+    expect(css).toMatch(/\.lap-heroi\.cartao-cc\s*\{\s*will-change:\s*transform;\s*\}/);
+    expect(css).toContain('.maco-segurando .cartao-frente > .cartao-cc { translate: 0 -3px; }');
   });
 });

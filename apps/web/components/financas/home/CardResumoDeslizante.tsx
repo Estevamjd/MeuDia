@@ -71,6 +71,16 @@ export function CardResumoDeslizante({ sobra, cofrinho, metas = [], hojeISO, esc
   const escritoRef = useRef<{ t: string; z: string; v: string }[]>([]);
   /** O navegador anima o maço pela rolagem (compositor); aí o JS não escreve pose por quadro. */
   const naRolagemRef = useRef(false);
+  /**
+   * Caminho em JS: largura do trilho e "reduzir movimento" ficam guardados (ResizeObserver / matchMedia), para o
+   * quadro só LER scrollLeft — nada de clientWidth (layout) nem matchMedia a cada quadro.
+   */
+  const larguraRef = useRef(0);
+  const reduzirRef = useRef(false);
+  /** Posição (em páginas) da última pose escrita: rolagem sem mudança não recalcula nada. */
+  const pEscritoRef = useRef(Number.NaN);
+  /** Dedo no trilho: sem `scrollend`, não dá por assentado no meio do gesto (evita re-render com o dedo parado). */
+  const tocandoRef = useRef(false);
   const cartoesRef = useRef<(HTMLDivElement | null)[]>([]);
   const atualRef = useRef(0);
   const idTrilho = useId();
@@ -89,33 +99,80 @@ export function CardResumoDeslizante({ sobra, cofrinho, metas = [], hojeISO, esc
     }
   }, [paginas, total]);
 
-  // Caminho em JS (sem scroll-driven animations ou com "reduzir movimento"): pose a cada quadro, escrevendo direto
-  // no DOM só transform/z-index/visibility que mudaram (nada de layout nem re-render).
-  const aplicarPoses = useCallback(() => {
+  // Caminho em JS (iOS < 26 sem scroll-driven animations, ou "reduzir movimento"): pose a cada quadro, escrevendo
+  // direto no DOM só transform/z-index/visibility que mudaram. O quadro lê UMA coisa (scrollLeft) e escreve depois:
+  // nenhuma leitura que force layout, nada de matchMedia, nada de re-render. z-index e visibility só mudam nas viradas
+  // (meio do arco), então na prática só o transform é escrito por quadro, e o cartão (camada própria) não repinta.
+  const aplicarPoses = useCallback((forcar = false) => {
     const el = trilhoRef.current;
     if (!el || naRolagemRef.current) return;
-    const largura = el.clientWidth || 1;
+    // Sem medida ainda (ResizeObserver não chegou ou não existe): mede uma vez só.
+    if (!larguraRef.current) larguraRef.current = el.clientWidth;
+    const largura = larguraRef.current || 1;
     const p = el.scrollLeft / largura;
-    const reduzir = reduzMovimento();
-    cartoesRef.current.forEach((c, i) => {
-      if (!c) return;
+    if (!forcar && p === pEscritoRef.current) return;
+    pEscritoRef.current = p;
+    const reduzir = reduzirRef.current;
+    const cartoes = cartoesRef.current;
+    const escrito = escritoRef.current;
+    for (let i = 0; i < cartoes.length; i++) {
+      const c = cartoes[i];
+      if (!c) continue;
       const pose = poseDoCartao(i - p, largura, reduzir);
-      const ant = (escritoRef.current[i] ??= { t: '', z: '', v: '' });
+      const ant = (escrito[i] ??= { t: '', z: '', v: '' });
       const t = transformDaPose(pose);
       const z = String(pose.z);
       const v = pose.visivel ? 'visible' : 'hidden';
       if (t !== ant.t) { c.style.transform = t; ant.t = t; }
       if (z !== ant.z) { c.style.zIndex = z; ant.z = z; }
       if (v !== ant.v) { c.style.visibility = v; ant.v = v; }
-    });
+    }
   }, []);
 
   // Mede e posiciona (montagem, meta nova).
   useEffect(() => {
+    reduzirRef.current = reduzMovimento();
     naRolagemRef.current = macoNaRolagem();
     escritoRef.current = [];
-    aplicarPoses();
+    aplicarPoses(true);
   }, [aplicarPoses, total]);
+
+  // Largura do trilho fora do quadro: ResizeObserver (ou resize da janela onde não houver).
+  useEffect(() => {
+    const el = trilhoRef.current;
+    if (!el) return;
+    const medir = (largura: number) => {
+      if (largura === larguraRef.current) return;
+      larguraRef.current = largura;
+      escritoRef.current = [];
+      aplicarPoses(true);
+    };
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver((entradas) => {
+        const caixa = entradas[entradas.length - 1]?.contentRect;
+        if (caixa) medir(caixa.width);
+      });
+      ro.observe(el);
+      return () => ro.disconnect();
+    }
+    const aoRedimensionar = () => medir(el.clientWidth);
+    window.addEventListener('resize', aoRedimensionar, { passive: true });
+    return () => window.removeEventListener('resize', aoRedimensionar);
+  }, [aplicarPoses]);
+
+  // "Reduzir movimento" ligado/desligado com a página aberta: troca de caminho (CSS ↔ JS) sem recarregar.
+  useEffect(() => {
+    const mq = typeof window !== 'undefined' ? window.matchMedia?.('(prefers-reduced-motion: reduce)') : undefined;
+    if (!mq?.addEventListener) return;
+    const aoMudar = () => {
+      reduzirRef.current = mq.matches;
+      naRolagemRef.current = macoNaRolagem();
+      escritoRef.current = [];
+      aplicarPoses(true);
+    };
+    mq.addEventListener('change', aoMudar);
+    return () => mq.removeEventListener('change', aoMudar);
+  }, [aplicarPoses]);
 
   useEffect(() => {
     const el = trilhoRef.current;
@@ -124,32 +181,33 @@ export function CardResumoDeslizante({ sobra, cofrinho, metas = [], hojeISO, esc
     let quadro = 0;
     let espera: ReturnType<typeof setTimeout> | undefined;
     const temScrollend = 'onscrollend' in window;
-    const aoRolar = () => {
-      if (!naRolagemRef.current && !quadro) {
-        quadro = requestAnimationFrame(() => { quadro = 0; aplicarPoses(); });
-      }
-      // Sem `scrollend` (iOS < 26): considera assentado depois de um instante sem rolagem.
+    // Sem `scrollend` (iOS < 26): considera assentado depois de um instante sem rolagem E sem dedo no trilho. Com o
+    // dedo parado no meio do gesto, nada de re-render (era um tranco no meio da troca de cartão).
+    const agendarAssentar = () => {
       clearTimeout(espera);
+      if (!temScrollend && tocandoRef.current) return;
       espera = setTimeout(assentar, temScrollend ? 600 : 120);
     };
+    const quadroDaPose = () => { quadro = 0; aplicarPoses(); };
+    const aoRolar = () => {
+      if (!naRolagemRef.current && !quadro) quadro = requestAnimationFrame(quadroDaPose);
+      agendarAssentar();
+    };
     const aoAssentar = () => { clearTimeout(espera); assentar(); };
-    const aoRedimensionar = () => { escritoRef.current = []; aplicarPoses(); };
     // "Segurar" o cartão é só uma classe (sem re-render no começo do gesto).
-    const pegar = () => secao.classList.add('maco-segurando');
-    const soltar = () => secao.classList.remove('maco-segurando');
+    const pegar = () => { tocandoRef.current = true; secao.classList.add('maco-segurando'); };
+    const soltar = () => { tocandoRef.current = false; secao.classList.remove('maco-segurando'); agendarAssentar(); };
     el.addEventListener('scroll', aoRolar, { passive: true });
     el.addEventListener('scrollend', aoAssentar, { passive: true });
     el.addEventListener('touchstart', pegar, { passive: true });
     el.addEventListener('touchend', soltar, { passive: true });
     el.addEventListener('touchcancel', soltar, { passive: true });
-    window.addEventListener('resize', aoRedimensionar, { passive: true });
     return () => {
       el.removeEventListener('scroll', aoRolar);
       el.removeEventListener('scrollend', aoAssentar);
       el.removeEventListener('touchstart', pegar);
       el.removeEventListener('touchend', soltar);
       el.removeEventListener('touchcancel', soltar);
-      window.removeEventListener('resize', aoRedimensionar);
       cancelAnimationFrame(quadro);
       clearTimeout(espera);
     };
