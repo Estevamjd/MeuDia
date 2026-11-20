@@ -521,7 +521,15 @@ html[data-trocando-tema] *, html[data-trocando-tema] *::before, html[data-trocan
 /* ── Início v5: cartãozinho em maço (formato ID-1, 85,6 × 53,98 mm → 1,586) ──────────────────────────────
    Reaproveita o material .lap-heroi (tokens escuros dentro do cartão, grão, luz) e troca só a "pele" de cada
    cartão, como cartões diferentes na carteira. Igual no claro e no escuro; muda só a sombra. */
-.lap-heroi.cartao-cc { border-radius: 18px; transition: box-shadow 0.2s ease, translate 0.2s ease; }
+.lap-heroi.cartao-cc { border-radius: 18px; transition: translate 0.2s ease; }
+/* Tamanho: largura do palco − 24px (máx. 400px), formato ID-1; o palco tem a altura do cartão + 34px de folga
+   para os cartões de trás. Container query: a largura vem da seção (o palco sangra -mx-4 no celular). */
+.maco-secao { container-type: inline-size; --maco-w: min(400px, calc(100cqw + 8px)); }
+@media (min-width: 768px) { .maco-secao { --maco-w: min(400px, calc(100cqw - 24px)); } }
+.maco-palco { height: calc(var(--maco-w) / 1.586 + 34px); }
+/* Cada cartão é uma camada própria do compositor: mover/girar não repinta nada (só transform, z-index e visibility
+   mudam por quadro). Sem `contain: paint` para não cortar a sombra. */
+.maco-cartao { width: var(--maco-w); will-change: transform; backface-visibility: hidden; -webkit-backface-visibility: hidden; contain: layout style; }
 .lap-heroi.cartao-cc { box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.25), inset 0 0 0 1px oklch(1 0 0 / 0.08), 0 18px 36px -18px oklch(0 0 0 / 0.85), 0 2px 4px oklch(0 0 0 / 0.5); }
 html[data-mode='light'] .lap-heroi.cartao-cc { box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.25), inset 0 0 0 1px oklch(1 0 0 / 0.08), 0 22px 40px -22px oklch(0.35 0.08 230 / 0.55), 0 2px 6px oklch(0.25 0.05 235 / 0.18); }
 .lap-heroi.cartao-pele-conta {
@@ -541,8 +549,8 @@ html[data-mode='light'] .lap-heroi.cartao-cc { box-shadow: inset 0 1px 0 oklch(1
   --lap-h-positivo: oklch(0.88 0.14 155);
 }
 /* Segurando o cartão da frente: ele sobe um pouco, como o cartão do funil do CRM. */
+/* Só o translate anima (compositor); a sombra não muda, para não repintar o desfoque a cada quadro. */
 .maco-segurando .cartao-frente > .cartao-cc { translate: 0 -3px; }
-.maco-segurando .cartao-frente > .cartao-cc { box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.25), 0 28px 44px -20px oklch(0 0 0 / 0.75), 0 4px 10px oklch(0 0 0 / 0.35); }
 .cartao-chip { width: 30px; height: 22px; border-radius: 5px; flex: none; position: relative; background: linear-gradient(135deg, #e9d8a6, #b9975b 55%, #e2c98f); box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.18); }
 .cartao-chip::before { content: ''; position: absolute; inset: 5px 9px; border: 1px solid rgb(0 0 0 / 0.25); border-radius: 3px; }
 @media (prefers-reduced-motion: reduce) { .lap-heroi.cartao-cc { transition: none; } .maco-segurando .cartao-frente > .cartao-cc { translate: none; } }

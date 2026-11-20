@@ -3,10 +3,15 @@
  * Os próximos ficam atrás, à direita; os já passados, atrás, à esquerda (como o efeito "cards" do Swiper:
  * deslocamento e giro pequenos por cartão). O cartão que está sendo passado (−1 < d < 0) sai em arco para a
  * esquerda, girando, e na metade do caminho vai para trás do maço, como quem passa cartões na carteira.
+ *
+ * O arco é medido em % da largura do próprio cartão (não do palco): assim a mesma pose serve para o caminho em JS
+ * e para os @keyframes da animação ligada à rolagem (que rodam no compositor, sem JS por quadro).
  */
 export interface PoseCartao {
-  /** Deslocamento horizontal em px, relativo ao centro do palco. */
-  x: number;
+  /** Deslocamento horizontal em % da largura do cartão. */
+  xPct: number;
+  /** Deslocamento horizontal extra em px. */
+  xPx: number;
   rot: number;
   escala: number;
   z: number;
@@ -17,18 +22,20 @@ export const DESLOCAMENTO = 13;
 export const GIRO = 2.4;
 export const ENCOLHE = 0.055;
 const GIRO_NA_MAO = 9;
-const ARCO = 0.62;
+/** Quanto o cartão passado anda para a esquerda no meio do arco, em larguras do cartão. */
+const ARCO = 0.68;
 
 export function poseDoCartao(d: number, larguraPalco: number, reduzirMovimento = false): PoseCartao {
   if (reduzirMovimento) {
     // Sem giro nem arco: um carrossel simples que acompanha o dedo.
-    return { x: d * larguraPalco, rot: 0, escala: 1, z: 20 - Math.round(Math.min(Math.abs(d), 2) * 2), visivel: Math.abs(d) < 1.5 };
+    return { xPct: 0, xPx: d * larguraPalco, rot: 0, escala: 1, z: 20 - Math.round(Math.min(Math.abs(d), 2) * 2), visivel: Math.abs(d) < 1.5 };
   }
   if (d < 0 && d > -1) {
     const a = -d;
     const arco = Math.sin(Math.PI * a);
     return {
-      x: -(arco * ARCO * larguraPalco) - a * DESLOCAMENTO,
+      xPct: -arco * ARCO * 100,
+      xPx: -a * DESLOCAMENTO,
       rot: -(arco * GIRO_NA_MAO + a * GIRO),
       escala: 1 - ENCOLHE * a,
       z: a < 0.5 ? 30 : 18,
@@ -37,9 +44,60 @@ export function poseDoCartao(d: number, larguraPalco: number, reduzirMovimento =
   }
   const a = Math.min(Math.abs(d), 2);
   const lado = d > 0 ? 1 : d < 0 ? -1 : 0;
-  return { x: lado * a * DESLOCAMENTO, rot: lado * a * GIRO, escala: 1 - ENCOLHE * a, z: 20 - Math.round(a * 2), visivel: Math.abs(d) <= 2.5 };
+  return { xPct: 0, xPx: lado * a * DESLOCAMENTO, rot: lado * a * GIRO, escala: 1 - ENCOLHE * a, z: 20 - Math.round(a * 2), visivel: Math.abs(d) <= 2.5 };
 }
 
+const n = (v: number, casas: number) => (Object.is(v, -0) ? 0 : v).toFixed(casas);
+
+/** Sempre a mesma lista de funções (translateX · rotate · scale), para interpolar sem matriz. */
 export function transformDaPose(p: PoseCartao): string {
-  return `translateX(${p.x.toFixed(2)}px) rotate(${p.rot.toFixed(2)}deg) scale(${p.escala.toFixed(4)})`;
+  return `translateX(calc(${n(p.xPct, 2)}% + ${n(p.xPx, 2)}px)) rotate(${n(p.rot, 2)}deg) scale(${n(p.escala, 4)})`;
+}
+
+/** Amostras por página: o arco (seno) fica liso com interpolação linear entre elas. */
+const AMOSTRAS_POR_PAGINA = 16;
+
+/**
+ * CSS da animação ligada à rolagem (scroll-driven animations; Chrome 116+, Safari/iOS 26+): o trilho publica a
+ * timeline `--maco` e cada cartão anima transform (compositor) e z-index/visibilidade (degraus) com ela. Onde não
+ * houver suporte, ou com "reduzir movimento", nada disso vale e o JS posiciona os cartões.
+ */
+export function cssDoMaco(total: number): string {
+  if (total < 2) return '';
+  const regras: string[] = [];
+  const quadros: string[] = [];
+  const ultimo = total - 1;
+  for (let i = 0; i < total; i++) {
+    const t: string[] = [];
+    const z: string[] = [];
+    const passos = ultimo * AMOSTRAS_POR_PAGINA;
+    // Pontos de amostra + as viradas de z (meio do arco) e de visibilidade, para os degraus caírem no lugar certo.
+    const posicoes = new Set<number>();
+    for (let k = 0; k <= passos; k++) posicoes.add(k / AMOSTRAS_POR_PAGINA);
+    for (let k = 0; k <= ultimo; k++) for (const extra of [k + 1e-4, k + 0.5]) if (extra <= ultimo) posicoes.add(extra);
+    let zAnterior = '';
+    for (const pos of [...posicoes].sort((a, b) => a - b)) {
+      const pose = poseDoCartao(i - pos, 0);
+      const off = `${n((pos / ultimo) * 100, 4)}%`;
+      t.push(`${off}{transform:${transformDaPose(pose)}}`);
+      const zv = `z-index:${pose.z};visibility:${pose.visivel ? 'visible' : 'hidden'}`;
+      if (zv !== zAnterior) {
+        z.push(`${off}{${zv};animation-timing-function:step-end}`);
+        zAnterior = zv;
+      }
+    }
+    if (!z.some((q) => q.startsWith('100.0000%'))) z.push(`100%{${zAnterior};animation-timing-function:step-end}`);
+    quadros.push(`@keyframes maco-${total}-${i}-t{${t.join('')}}@keyframes maco-${total}-${i}-z{${z.join('')}}`);
+    regras.push(
+      `.maco-palco[data-total="${total}"] .maco-cartao[data-i="${i}"]{animation-name:maco-${total}-${i}-t,maco-${total}-${i}-z;animation-duration:1ms,1ms;animation-timing-function:linear,linear;animation-fill-mode:both,both;animation-timeline:--maco,--maco}`,
+    );
+  }
+  return `@supports (animation-timeline: --maco) and (timeline-scope: --maco){@media (prefers-reduced-motion: no-preference){.maco-palco{timeline-scope:--maco}.maco-trilho{scroll-timeline:--maco x}${regras.join('')}${quadros.join('')}}}`;
+}
+
+/** Mesmo critério do CSS acima, para o JS saber se precisa posicionar os cartões a cada quadro. */
+export function macoNaRolagem(): boolean {
+  if (typeof window === 'undefined' || typeof CSS === 'undefined' || !CSS.supports) return false;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
+  return CSS.supports('animation-timeline: --maco') && CSS.supports('timeline-scope: --maco');
 }

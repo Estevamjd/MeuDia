@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import { clsx } from 'clsx';
 import { ChevronDown, ChevronLeft, ChevronRight, PiggyBank } from 'lucide-react';
@@ -13,7 +13,7 @@ import { IconeMeta } from '../metas/IconeMeta';
 import { SITUACAO, pctComprometida } from '../resumo/ResumoMesConta';
 import { situacaoDo } from '../resumo/montarResumoMes';
 import { BANCOS_PATH } from './CardSaldoHoje';
-import { poseDoCartao, transformDaPose } from './poseDoMaco';
+import { cssDoMaco, macoNaRolagem, poseDoCartao, transformDaPose } from './poseDoMaco';
 
 export const METAS_PATH = '/financas/metas';
 
@@ -58,72 +58,102 @@ const PILULA = 'inline-flex h-[22px] shrink-0 items-center whitespace-nowrap rou
  * "reduzir movimento" vira um carrossel simples, sem giro.
  */
 export function CardResumoDeslizante({ sobra, cofrinho, metas = [], hojeISO, escondido = false }: CardResumoDeslizanteProps) {
-  const meta = metaDoCartao(metas);
+  const meta = useMemo(() => metaDoCartao(metas), [metas]);
   const temMeta = !!meta;
   const paginas = useMemo(() => paginasDoCartao(temMeta), [temMeta]);
   const total = paginas.length;
   const [atual, setAtual] = useState(0);
   const [anuncio, setAnuncio] = useState('');
-  const [segurando, setSegurando] = useState(false);
   const [contasAbertas, setContasAbertas] = useState(false);
+  const secaoRef = useRef<HTMLElement>(null);
   const trilhoRef = useRef<HTMLDivElement>(null);
+  /** Última pose escrita em cada cartão (só escreve no DOM o que mudou). */
+  const escritoRef = useRef<{ t: string; z: string; v: string }[]>([]);
+  /** O navegador anima o maço pela rolagem (compositor); aí o JS não escreve pose por quadro. */
+  const naRolagemRef = useRef(false);
   const cartoesRef = useRef<(HTMLDivElement | null)[]>([]);
   const atualRef = useRef(0);
   const idTrilho = useId();
   const idListaContas = useId();
   const mes = nomeMes(sobra.competencia);
 
-  // Pose do maço a partir da rolagem do trilho (escreve direto no DOM, sem re-render por quadro).
-  const aplicarPoses = useCallback((acompanharRolagem = true) => {
+  // Página em que o trilho assentou (só re-renderiza ao trocar de cartão, nunca por quadro).
+  const assentar = useCallback(() => {
     const el = trilhoRef.current;
     if (!el) return;
-    const largura = el.clientWidth || 1;
-    const p = el.scrollLeft / largura;
-    const reduzir = reduzMovimento();
-    cartoesRef.current.forEach((c, i) => {
-      if (!c) return;
-      const pose = poseDoCartao(i - p, largura, reduzir);
-      c.style.transform = transformDaPose(pose);
-      c.style.zIndex = String(pose.z);
-      c.style.visibility = pose.visivel ? 'visible' : 'hidden';
-    });
-    const novo = Math.max(0, Math.min(total - 1, Math.round(p)));
-    if (acompanharRolagem && novo !== atualRef.current) {
+    const novo = Math.max(0, Math.min(total - 1, Math.round(el.scrollLeft / (el.clientWidth || 1))));
+    if (novo !== atualRef.current) {
       atualRef.current = novo;
       setAtual(novo);
       setAnuncio(`Cartão ${novo + 1} de ${total}: ${paginas[novo]!.titulo}`);
     }
   }, [paginas, total]);
 
-  // Mede e posiciona (montagem, meta nova); a página atual só muda pela rolagem ou pelos botões.
+  // Caminho em JS (sem scroll-driven animations ou com "reduzir movimento"): pose a cada quadro, escrevendo direto
+  // no DOM só transform/z-index/visibility que mudaram (nada de layout nem re-render).
+  const aplicarPoses = useCallback(() => {
+    const el = trilhoRef.current;
+    if (!el || naRolagemRef.current) return;
+    const largura = el.clientWidth || 1;
+    const p = el.scrollLeft / largura;
+    const reduzir = reduzMovimento();
+    cartoesRef.current.forEach((c, i) => {
+      if (!c) return;
+      const pose = poseDoCartao(i - p, largura, reduzir);
+      const ant = (escritoRef.current[i] ??= { t: '', z: '', v: '' });
+      const t = transformDaPose(pose);
+      const z = String(pose.z);
+      const v = pose.visivel ? 'visible' : 'hidden';
+      if (t !== ant.t) { c.style.transform = t; ant.t = t; }
+      if (z !== ant.z) { c.style.zIndex = z; ant.z = z; }
+      if (v !== ant.v) { c.style.visibility = v; ant.v = v; }
+    });
+  }, []);
+
+  // Mede e posiciona (montagem, meta nova).
   useEffect(() => {
-    aplicarPoses(false);
-  }, [aplicarPoses]);
+    naRolagemRef.current = macoNaRolagem();
+    escritoRef.current = [];
+    aplicarPoses();
+  }, [aplicarPoses, total]);
 
   useEffect(() => {
     const el = trilhoRef.current;
-    if (!el) return;
+    const secao = secaoRef.current;
+    if (!el || !secao) return;
     let quadro = 0;
+    let espera: ReturnType<typeof setTimeout> | undefined;
+    const temScrollend = 'onscrollend' in window;
     const aoRolar = () => {
-      cancelAnimationFrame(quadro);
-      quadro = requestAnimationFrame(() => aplicarPoses());
+      if (!naRolagemRef.current && !quadro) {
+        quadro = requestAnimationFrame(() => { quadro = 0; aplicarPoses(); });
+      }
+      // Sem `scrollend` (iOS < 26): considera assentado depois de um instante sem rolagem.
+      clearTimeout(espera);
+      espera = setTimeout(assentar, temScrollend ? 600 : 120);
     };
-    const pegar = () => setSegurando(true);
-    const soltar = () => setSegurando(false);
+    const aoAssentar = () => { clearTimeout(espera); assentar(); };
+    const aoRedimensionar = () => { escritoRef.current = []; aplicarPoses(); };
+    // "Segurar" o cartão é só uma classe (sem re-render no começo do gesto).
+    const pegar = () => secao.classList.add('maco-segurando');
+    const soltar = () => secao.classList.remove('maco-segurando');
     el.addEventListener('scroll', aoRolar, { passive: true });
+    el.addEventListener('scrollend', aoAssentar, { passive: true });
     el.addEventListener('touchstart', pegar, { passive: true });
     el.addEventListener('touchend', soltar, { passive: true });
     el.addEventListener('touchcancel', soltar, { passive: true });
-    window.addEventListener('resize', aoRolar);
+    window.addEventListener('resize', aoRedimensionar, { passive: true });
     return () => {
       el.removeEventListener('scroll', aoRolar);
+      el.removeEventListener('scrollend', aoAssentar);
       el.removeEventListener('touchstart', pegar);
       el.removeEventListener('touchend', soltar);
       el.removeEventListener('touchcancel', soltar);
-      window.removeEventListener('resize', aoRolar);
+      window.removeEventListener('resize', aoRedimensionar);
       cancelAnimationFrame(quadro);
+      clearTimeout(espera);
     };
-  }, [aplicarPoses]);
+  }, [aplicarPoses, assentar]);
 
   // Cartões de trás não recebem foco nem toque (o da frente é o que vale); `inert` via DOM por compatibilidade.
   useEffect(() => {
@@ -168,10 +198,14 @@ export function CardResumoDeslizante({ sobra, cofrinho, metas = [], hojeISO, esc
     cartoesRef.current[i] = el;
   };
   cartoesRef.current.length = total;
+  const alternarContas = useCallback(() => setContasAbertas((a) => !a), []);
+  const css = useMemo(() => cssDoMaco(total), [total]);
 
   return (
-    <section aria-roledescription="carrossel" aria-label="Resumo do mês" data-testid="cartao-resumo" data-paginas={total} className={clsx(segurando && 'maco-segurando')}>
-      <div className="relative -mx-4 h-[248px] md:mx-0" data-testid="cartao-maco">
+    <section ref={secaoRef} aria-roledescription="carrossel" aria-label="Resumo do mês" data-testid="cartao-resumo" data-paginas={total} className="maco-secao">
+      {/* eslint-disable-next-line react/no-danger -- CSS gerado aqui mesmo (keyframes do maço), sem dado do usuário */}
+      <style dangerouslySetInnerHTML={{ __html: css }} />
+      <div className="maco-palco relative -mx-4 overflow-x-clip md:mx-0" data-total={total} data-testid="cartao-maco">
         {/* Trilho invisível: é ele que rola (dedo, inércia, teclado); os cartões só desenham a pose. */}
         <div
           id={idTrilho}
@@ -179,7 +213,7 @@ export function CardResumoDeslizante({ sobra, cofrinho, metas = [], hojeISO, esc
           tabIndex={0}
           onKeyDown={aoTeclar}
           aria-label="Cartões do resumo do mês. Deslize para o lado ou use as setas."
-          className="sem-barra absolute inset-0 flex snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-[20px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="maco-trilho sem-barra absolute inset-0 flex snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-[20px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           {paginas.map((p) => (
             <div key={p.id} className="h-full w-full shrink-0 snap-center snap-always" aria-hidden="true" />
@@ -190,7 +224,7 @@ export function CardResumoDeslizante({ sobra, cofrinho, metas = [], hojeISO, esc
             <CartaoResumo sobra={sobra} cofrinho={cofrinho} meta={meta} hojeISO={hojeISO} escondido={escondido} />
           </Cartao>
           <Cartao i={1} total={total} atual={atual} refEl={refCartao(1)} estilo={poseInicial(1)} rotulo={rotulo(1)} testid="cartao-pagina-conta" pele="cartao-pele-conta">
-            <CartaoConta sobra={sobra} escondido={escondido} contasAbertas={contasAbertas} onContas={() => setContasAbertas((a) => !a)} idLista={idListaContas} />
+            <CartaoConta sobra={sobra} escondido={escondido} contasAbertas={contasAbertas} onContas={alternarContas} idLista={idListaContas} />
           </Cartao>
           {meta && (
             <Cartao i={2} total={total} atual={atual} refEl={refCartao(2)} estilo={poseInicial(2)} rotulo={rotulo(2)} testid="cartao-pagina-meta" pele="cartao-pele-meta">
@@ -200,23 +234,23 @@ export function CardResumoDeslizante({ sobra, cofrinho, metas = [], hojeISO, esc
         </div>
       </div>
 
-      <div className="mt-1 flex items-center justify-between gap-2">
+      <div className="mt-1 flex items-center justify-between gap-2 px-1">
         <BotaoRedondo onClick={() => irPara(atual - 1)} controla={idTrilho} rotulo={atual > 0 ? `Cartão anterior: ${paginas[atual - 1]!.titulo}` : 'Cartão anterior'} desligado={atual === 0}>
-          <ChevronLeft size={18} aria-hidden="true" />
+          <ChevronLeft size={16} aria-hidden="true" />
         </BotaoRedondo>
-        <div className="flex flex-col items-center gap-1.5">
+        <div className="flex flex-col items-center gap-1">
           <Pontos total={total} atual={atual} />
-          <span className="text-[11.5px] text-muted" data-testid="cartao-posicao">
+          <span className="text-[11px] text-muted" data-testid="cartao-posicao">
             {atual + 1} de {total} · {paginas[atual]?.titulo}
           </span>
         </div>
         {atual === total - 1 && paginas[atual]?.id === 'meta' ? (
-          <Link href={METAS_PATH} className={clsx(CLASSE_REDONDO, 'w-auto px-3.5 text-[13px] font-medium text-accent')}>
-            Guardar <ChevronRight size={16} aria-hidden="true" />
+          <Link href={METAS_PATH} className={clsx(CLASSE_REDONDO, 'w-auto pl-3 pr-2 text-[12.5px] font-medium text-accent')}>
+            Guardar <ChevronRight size={14} aria-hidden="true" />
           </Link>
         ) : (
           <BotaoRedondo onClick={() => irPara(atual + 1)} controla={idTrilho} rotulo={atual < total - 1 ? `Próximo cartão: ${paginas[atual + 1]!.titulo}` : 'Próximo cartão'} desligado={atual === total - 1}>
-            <ChevronRight size={18} aria-hidden="true" />
+            <ChevronRight size={16} aria-hidden="true" />
           </BotaoRedondo>
         )}
       </div>
@@ -227,12 +261,13 @@ export function CardResumoDeslizante({ sobra, cofrinho, metas = [], hojeISO, esc
   );
 }
 
+/** Visual pequeno (30px), área de toque de 44px pelo ::before (WCAG 2.5.8 pede ≥ 24px). */
 const CLASSE_REDONDO =
-  'lap-cartao inline-flex h-11 min-w-[44px] items-center justify-center gap-1 rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
+  "lap-cartao relative inline-flex h-[30px] min-w-[30px] items-center justify-center gap-0.5 rounded-full before:absolute before:-inset-y-[7px] before:-inset-x-[7px] before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 function BotaoRedondo({ children, onClick, controla, rotulo, desligado }: { children: ReactNode; onClick: () => void; controla: string; rotulo: string; desligado: boolean }) {
   return (
-    <button type="button" onClick={onClick} aria-controls={controla} aria-label={rotulo} disabled={desligado} className={clsx(CLASSE_REDONDO, 'w-11 text-accent disabled:text-muted disabled:opacity-45')}>
+    <button type="button" onClick={onClick} aria-controls={controla} aria-label={rotulo} disabled={desligado} className={clsx(CLASSE_REDONDO, 'w-[30px] text-accent disabled:text-muted disabled:opacity-45')}>
       {children}
     </button>
   );
@@ -242,7 +277,7 @@ function Pontos({ total, atual }: { total: number; atual: number }) {
   return (
     <span className="flex items-center gap-1.5" aria-hidden="true" data-testid="cartao-pontos">
       {Array.from({ length: total }, (_, i) => (
-        <i key={i} className={clsx('block h-[7px] rounded-full transition-all motion-reduce:transition-none', i === atual ? 'w-5 bg-accent' : 'w-[7px] bg-text/20')} />
+        <i key={i} className={clsx('block h-1.5 rounded-full transition-colors motion-reduce:transition-none', i === atual ? 'w-4 bg-accent' : 'w-1.5 bg-text/20')} />
       ))}
     </span>
   );
@@ -262,7 +297,8 @@ function Cartao({ children, i, atual, refEl, estilo, rotulo, testid, pele }: {
       aria-label={rotulo}
       data-testid={testid}
       style={inicial}
-      className={clsx('absolute inset-x-0 top-[17px] mx-auto aspect-[1.586] w-[min(340px,calc(100%-3rem))] origin-[50%_120%] will-change-transform', i === atual && 'cartao-frente')}
+      data-i={i}
+      className={clsx('maco-cartao absolute inset-x-0 top-[17px] mx-auto aspect-[1.586] origin-[50%_120%]', i === atual && 'cartao-frente')}
     >
       <div className={clsx('lap-heroi cartao-cc flex h-full flex-col px-4 pb-3.5 pt-[15px]', pele)}>{children}</div>
     </div>
@@ -282,7 +318,7 @@ const ROTULO = 'lap-rotulo lap-texto-3 flex min-w-0 items-center gap-2 text-[10.
 const ROTULO_PEQ = 'lap-rotulo lap-texto-3 text-[9.5px] tracking-[0.09em]';
 const MARCA = <span className="lap-texto-3 font-mono text-[11px] tracking-[0.16em]" aria-hidden="true">MEUDIA</span>;
 
-function CartaoResumo({ sobra, cofrinho, meta, hojeISO, escondido }: { sobra: SobraDoMes; cofrinho: number; meta: MetaDoCartao | null; hojeISO: string; escondido: boolean }) {
+const CartaoResumo = memo(function CartaoResumo({ sobra, cofrinho, meta, hojeISO, escondido }: { sobra: SobraDoMes; cofrinho: number; meta: MetaDoCartao | null; hojeISO: string; escondido: boolean }) {
   const pct = pctComprometida(sobra);
   const pctBarra = pct === null ? 0 : Math.min(Math.max(pct, 0), 100);
   const situacao = SITUACAO[situacaoDo(pct, sobra.valor) ?? 'no-controle'];
@@ -343,9 +379,9 @@ function CartaoResumo({ sobra, cofrinho, meta, hojeISO, escondido }: { sobra: So
       </div>
     </>
   );
-}
+});
 
-function CartaoConta({ sobra, escondido, contasAbertas, onContas, idLista }: { sobra: SobraDoMes; escondido: boolean; contasAbertas: boolean; onContas: () => void; idLista: string }) {
+const CartaoConta = memo(function CartaoConta({ sobra, escondido, contasAbertas, onContas, idLista }: { sobra: SobraDoMes; escondido: boolean; contasAbertas: boolean; onContas: () => void; idLista: string }) {
   const v = (n: number) => (escondido ? VALOR_OCULTO : formatBRL(n));
   const mes = nomeMes(sobra.competencia);
   const linha = 'flex min-h-[26px] items-center justify-between gap-2 text-[13.5px]';
@@ -408,7 +444,7 @@ function CartaoConta({ sobra, escondido, contasAbertas, onContas, idLista }: { s
       </div>
     </section>
   );
-}
+});
 
 /** A lista das contas fixas abre logo abaixo do maço (no cartão não cabe). */
 function ListaContasFixas({ sobra, escondido, id, mes }: { sobra: SobraDoMes; escondido: boolean; id: string; mes: string }) {
@@ -448,7 +484,7 @@ const RITMO: Record<'a_frente' | 'no_ritmo' | 'atras', { texto: string; classe: 
   atras: { texto: 'atrás do ritmo', classe: 'border-yellow/30 bg-yellow/[0.12] text-yellow' },
 };
 
-function CartaoMeta({ meta, sobraMensal, hojeISO, escondido }: { meta: MetaDoCartao; sobraMensal: number; hojeISO: string; escondido: boolean }) {
+const CartaoMeta = memo(function CartaoMeta({ meta, sobraMensal, hojeISO, escondido }: { meta: MetaDoCartao; sobraMensal: number; hojeISO: string; escondido: boolean }) {
   const v = (n: number) => (escondido ? VALOR_OCULTO : formatBRL(n));
   const vCurto = (n: number) => (escondido ? VALOR_OCULTO : formatBRL(n).replace(/,00$/, ''));
   const p = progressoMeta(meta, hojeISO);
@@ -509,7 +545,7 @@ function CartaoMeta({ meta, sobraMensal, hojeISO, escondido }: { meta: MetaDoCar
       </div>
     </>
   );
-}
+});
 
 function Celula({ rotulo, valor, nota, testid }: { rotulo: string; valor: string; nota?: string; testid?: string }) {
   return (

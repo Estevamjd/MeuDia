@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { SobraDoMes } from '@meudia/shared';
 import { CardResumoDeslizante, paginasDoCartao, type MetaDoCartao } from '../CardResumoDeslizante';
 
@@ -102,9 +102,9 @@ describe('CardResumoDeslizante (Início v5, maço)', () => {
   it('pose inicial do maço: o 1º na frente, os outros atrás à direita, menores e girados', () => {
     render(<CardResumoDeslizante {...base} metas={[meta]} />);
     const tr = (id: string) => (screen.getByTestId(id) as HTMLElement).style.transform;
-    expect(tr('cartao-pagina-resumo')).toBe('translateX(0.00px) rotate(0.00deg) scale(1.0000)');
-    expect(tr('cartao-pagina-conta')).toBe('translateX(13.00px) rotate(2.40deg) scale(0.9450)');
-    expect(tr('cartao-pagina-meta')).toBe('translateX(26.00px) rotate(4.80deg) scale(0.8900)');
+    expect(tr('cartao-pagina-resumo')).toBe('translateX(calc(0.00% + 0.00px)) rotate(0.00deg) scale(1.0000)');
+    expect(tr('cartao-pagina-conta')).toBe('translateX(calc(0.00% + 13.00px)) rotate(2.40deg) scale(0.9450)');
+    expect(tr('cartao-pagina-meta')).toBe('translateX(calc(0.00% + 26.00px)) rotate(4.80deg) scale(0.8900)');
   });
 
   it('"Contas fixas" no cartão abre a lista abaixo do maço, com pago / a pagar', () => {
@@ -127,5 +127,31 @@ describe('CardResumoDeslizante (Início v5, maço)', () => {
     expect(screen.getByText('Cartão 2 de 3: A conta')).toBeTruthy();
     fireEvent.keyDown(trilho, { key: 'ArrowLeft' });
     expect(screen.getByText('Cartão 1 de 3: Resumo')).toBeTruthy();
+  });
+
+  it('arrastar não re-renderiza por quadro: a página só muda quando o trilho assenta; segurar é só uma classe', () => {
+    vi.useFakeTimers();
+    try {
+      render(<CardResumoDeslizante {...base} metas={[meta]} />);
+      const trilho = screen.getByLabelText(/Cartões do resumo do mês/);
+      const secao = screen.getByTestId('cartao-resumo');
+      Object.defineProperty(trilho, 'clientWidth', { configurable: true, value: 390 });
+      fireEvent.touchStart(trilho);
+      expect(secao.className).toContain('maco-segurando');
+      let rolagem = 300;
+      Object.defineProperty(trilho, 'scrollLeft', { configurable: true, get: () => rolagem });
+      fireEvent.scroll(trilho);
+      // No meio do gesto continua no cartão 1 (nada de setState por evento de rolagem).
+      expect(t(screen.getByTestId('cartao-posicao'))).toBe('1 de 3 · Resumo');
+      rolagem = 390;
+      fireEvent.scroll(trilho);
+      fireEvent.touchEnd(trilho);
+      expect(secao.className).not.toContain('maco-segurando');
+      act(() => { vi.advanceTimersByTime(700); });
+      expect(t(screen.getByTestId('cartao-posicao'))).toBe('2 de 3 · A conta');
+      expect(screen.getByText('Cartão 2 de 3: A conta')).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

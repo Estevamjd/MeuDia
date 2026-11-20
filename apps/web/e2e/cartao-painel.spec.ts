@@ -66,10 +66,13 @@ const naFrente = async (page: Page, testid: string) => {
     .poll(async () => {
       const b = await c.boundingBox();
       const largura = page.viewportSize()!.width;
-      return !!b && Math.abs(b.x + b.width / 2 - largura / 2) < 2 && b.width <= 341;
+      return !!b && Math.abs(b.x + b.width / 2 - largura / 2) < 2 && b.width <= 401;
     }, { message: `${testid} na frente` })
     .toBe(true);
 };
+
+/* Screenshots com as animações ligadas (sem `animations: 'disabled'`): desligar finaliza a animação ligada à
+   rolagem e o print mostraria a pose inicial, não a real. */
 
 /** Arrasta com o dedo (touch de verdade via CDP; só no Chromium), conferindo o maço no meio do gesto. */
 async function arrastarCartao(page: Page, deX: number, ateX: number, y: number, noMeio: () => Promise<void>) {
@@ -90,7 +93,7 @@ async function arrastarCartao(page: Page, deX: number, ateX: number, y: number, 
 const semRolagemLateral = async (page: Page) =>
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
 
-test('maço de cartões: 2 sem meta, 3 com meta; formato de cartão (≤ 240px); arrastar, botões, setas e anúncio; Painel; claro e escuro', async ({ page, browserName }) => {
+test('maço de cartões: 2 sem meta, 3 com meta; formato de cartão (230–250px); arrastar, botões, setas e anúncio; Painel; claro e escuro', async ({ page, browserName }) => {
   const erros: string[] = [];
   page.on('pageerror', (err) => erros.push(`${err.name}: ${err.message}`));
   page.on('response', (res) => { if (res.status() >= 400) erros.push(`${res.request().method()} ${res.url()} → ${res.status()}`); });
@@ -116,23 +119,36 @@ test('maço de cartões: 2 sem meta, 3 com meta; formato de cartão (≤ 240px);
   await expect(page.getByTestId('previsao-fim-mes-valor')).toHaveText(brl('139,10'));
   await expect(page.getByTestId('linha-cofrinho')).toBeVisible();
   await naFrente(page, 'cartao-pagina-resumo');
-  // Formato de cartão de crédito: ≤ 240px de altura, razão ~1,586, e o maço inteiro cabe sem empurrar a Início.
+  // Formato de cartão de crédito: largura da tela − 24px, 230–250px de altura no iPhone 13, razão ~1,586, e o maço
+  // inteiro cabe sem empurrar a Início.
   const caixa = (await page.getByTestId('cartao-pagina-resumo').boundingBox())!;
-  expect(caixa.height).toBeLessThanOrEqual(240);
+  expect(caixa.width).toBeCloseTo(page.viewportSize()!.width - 24, 0);
+  expect(caixa.height).toBeGreaterThanOrEqual(228);
+  expect(caixa.height).toBeLessThanOrEqual(250);
   expect(caixa.width / caixa.height).toBeGreaterThan(1.55);
   expect(caixa.width / caixa.height).toBeLessThan(1.62);
-  expect((await page.getByTestId('cartao-maco').boundingBox())!.height).toBeLessThanOrEqual(250);
+  expect((await page.getByTestId('cartao-maco').boundingBox())!.height).toBeLessThanOrEqual(285);
+  // Setas menores (30px), mas com área de toque ≥ 24px.
+  const seta = (await page.getByRole('button', { name: 'Próximo cartão: A conta' }).boundingBox())!;
+  expect(seta.height).toBeLessThanOrEqual(32);
+  expect(seta.height).toBeGreaterThanOrEqual(24);
   await expect(page.getByRole('region', { name: 'Contas a vencer' })).toBeInViewport();
   await semRolagemLateral(page);
 
   // Arrastar com o dedo: no meio do gesto o cartão da frente está "na mão" (sobe e gira) e o de trás aparece.
   if (browserName === 'chromium') {
+    // No Chrome (e no iOS 26+) o maço anda por animação ligada à rolagem (compositor): 2 animações por cartão.
+    expect(await page.getByTestId('cartao-pagina-resumo').evaluate((el) => el.getAnimations().length)).toBe(2);
     const y = caixa.y + caixa.height / 2;
     await arrastarCartao(page, 330, 70, y, async () => {
       await expect(cartao).toHaveClass(/maco-segurando/);
-      const giro = await page.getByTestId('cartao-pagina-resumo').evaluate((el) => (el as HTMLElement).style.transform);
-      expect(giro).toMatch(/rotate\(-\d/);
-      await page.screenshot({ path: path.join(pasta, '00-arrastando-escuro.png'), animations: 'disabled' });
+      // Giro calculado (vale tanto para a animação ligada à rolagem quanto para o caminho em JS).
+      const giro = await page.getByTestId('cartao-pagina-resumo').evaluate((el) => {
+        const m = new DOMMatrixReadOnly(getComputedStyle(el).transform);
+        return (Math.atan2(m.b, m.a) * 180) / Math.PI;
+      });
+      expect(giro).toBeLessThan(-1);
+      await page.screenshot({ path: path.join(pasta, '00-arrastando-escuro.png') });
     });
     await naFrente(page, 'cartao-pagina-conta');
     await expect(anuncio).toHaveText('Cartão 2 de 2: A conta');
@@ -150,7 +166,7 @@ test('maço de cartões: 2 sem meta, 3 com meta; formato de cartão (≤ 240px);
   await page.getByRole('button', { name: /Contas fixas/ }).click();
   await expect(page.getByRole('list', { name: 'Contas fixas de outubro' })).toContainText('Curso');
   await page.getByRole('button', { name: /Contas fixas/ }).click();
-  await page.screenshot({ path: path.join(pasta, '01-sem-meta-p2-escuro.png'), animations: 'disabled' });
+  await page.screenshot({ path: path.join(pasta, '01-sem-meta-p2-escuro.png') });
 
   // ── Com meta: 3 páginas; linha da meta na página 1 e página Meta com os números ──
   await semear(email, {
@@ -165,13 +181,13 @@ test('maço de cartões: 2 sem meta, 3 com meta; formato de cartão (≤ 240px);
     await expect(page.getByTestId('cartao-meta-mini')).toContainText('Celular novo');
     await semRolagemLateral(page);
     await page.evaluate(() => window.scrollTo(0, 0));
-    await page.screenshot({ path: path.join(pasta, `02-inicio-p1-${sufixo}.png`), animations: 'disabled' });
+    await page.screenshot({ path: path.join(pasta, `02-inicio-p1-${sufixo}.png`) });
 
     await naFrente(page, 'cartao-pagina-resumo');
     await page.getByRole('button', { name: 'Próximo cartão: A conta' }).click();
     await naFrente(page, 'cartao-pagina-conta');
     await page.evaluate(() => window.scrollTo(0, 0));
-    await page.screenshot({ path: path.join(pasta, `03-inicio-p2-${sufixo}.png`), animations: 'disabled' });
+    await page.screenshot({ path: path.join(pasta, `03-inicio-p2-${sufixo}.png`) });
 
     // Setas do teclado no trilho levam à página Meta.
     await page.getByLabel('Cartões do resumo do mês. Deslize para o lado ou use as setas.').focus();
@@ -183,7 +199,7 @@ test('maço de cartões: 2 sem meta, 3 com meta; formato de cartão (≤ 240px);
     await expect(page.getByRole('progressbar', { name: 'Meta Celular novo' })).toHaveAttribute('aria-valuenow', '42');
     await expect(cartao.getByRole('link', { name: 'Guardar', exact: true })).toHaveAttribute('href', '/financas/metas');
     await page.evaluate(() => window.scrollTo(0, 0));
-    await page.screenshot({ path: path.join(pasta, `04-inicio-p3-${sufixo}.png`), animations: 'disabled' });
+    await page.screenshot({ path: path.join(pasta, `04-inicio-p3-${sufixo}.png`) });
 
     // ── Painel (antigo Relatório) ──
     await page.getByRole('navigation', { name: 'Navegação principal' }).getByRole('link', { name: 'Painel' }).click();
@@ -193,7 +209,7 @@ test('maço de cartões: 2 sem meta, 3 com meta; formato de cartão (≤ 240px);
     for (const nome of ['Para onde vai o salário', 'Para onde foi seu dinheiro', 'Seu mês dia a dia']) await expect(page.getByRole('region', { name: nome })).toBeVisible();
     await page.getByTestId('painel-dia-a-dia').locator('svg').first().waitFor();
     await semRolagemLateral(page);
-    await page.screenshot({ path: path.join(pasta, `05-painel-${sufixo}.png`), fullPage: true, animations: 'disabled' });
+    await page.screenshot({ path: path.join(pasta, `05-painel-${sufixo}.png`), fullPage: true });
   }
 
   expect(erros, 'erros na página ou respostas HTTP ≥ 400').toEqual([]);
