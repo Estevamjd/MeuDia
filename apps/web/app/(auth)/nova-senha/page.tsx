@@ -137,7 +137,7 @@ export default function NovaSenhaPage() {
               </div>
               <Link
                 href={ESQUECI_SENHA_PATH}
-                className="mt-6 inline-flex w-full items-center justify-center rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-accent-fg shadow-[0_0_24px_-6px_rgb(var(--c-brilho)/0.55)] transition-all duration-200 hover:bg-[#5cefff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                className="mt-6 inline-flex w-full items-center justify-center rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-accent-fg shadow-[0_0_24px_-6px_rgb(var(--c-brilho)/0.55)] transition-all duration-200 hover:bg-accent3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
                 Pedir novo link
               </Link>

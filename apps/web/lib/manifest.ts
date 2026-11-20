@@ -5,9 +5,13 @@ const ATALHOS = [
   { name: 'Financas', url: '/financas', description: 'Ver financas do mes' },
 ];
 
+/** Sobe a cada troca de ícone: a query nova faz o celular com o app instalado baixar o ícone de novo. */
+export const VERSAO_ICONE = '3c';
+
 const ICONES = [192, 512].flatMap((tamanho) =>
   (['any', 'maskable'] as const).map((purpose) => ({
-    src: `/icons/icon-${tamanho}.png`,
+    // O ícone vai até a borda com a marca na zona segura, então serve como `any` e `maskable`.
+    src: `/icons/icon-${tamanho}${purpose === 'maskable' && tamanho === 512 ? '-maskable' : ''}.png?v=${VERSAO_ICONE}`,
     sizes: `${tamanho}x${tamanho}`,
     type: 'image/png',
     purpose,
@@ -23,7 +27,8 @@ export function buildManifest(mode: AppMode) {
     start_url: rotaInicial(mode),
     display: 'standalone',
     orientation: 'portrait',
-    background_color: '#050a16',
+    // Mesmo navy do ícone e das splash (sem flash de tom ao abrir o PWA); a barra segue o fundo do app.
+    background_color: '#0a0f1c',
     theme_color: '#050a16',
     categories: mode === 'financas' ? ['finance'] : ['finance', 'health', 'fitness'],
     lang: 'pt-BR',

@@ -17,7 +17,9 @@ describe('tema claro (globals.css)', () => {
   it('dentro do .lap-heroi devolve os tokens escuros (texto claro, ciano, números rosa/ciano)', () => {
     const heroi = blocoClaro.slice(blocoClaro.indexOf("html[data-mode='light'] .lap-heroi"));
     // Número ciano com croma um pouco menor no claro (Wave 1B / P0.2): mesma luz, sem "estourar" sobre o branco.
-    for (const token of ['--c-text: 245 246 248', '--c-accent: 0 229 255', '--lap-h-negativo: #f8b4b4', '--lap-h-positivo: oklch(0.9 0.105 203)']) {
+    // O accent do bloco é o tom "vivo" da cor do app (ciano = 0 229 255 no :root; ver cores-app.test.ts).
+    expect(css).toContain('--c-accent-vivo: 0 229 255;');
+    for (const token of ['--c-text: 245 246 248', '--c-accent: var(--c-accent-vivo)', '--lap-h-negativo: #f8b4b4', '--lap-h-positivo: oklch(0.9 0.105 203)']) {
       expect(heroi).toContain(token);
     }
   });

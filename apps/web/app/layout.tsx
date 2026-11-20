@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { VERSAO_ICONE } from '../lib/manifest';
 import localFont from 'next/font/local';
 import './globals.css';
 import { Providers } from './providers';
@@ -40,23 +41,23 @@ export const metadata: Metadata = {
     title: 'MeuDia',
     startupImage: [
       {
-        url: '/icons/splash-1290x2796.png',
+        url: `/icons/splash-1290x2796.png?v=${VERSAO_ICONE}`,
         media: '(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)',
       },
       {
-        url: '/icons/splash-1179x2556.png',
+        url: `/icons/splash-1179x2556.png?v=${VERSAO_ICONE}`,
         media: '(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)',
       },
       {
-        url: '/icons/splash-1170x2532.png',
+        url: `/icons/splash-1170x2532.png?v=${VERSAO_ICONE}`,
         media: '(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)',
       },
       {
-        url: '/icons/splash-1080x2340.png',
+        url: `/icons/splash-1080x2340.png?v=${VERSAO_ICONE}`,
         media: '(device-width: 360px) and (device-height: 780px) and (-webkit-device-pixel-ratio: 3)',
       },
       {
-        url: '/icons/splash-750x1334.png',
+        url: `/icons/splash-750x1334.png?v=${VERSAO_ICONE}`,
         media: '(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)',
       },
     ],
@@ -75,9 +76,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         {/* Tema antes da 1ª pintura: sem piscar o escuro para quem escolheu claro. */}
         <script dangerouslySetInnerHTML={{ __html: SCRIPT_TEMA }} />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href={`/apple-touch-icon.png?v=${VERSAO_ICONE}`} />
+        <link rel="icon" type="image/png" sizes="32x32" href={`/favicon-32x32.png?v=${VERSAO_ICONE}`} />
+        <link rel="icon" type="image/png" sizes="16x16" href={`/favicon-16x16.png?v=${VERSAO_ICONE}`} />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>

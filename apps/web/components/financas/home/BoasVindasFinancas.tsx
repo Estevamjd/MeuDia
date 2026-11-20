@@ -15,7 +15,7 @@ const PASSOS = {
 
 /** Botão de 36px com área de toque de 44px pelo ::before. */
 const CLASSE_ACAO =
-  "relative inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-lg bg-accent px-3 text-[12.5px] font-medium text-accent-fg transition-opacity hover:opacity-90 before:absolute before:-inset-y-1 before:inset-x-0 before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+  "relative inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-lg bg-accent px-3 text-[12.5px] font-medium text-accent-fg transition-colors hover:bg-accent3 before:absolute before:-inset-y-1 before:inset-x-0 before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
 /**
  * Onboarding da home numa faixa só (≤ 56px), para o "Gastei" caber acima da dobra no iPhone 13: um passo por vez

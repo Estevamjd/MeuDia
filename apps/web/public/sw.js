@@ -1,7 +1,7 @@
-const CACHE_NAME = 'meudia-v8';
+const CACHE_NAME = 'meudia-v9';
 const STATIC_ASSETS = [
-  '/icons/icon-192.png', '/icons/icon-512.png',
-  '/apple-touch-icon.png', '/favicon.png',
+  '/icons/icon-192.png?v=3c', '/icons/icon-512.png?v=3c',
+  '/apple-touch-icon.png?v=3c', '/favicon.png',
 ];
 
 // Pure policy, also exercised directly by Vitest. Fail closed for credentials:

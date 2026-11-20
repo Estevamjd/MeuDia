@@ -160,7 +160,7 @@ export function InstallPrompt() {
         <div className="flex items-center gap-1">
           <button
             onClick={handleInstall}
-            className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg transition-colors hover:bg-accent/80"
+            className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg transition-colors hover:bg-accent3"
           >
             Instalar
           </button>

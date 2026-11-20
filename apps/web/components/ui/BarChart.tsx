@@ -22,7 +22,7 @@ export function BarChart({
   data,
   dataKey,
   xAxisKey = 'label',
-  color = '#00e5ff',
+  color = 'var(--accent)', // segue a cor do app (variável CSS vale em atributo de SVG)
   height = 200,
 }: BarChartProps) {
   return (

@@ -3,6 +3,8 @@
  * pelo SCRIPT_TEMA no <head>, sem piscar) e na conta (user_metadata.tema), para seguir a pessoa em outro aparelho.
  * O padrão continua o escuro Astro G: quem nunca escolheu não vê nada mudar.
  */
+import { SCRIPT_COR } from './cores-app';
+
 export type PreferenciaTema = 'claro' | 'escuro' | 'sistema';
 export type ModoTema = 'light' | 'dark';
 
@@ -39,7 +41,7 @@ export function pintarModo(modo: ModoTema, doc: Document = document): void {
 
 /**
  * Roda no <head> antes do React: mesma regra de `resolverModo`, escrita à mão em ES5 para não depender do bundle.
- * Sem localStorage (modo privado antigo) fica no padrão escuro.
+ * Sem localStorage (modo privado antigo) fica no padrão escuro. Também põe a cor do app (data-accent, `SCRIPT_COR`).
  */
 export const SCRIPT_TEMA = `(function(){try{var p=null;try{p=localStorage.getItem('${CHAVE_TEMA}')}catch(e){}
 if(p!=='claro'&&p!=='escuro'&&p!=='sistema')p='${TEMA_PADRAO}';
@@ -47,4 +49,5 @@ var m=p==='sistema'?(window.matchMedia&&window.matchMedia('(prefers-color-scheme
 var r=document.documentElement;r.dataset.mode=m;r.style.colorScheme=m;
 var c=m==='light'?'${COR_BARRA.light}':'${COR_BARRA.dark}';
 var f=function(){var l=document.querySelectorAll('meta[name="theme-color"]');for(var i=0;i<l.length;i++)l[i].setAttribute('content',c)};
-f();document.addEventListener('DOMContentLoaded',f);}catch(e){}})();`;
+f();document.addEventListener('DOMContentLoaded',f);}catch(e){}
+${SCRIPT_COR}})();`;

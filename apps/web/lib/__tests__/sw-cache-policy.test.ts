@@ -7,7 +7,7 @@ const source = readFileSync(new URL('../../public/sw.js', import.meta.url), 'utf
 function worker() {
   const listeners: Record<string, (event: unknown) => void> = {};
   const cache = { match: vi.fn(), put: vi.fn().mockResolvedValue(undefined) };
-  const caches = { open: vi.fn().mockResolvedValue(cache), keys: vi.fn().mockResolvedValue(['meudia-v7', 'meudia-v8']), delete: vi.fn().mockResolvedValue(true) };
+  const caches = { open: vi.fn().mockResolvedValue(cache), keys: vi.fn().mockResolvedValue(['meudia-v8', 'meudia-v9']), delete: vi.fn().mockResolvedValue(true) };
   const fetch = vi.fn().mockResolvedValue(new Response('asset', { headers: { 'content-type': 'image/png' } }));
   const self = { location: { origin }, addEventListener: (name: string, listener: (event: unknown) => void) => { listeners[name] = listener; }, clients: { claim: vi.fn() }, skipWaiting: vi.fn() };
   const policy = runInNewContext(`${source}\nshouldCache`, { URL, Request, self, caches, fetch }) as (request: Request, origin: string, response?: Response) => boolean;
@@ -80,13 +80,13 @@ it('grava somente resposta de asset permitida; HTML nunca entra no cache', async
   listeners.fetch!(event); await result;
   expect(cache.put).not.toHaveBeenCalled();
 });
-it('activate remove cache antigo contendo HTML e preserva apenas v8; mantém push e clique', async () => {
+it('activate remove cache antigo contendo HTML e preserva apenas v9; mantém push e clique', async () => {
   const { listeners, caches } = worker();
   let done: Promise<unknown> | undefined;
   listeners.activate!({ waitUntil: (value: Promise<unknown>) => { done = value; } });
   await done;
   expect(caches.delete).toHaveBeenCalledTimes(1);
-  expect(caches.delete).toHaveBeenCalledWith('meudia-v7');
+  expect(caches.delete).toHaveBeenCalledWith('meudia-v8');
   expect(listeners.push).toBeTypeOf('function');
   expect(listeners.notificationclick).toBeTypeOf('function');
 });

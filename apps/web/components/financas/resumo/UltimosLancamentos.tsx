@@ -84,7 +84,7 @@ function BotaoGastei({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex min-h-[44px] shrink-0 items-center gap-2 rounded-lg bg-accent px-5 text-sm font-medium text-accent-fg shadow-[0_0_24px_-6px_rgb(var(--c-brilho)/0.55)] transition-colors hover:bg-[#5cefff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      className="inline-flex min-h-[44px] shrink-0 items-center gap-2 rounded-lg bg-accent px-5 text-sm font-medium text-accent-fg shadow-[0_0_24px_-6px_rgb(var(--c-brilho)/0.55)] transition-colors hover:bg-accent3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
     >
       <Plus size={16} aria-hidden="true" />
       Gastei

@@ -189,7 +189,7 @@ export function AgentChat({
           <button
             onClick={handleEnviar}
             disabled={!input.trim() || isSending}
-            className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-accent-fg transition-all hover:bg-accent/80 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-accent-fg transition-all hover:bg-accent3 disabled:opacity-40 disabled:cursor-not-allowed"
             aria-label="Enviar mensagem"
           >
             <Send size={16} />

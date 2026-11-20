@@ -56,7 +56,7 @@ async function generateSplash(iconPath, width, height, outputPath) {
       width,
       height,
       channels: 4,
-      background: { r: 10, g: 10, b: 28, alpha: 1 },
+      background: { r: 10, g: 15, b: 28, alpha: 1 }, // #0a0f1c, igual ao ícone
     },
   })
     .composite([

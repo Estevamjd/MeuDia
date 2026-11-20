@@ -18,6 +18,14 @@ describe('buildManifest', () => {
     expect(m.icons).toHaveLength(4);
   });
 
+  it('ícone novo: any + maskable, URLs com versão (celular instalado baixa de novo) e fundo igual ao do ícone', () => {
+    const m = buildManifest('padrao');
+    for (const i of m.icons) expect(i.src).toMatch(/^\/icons\/icon-(192|512)(-maskable)?\.png\?v=\w+$/);
+    expect(m.icons.filter((i) => i.purpose === 'maskable').map((i) => i.src.split('?')[0])).toEqual(['/icons/icon-192.png', '/icons/icon-512-maskable.png']);
+    expect(m.background_color).toBe('#0a0f1c');
+    expect(m.theme_color).toBe('#050a16');
+  });
+
   it('modo finanças: atalhos de Treinos e Finanças e start_url /financas', () => {
     const m = buildManifest('financas');
     expect(m.start_url).toBe('/financas');
