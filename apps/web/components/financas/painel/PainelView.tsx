@@ -121,22 +121,24 @@ export function PainelView({ nomeMes, numeros: n, resumo, acumulado, meses, esco
 }
 
 /**
- * Renda nunca aparece como "Recebeu" se ainda não entrou: sem nenhum "Recebi" é "Renda do mês" (previsão); com parte
- * recebida, "Recebeu" mostra só o que entrou e a nota diz quanto falta.
+ * Renda nunca aparece como "Recebeu" se ainda não entrou: sem nenhum "Recebi" é "Renda" com a nota "previsão" (rótulo
+ * curto: "Renda do mês" em caixa alta cortava no mini-card em 390px); com parte recebida, "Recebeu" mostra só o que
+ * entrou e a nota diz quanto falta.
  */
 export function celulaRenda(n: NumerosPainel | null, entrou: number, v: (x: number) => string): { rotulo: string; valor: string; nota: string } {
   if (!n) return { rotulo: 'Recebeu', valor: v(entrou), nota: 'entradas' };
   if (!n.previsao) return { rotulo: 'Recebeu', valor: v(n.recebeu), nota: 'renda do mês' };
   if (n.recebido > 0) return { rotulo: 'Recebeu', valor: v(n.recebido), nota: `falta ${v(n.faltaReceber)}` };
-  return { rotulo: 'Renda do mês', valor: v(n.recebeu), nota: 'previsão' };
+  return { rotulo: 'Renda', valor: v(n.recebeu), nota: 'previsão' };
 }
 
+/** Rótulo e nota quebram linha em vez de cortar com reticências (360px: "pagas + extras" não cabia numa linha). */
 function Celula({ rotulo, valor, nota, testid }: { rotulo: string; valor: string; nota: string; testid: string }) {
   return (
     <div className="lap-vidro min-w-0 px-2.5 py-2">
-      <p className="lap-rotulo lap-texto-3 truncate text-[10px]">{rotulo}</p>
+      <p className="lap-rotulo lap-texto-3 break-words text-[10px] !leading-[13px]">{rotulo}</p>
       <p data-testid={testid} className="mt-0.5 break-words text-[13px] font-medium leading-tight tracking-[-0.02em] tabular-nums">{valor}</p>
-      <p className="lap-texto-3 truncate text-[11px]">{nota}</p>
+      <p className="lap-texto-3 break-words text-[11px] leading-tight">{nota}</p>
     </div>
   );
 }

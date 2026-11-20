@@ -51,10 +51,10 @@ describe('PainelView (Relatório → Painel)', () => {
     render(<PainelView nomeMes="novembro" numeros={numeros} resumo={resumo} acumulado={acumulado} meses={meses} escondido={false} />);
     expect(celula('painel-recebeu')).toBe('RecebeuR$ 943,00renda do mês');
   });
-  it('renda prevista sem nenhum "Recebi": nunca "Recebeu", e sim "Renda do mês" (previsão)', () => {
+  it('renda prevista sem nenhum "Recebi": nunca "Recebeu", e sim "Renda" (previsão)', () => {
     const previsto = { ...numeros, previsao: true, recebido: 0, faltaReceber: 943 };
     render(<PainelView nomeMes="novembro" numeros={previsto} resumo={resumo} acumulado={acumulado} meses={meses} escondido={false} />);
-    expect(celula('painel-recebeu')).toBe('Renda do mêsR$ 943,00previsão');
+    expect(celula('painel-recebeu')).toBe('RendaR$ 943,00previsão');
     expect(celula('painel-recebeu')).not.toContain('Recebeu');
   });
   it('parte recebida: "Recebeu" só o que entrou e quanto falta', () => {

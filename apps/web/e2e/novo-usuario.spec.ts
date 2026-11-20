@@ -334,3 +334,61 @@ test('novo usuário: cadastro → onboarding → finanças → logout → login'
   expect(consoleErrors, 'console.error').toEqual([]);
   expect(falhas, 'requisições com falha').toEqual([]);
 });
+
+// Estado real mais comum da usuária nova (QA ao vivo da Wave 1B): Passo 2 com renda ainda não recebida, 1 banco e
+// 1 meta (maço com 3 cartões e "A receber" em Contas a vencer). O "Gastei" tem de caber em 390×844 sem rolar.
+test('Passo 2 com renda pendente e meta: "Gastei" acima da barra inferior em 390×844', async ({ page }) => {
+  const bottomNav = page.getByRole('navigation', { name: 'Navegação principal' });
+  await page.goto('/registro');
+  await page.getByLabel('Nome').fill('Bia Passo Dois');
+  await page.getByLabel('Email').fill(`bia.passo2.${run}@example.test`);
+  await page.getByLabel('Senha', { exact: true }).fill(SENHA);
+  await page.getByLabel('Confirmar senha').fill(SENHA);
+  await page.getByRole('button', { name: 'Criar conta' }).click();
+  await page.waitForURL(/\/onboarding/);
+  await page.getByRole('button', { name: 'Continuar' }).click();
+  await page.getByLabel('Banco ou carteira 1').fill('Nubank');
+  await page.getByLabel('Quanto tem hoje (1)').fill('120000');
+  await page.getByRole('button', { name: 'Concluir' }).click();
+  await page.waitForURL(/\/financas$/);
+  const banner = page.getByText('Instalar MeuDia').locator('xpath=ancestor::div[contains(@class,"fixed")][1]');
+  await expect(banner).toBeVisible();
+  await banner.getByRole('button', { name: 'Fechar' }).click();
+
+  await page.getByRole('button', { name: 'Cadastrar minha renda' }).click();
+  const modalRenda = page.getByRole('dialog', { name: 'Sua renda do mês' });
+  await modalRenda.getByLabel('Valor').fill('350000');
+  await modalRenda.getByLabel('Dia que recebe (opcional)').fill('5');
+  await modalRenda.getByRole('button', { name: 'Salvar' }).click();
+  await expect(modalRenda).toBeHidden();
+
+  await page.goto('/financas/metas');
+  await page.getByRole('button', { name: 'Nova meta', exact: true }).click();
+  const nova = page.getByRole('dialog', { name: 'Nova meta' });
+  await nova.getByLabel('Nome', { exact: true }).fill('Viagem');
+  await nova.getByLabel('Quanto custa').fill('300000');
+  await nova.getByRole('button', { name: 'Salvar meta' }).click();
+  await expect(nova).toBeHidden();
+
+  await bottomNav.getByRole('link', { name: 'Início' }).click();
+  await page.waitForURL(/\/financas$/);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForLoadState('networkidle');
+  await page.evaluate(() => window.scrollTo(0, 0));
+
+  // Confere que é mesmo o cenário do print: Passo 2, maço com 3 cartões, sem conta fixa e com "A receber".
+  await expect(page.getByRole('region', { name: 'Agora, suas contas' })).toBeVisible();
+  await expect(page.getByText('Passo 2 de 2')).toBeVisible();
+  await expect(page.getByTestId('cartao-resumo')).toHaveAttribute('data-paginas', '3');
+  await expect(page.getByTestId('contas-vazio')).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Recebi / })).toBeVisible();
+  await expect(page.getByTestId('lancamento')).toHaveCount(0);
+
+  const gastei = page.getByRole('region', { name: 'Últimos lançamentos' }).getByRole('button', { name: 'Gastei' });
+  await expect(gastei).toBeVisible();
+  const caixaGastei = (await gastei.boundingBox())!;
+  const topoBarra = (await bottomNav.boundingBox())!.y;
+  console.log(`[passo 2] Gastei bottom=${(caixaGastei.y + caixaGastei.height).toFixed(1)} topo da barra=${topoBarra.toFixed(1)}`);
+  expect(await page.evaluate(() => window.scrollY), 'a Início rolou sozinha').toBe(0);
+  expect(caixaGastei.y + caixaGastei.height, '"Gastei" atrás da barra inferior (Passo 2)').toBeLessThanOrEqual(topoBarra);
+});

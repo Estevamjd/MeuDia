@@ -326,6 +326,8 @@ describe('FinancasHomeView (Início, design v2)', () => {
     expect(linhas[1]!.textContent).toContain('Mercado 7');
     expect(linhas[1]!.querySelector('[data-origem]')!.textContent).toBe('WhatsApp');
     expect(screen.getByRole('link', { name: /Ver todos/ }).getAttribute('href')).toBe('/financas/gastos');
+    // Com lançamentos, o "Gastei" segue no rodapé (o cabeçalho mostra "Este mês").
+    expect(screen.getByRole('heading', { name: 'Últimos lançamentos' }).parentElement!.textContent).toContain('Este mês');
     fireEvent.click(screen.getByRole('button', { name: 'Gastei' }));
     expect(onGastei).toHaveBeenCalled();
   });
@@ -348,6 +350,10 @@ describe('FinancasHomeView (Início, design v2)', () => {
     render(<FinancasHomeView {...viewProps({ onGastei, boasVindas: { rendaCadastrada: false, onCadastrarRenda: vi.fn() }, resumo: montarResumoMes('2026-10', [], sobra) }, { ocorrencias: [], transacoes: [] })} />);
     expect(regioes()).toEqual(['Vamos montar seu mês', 'Resumo do mês', 'A conta de outubro', 'Contas a vencer', 'Últimos lançamentos']);
     expect(screen.queryByRole('region', { name: 'Para onde foi' })).toBeNull();
+    // Vazio: "Gastei" no cabeçalho do card (ao lado do título) e sem a linha de rodapé, para caber acima da barra.
+    const titulo = screen.getByRole('heading', { name: 'Últimos lançamentos' });
+    expect(titulo.parentElement!.contains(screen.getByRole('button', { name: 'Gastei' }))).toBe(true);
+    expect(screen.queryByRole('link', { name: /Ver todos/ })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Gastei' }));
     expect(onGastei).toHaveBeenCalled();
   });

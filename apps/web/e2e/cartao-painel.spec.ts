@@ -208,6 +208,21 @@ test('maço de cartões: 2 sem meta, 3 com meta; formato de cartão (230–250px
     await expect(page.getByTestId('painel-sobra-valor')).toHaveText(brl('139,10'));
     for (const nome of ['Para onde vai o salário', 'Para onde foi seu dinheiro', 'Seu mês dia a dia']) await expect(page.getByRole('region', { name: nome })).toBeVisible();
     await page.getByTestId('painel-dia-a-dia').locator('svg').first().waitFor();
+    // Renda sem "Recebi" é previsão: nunca "Recebeu". Rótulo e nota dos 3 mini-cards inteiros (sem reticências)
+    // em 390 e em 360 de largura (QA ao vivo: "RENDA DO …").
+    await expect(page.getByTestId('painel-recebeu').locator('..')).not.toContainText('Recebeu');
+    for (const largura of [390, 360]) {
+      await page.setViewportSize({ width: largura, height: 844 });
+      for (const id of ['painel-recebeu', 'painel-ja-gastou', 'painel-falta-pagar']) {
+        const cortados = await page.getByTestId(id).evaluate((valor) =>
+          Array.from(valor.parentElement!.querySelectorAll('p'))
+            .filter((p) => p.scrollWidth > p.clientWidth)
+            .map((p) => p.textContent),
+        );
+        expect(cortados, `${id} cortado em ${largura}px`).toEqual([]);
+      }
+    }
+    await page.setViewportSize({ width: 390, height: 664 });
     await semRolagemLateral(page);
     await page.screenshot({ path: path.join(pasta, `05-painel-${sufixo}.png`), fullPage: true });
   }

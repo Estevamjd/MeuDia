@@ -15,16 +15,19 @@ export interface UltimosLancamentosProps {
 
 /** Últimos lançamentos do mês com o selo de origem (Manual ou WhatsApp) em cada linha. */
 export function UltimosLancamentos({ lancamentos, escondido = false, onGastei }: UltimosLancamentosProps) {
+  const vazio = lancamentos.length === 0;
+  // Vazio (usuária nova): o "Gastei" sobe para o cabeçalho e o rodapé some, para caber acima da barra em 390×844.
+  const gasteiNoCabecalho = vazio && !!onGastei;
   return (
     <section aria-labelledby="ultimos-lancamentos" className="lap-cartao px-4 pb-3 pt-4">
-      <div className="mb-3.5 flex items-center justify-between gap-3">
+      <div className={clsx('flex items-center justify-between gap-3', gasteiNoCabecalho ? '-mt-1.5 mb-2' : 'mb-3.5')}>
         <h2 id="ultimos-lancamentos" className="text-base font-medium tracking-[-0.02em] text-text">
           Últimos lançamentos
         </h2>
-        <span className="text-xs text-muted">Este mês</span>
+        {gasteiNoCabecalho ? <BotaoGastei onClick={onGastei} /> : <span className="text-xs text-muted">Este mês</span>}
       </div>
-      {lancamentos.length === 0 ? (
-        <div className="flex items-center gap-3 pb-2">
+      {vazio ? (
+        <div className="flex items-center gap-3 pb-1">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-trilho text-accent">
             <ReceiptText size={16} aria-hidden="true" />
           </span>
@@ -62,21 +65,27 @@ export function UltimosLancamentos({ lancamentos, escondido = false, onGastei }:
           ))}
         </ul>
       )}
-      {onGastei && (
+      {onGastei && !vazio && (
         <div className="mt-1 flex items-center justify-between gap-3 border-t border-border pt-2">
           <Link href="/financas/gastos" className="-ml-1 flex min-h-[44px] items-center gap-1 px-1 text-sm font-medium text-accent">
             Ver todos <ChevronRight size={16} aria-hidden="true" />
           </Link>
-          <button
-            type="button"
-            onClick={onGastei}
-            className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-accent px-5 text-sm font-medium text-accent-fg shadow-[0_0_24px_-6px_rgb(var(--c-brilho)/0.55)] transition-colors hover:bg-[#5cefff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
-            <Plus size={16} aria-hidden="true" />
-            Gastei
-          </button>
+          <BotaoGastei onClick={onGastei} />
         </div>
       )}
     </section>
+  );
+}
+
+function BotaoGastei({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex min-h-[44px] shrink-0 items-center gap-2 rounded-lg bg-accent px-5 text-sm font-medium text-accent-fg shadow-[0_0_24px_-6px_rgb(var(--c-brilho)/0.55)] transition-colors hover:bg-[#5cefff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+    >
+      <Plus size={16} aria-hidden="true" />
+      Gastei
+    </button>
   );
 }
