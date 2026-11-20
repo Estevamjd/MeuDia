@@ -1,8 +1,13 @@
+const path = require('path');
 const { withSentryConfig } = require('@sentry/nextjs');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: { instrumentationHook: true },
+  output: 'standalone',
+  experimental: {
+    instrumentationHook: true,
+    outputFileTracingRoot: path.join(__dirname, '../../'),
+  },
   transpilePackages: ['@meudia/shared', '@meudia/api', '@meudia/ai'],
   images: {
     remotePatterns: [

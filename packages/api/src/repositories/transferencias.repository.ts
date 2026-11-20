@@ -26,3 +26,11 @@ export async function remove(id: string, userId: string): Promise<void> {
   const { error } = await getSupabase().from('transferencias').delete().eq('id', id).eq('user_id', userId);
   if (error) erroDb(error);
 }
+
+export async function findAll(userId: string): Promise<Transferencia[]> {
+  return await paginasPorChave(() => getSupabase().from('transferencias').select(COLUMNS).eq('user_id', userId), erroDb) as unknown as Transferencia[];
+}
+
+export async function findEntre(userId: string, de: string, ate: string): Promise<Transferencia[]> {
+  return await paginasPorChave(() => getSupabase().from('transferencias').select(COLUMNS).eq('user_id', userId).gte('data', de).lte('data', ate), erroDb) as unknown as Transferencia[];
+}

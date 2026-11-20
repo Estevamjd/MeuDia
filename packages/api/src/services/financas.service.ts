@@ -1,6 +1,7 @@
 import { AppError } from '@meudia/shared';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { pagamentosContaRepository, recebimentosRendaRepository, transacaoRepository } from '../repositories';
+import { findEntre as transacoesNaFaixa } from '../repositories/transacoes-faixa.repository';
 import { transacaoInsertSchema } from '../validators';
 
 export async function listarTransacoes(userId: string) {
@@ -29,6 +30,11 @@ export async function transacoesDoMes(userId: string, ano: number, mes: number) 
   const start = format(startOfMonth(ref), 'yyyy-MM-dd');
   const end = format(endOfMonth(ref), 'yyyy-MM-dd');
   return transacaoRepository.findByDateRange(userId, start, end);
+}
+
+/** Lançamentos com data entre `inicio` e `fim` (inclusive, AAAA-MM-DD), em ordem (data, id), sem truncar em max-rows. */
+export async function transacoesEntre(userId: string, inicio: string, fim: string) {
+  return transacoesNaFaixa(userId, inicio, fim);
 }
 
 export async function resumoMensal(userId: string, ano: number, mes: number) {

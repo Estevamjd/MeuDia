@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { AlertCircle } from 'lucide-react';
 import {
   RITMOS_SEMANAIS_PCT,
@@ -12,12 +13,17 @@ import {
 } from '@meudia/shared';
 import { hojeLocal, usePerfilSaude, usePesoRecente, useProfile, useRegistrarPesoDoDia, useUpdateProfile } from '../../../../hooks';
 import { Cabecalho, Chip, LinkAcao, Rotulo, Secao, Subabas, TelaCaderno, VazioCaderno, classeBotaoCheio, classeTextoCaderno } from '../../../../components/caderno';
-import { GraficoPeso } from '../../../../components/saude/GraficoPeso';
 import { EmptyState } from '../../../../components/ui/EmptyState';
 import { Modal } from '../../../../components/ui/Modal';
-import { SkeletonList } from '../../../../components/ui/Skeleton';
+import { Skeleton, SkeletonList } from '../../../../components/ui/Skeleton';
 import { useToast } from '../../../../components/ui/Toast';
 import { perfilVazio } from '../../../../lib/perfil-saude';
+
+// Recharts só por next/dynamic (lib/__tests__/recharts-dinamico.test.ts): fora do JS inicial da rota.
+const GraficoPeso = dynamic(() => import('../../../../components/saude/GraficoPeso').then((m) => m.GraficoPeso), {
+  ssr: false,
+  loading: () => <Skeleton className="h-[190px] w-full" />,
+});
 
 const PERIODOS = [7, 30, 90] as const;
 const fmtKg = (n: number, casas = 1) => n.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas });

@@ -33,14 +33,20 @@ ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL \
     NEXT_TELEMETRY_DISABLED=1 \
     NODE_ENV=production
 RUN pnpm turbo run build --filter=@meudia/web
+# Resolve from Next's pnpm location, exactly as its image optimizer does.
+# Fail the build if standalone tracing ever drops sharp or its native libraries.
+RUN cd apps/web/.next/standalone/apps/web && node -e "require('module').createRequire(require.resolve('next/package.json'))('sharp')"
 
-FROM base AS runner
+FROM node:22-bookworm-slim AS runner
+WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
     HOSTNAME=0.0.0.0
 RUN useradd --system --uid 1001 --create-home nextjs
-COPY --from=build --chown=nextjs:nextjs /app /app
+COPY --from=build --chown=nextjs:nextjs /app/apps/web/.next/standalone ./
+COPY --from=build --chown=nextjs:nextjs /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=build --chown=nextjs:nextjs /app/apps/web/public ./apps/web/public
 USER nextjs
 EXPOSE 3000
-CMD ["pnpm", "--filter", "@meudia/web", "exec", "next", "start", "-H", "0.0.0.0", "-p", "3000"]
+CMD ["node", "apps/web/server.js"]

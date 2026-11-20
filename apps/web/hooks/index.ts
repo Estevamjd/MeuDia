@@ -50,6 +50,7 @@ export {
 export {
   useTransacoes,
   useTransacoesMes,
+  useTransacoesFaixa,
   useResumoMensal,
   useCriarTransacao,
   useAtualizarTransacao,
@@ -141,6 +142,8 @@ export {
 export {
   useCarteiras,
   usePainelSaldo,
+  useHistoricoSaldoMes,
+  useTransferencias,
   useCriarCarteira,
   useAtualizarCarteira,
   useGastei,

@@ -58,7 +58,9 @@ db() {
     "${q[@]}" -f tests/012_whatsapp_amigo.sql >/dev/null
     "${q[@]}" -f tests/013_whatsapp_lembretes.sql >/dev/null
     "${q[@]}" -f tests/013_whatsapp_lembretes_sem_008.sql >/dev/null
-    echo "ok: tests/005..013 (financas, carteiras, excluir_metas, saude_treino, origem_lancamento, treino_dieta_whatsapp, whatsapp_onboarding, whatsapp_amigo, whatsapp_lembretes)"
+    "${q[@]}" -f tests/014_cofrinho.sql >/dev/null
+    "${q[@]}" -f tests/015_rpc_saldo_painel.sql >/dev/null
+    echo "ok: tests/005..015 (financas, carteiras, excluir_metas, saude_treino, origem_lancamento, treino_dieta_whatsapp, whatsapp_onboarding, whatsapp_amigo, whatsapp_lembretes, cofrinho, rpc_saldo_painel)"
     bash tests/006_corrigir_saldo_concorrencia.sh
   )
 }
@@ -66,11 +68,16 @@ db() {
 smoke() {
   local url="${1:?uso: scripts/verify.sh smoke https://meudia.vercel.app}"
   local html
-  html="$(curl -fsSL --max-time 30 "${url%/}/login")"
+  # /login é estático (sem noStore no layout raiz): só precisa responder 200.
+  local status
+  status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "${url%/}/login" || true)"
+  [[ "$status" == "200" ]] || { echo "smoke FALHOU: ${url%/}/login respondeu ${status:-sem resposta} (esperado 200)" >&2; exit 1; }
+  # /onboarding é público no middleware e lê o APP_MODE por request (RuntimeAppConfig).
+  html="$(curl -fsSL --max-time 30 "${url%/}/onboarding")"
   if grep -Eq 'mode\\?":\\?"financas' <<<"$html"; then
-    echo "smoke ok: ${url%/}/login contém mode\":\"financas"
+    echo "smoke ok: ${url%/}/login 200 e ${url%/}/onboarding contém mode\":\"financas"
   else
-    echo "smoke FALHOU: ${url%/}/login não contém mode\":\"financas (APP_MODE congelado ou env ausente)" >&2
+    echo "smoke FALHOU: ${url%/}/onboarding não contém mode\":\"financas (APP_MODE congelado ou env ausente)" >&2
     exit 1
   fi
 }

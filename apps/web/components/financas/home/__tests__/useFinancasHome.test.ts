@@ -177,7 +177,7 @@ it.each([null, 'inexistente', 'segunda'])('Paguei usa sempre carteira ativa (pad
     carteiras: [{ carteira: { id: 'primeira', nome: 'Nubank' }, saldo: 100 }, { carteira: { id: 'segunda', nome: 'Caixa' }, saldo: 50 }],
     carteiraPadraoId: padrao,
     hojeISO: '2026-10-16', competencia: '2026-10', saldoHoje: 150, comecouMes: null,
-    arquivadas: [], rendasAReceber: [], transacoesCarteiras: [], transferencias: [],
+    arquivadas: [], rendasAReceber: [],
     mes: { rendas: [], recebimentos: [], contas: [], pagamentos: [] },
   };
   const home = usar();
@@ -195,7 +195,6 @@ it.each([['arquivada', 'primeira'], ['segunda', 'segunda'], [null, 'primeira']])
       hojeISO: '2026-10-16', competencia: '2026-10', saldoHoje: 150, comecouMes: null,
       arquivadas: [{ id: 'arquivada', nome: 'Antiga', arquivada: true }],
       rendasAReceber: [{ renda: { id: 'r1', descricao: 'Salário', valor: 900, carteira_id: daRenda }, competencia: '2026-10', data: '2026-10-05' }],
-      transacoesCarteiras: [], transferencias: [],
       mes: { rendas: [], recebimentos: [], contas: [], pagamentos: [] },
     };
     const result = montar();
@@ -207,7 +206,7 @@ describe('fechamento do mês (Cofrinho)', () => {
   const painel = (respondidas: string[] = []) => ({
     carteiras: [{ carteira: { id: 'primeira', nome: 'Nubank' }, saldo: 100 }], carteiraPadraoId: 'primeira',
     hojeISO: '2026-10-01', competencia: '2026-10', saldoHoje: 100, comecouMes: null,
-    arquivadas: [], rendasAReceber: [], transacoesCarteiras: [], transferencias: [],
+    arquivadas: [], rendasAReceber: [],
     mes: { rendas: [], recebimentos: [], contas: [], pagamentos: [], transacoesDeContas: {} },
     mesAnterior: { competencia: '2026-09', sobra: 99 },
     cofrinho: { saldo: 150, inicioEm: '2026-09-19T15:00:00Z', respondidas, movimentos: [] },

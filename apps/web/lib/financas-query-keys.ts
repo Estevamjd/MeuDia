@@ -35,6 +35,10 @@ export const carteirasKeys = {
   todas: ['carteiras'] as const,
   lista: (userId: string | undefined) => ['carteiras', userId, 'lista'] as const,
   painel: (userId: string | undefined, hojeISO: string) => ['carteiras', userId, 'painel', hojeISO] as const,
+  /** Saldos de abertura + transferências do mês (linha de saldo da Análise em Gastos). */
+  historicoMes: (userId: string | undefined, competencia: Competencia) => ['carteiras', userId, 'historico-mes', competencia] as const,
+  /** Lista de transferências da tela de bancos. */
+  transferencias: (userId: string | undefined) => ['carteiras', userId, 'transferencias'] as const,
 };
 
 /** Metas de compra (007). A sugestão usa a sobra do mês (painel + lançamentos), que tem as próprias chaves. */

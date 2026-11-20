@@ -129,3 +129,26 @@ export function sobraPorMes(
     return [{ competencia, rotulo, valor: centavos / 100, previsao: false }];
   });
 }
+
+/** Faixa de datas (AAAA-MM-DD, inclusiva) que cobre as competências: 1º dia da mais antiga → último dia da mais nova. */
+export function faixaDosMeses(competencias: readonly Competencia[]): { inicio: string; fim: string } {
+  const primeira = competencias[0]!;
+  const ultima = competencias[competencias.length - 1]!;
+  const [a, m] = ultima.split('-').map(Number) as [number, number];
+  const ultimoDia = new Date(Date.UTC(a, m, 0)).getUTCDate();
+  return { inicio: `${primeira}-01`, fim: `${ultima}-${String(ultimoDia).padStart(2, '0')}` };
+}
+
+/**
+ * Separa os lançamentos de uma faixa por competência (`data.slice(0, 7)`). Cada mês sai em ordem (data, id)
+ * decrescente, como a consulta de um mês só (`transacoesDoMes`, data decrescente). Mês sem lançamento = [].
+ */
+export function separarPorCompetencia<T extends { data: string; id: string }>(
+  transacoes: readonly T[],
+  competencias: readonly Competencia[],
+): Map<Competencia, T[]> {
+  const porMes = new Map<Competencia, T[]>(competencias.map((c) => [c, []]));
+  for (const t of transacoes) porMes.get(t.data.slice(0, 7) as Competencia)?.push(t);
+  for (const lista of porMes.values()) lista.sort((x, y) => y.data.localeCompare(x.data) || y.id.localeCompare(x.id));
+  return porMes;
+}

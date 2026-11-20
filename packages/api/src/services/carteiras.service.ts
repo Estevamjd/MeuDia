@@ -10,6 +10,8 @@ import {
   fimDoMes,
   hojeSP,
   saldoCarteira,
+  somarDias,
+  painelDeSaldosAgregados,
   saldoHoje,
   saldosCarteiras,
   saldoCofrinho,
@@ -184,8 +186,9 @@ export async function painelSaldo(userId: string, hojeISO = hojeSP()) {
   usuario(userId);
   const competencia = competenciaDe(hojeISO);
   const anterior = competenciaAnterior(competencia);
-  const carteiras = await carteirasRepository.findAll(userId);
-  const desde = carteiras.map(dataAncora).sort()[0];
+  const agregado = await carteirasRepository.rpcResumoPainelSaldo(hojeISO);
+  const carteiras = agregado ? agregado.carteiras.map(({ saldo: _saldo, saldo_fim_mes_anterior: _anterior, ...c }) => c) : await carteirasRepository.findAll(userId);
+  const desde = agregado ? undefined : carteiras.map(dataAncora).sort()[0];
   const [transacoes, transferencias, rendas, recebimentos, contas, pagamentos, doisMeses, cofrinho] = await Promise.all([
     desde ? transacaoRepository.findComCarteiraDesde(userId, desde) : Promise.resolve([] as Transacao[]),
     desde ? transferenciasRepository.findDesde(userId, desde) : Promise.resolve([] as Transferencia[]),
@@ -214,7 +217,7 @@ export async function painelSaldo(userId: string, hojeISO = hojeSP()) {
     competencia: anterior, transacoes: doisMeses, rendas, contas, transacoesDeContas,
     recebimentos: doMes(anterior)(recebimentos), pagamentos: doMes(anterior)(pagamentos),
   });
-  const saldos = saldosCarteiras(carteiras, transacoes, transferencias, hojeISO);
+  const saldos = agregado ? [] : saldosCarteiras(carteiras, transacoes, transferencias, hojeISO);
   const recebidas = new Set(recebimentosMes.map((r) => r.renda_id));
   const rendasAReceber: RendaAReceber[] = rendas
     .filter((r) => r.ativo && !recebidas.has(r.id))
@@ -224,7 +227,7 @@ export async function painelSaldo(userId: string, hojeISO = hojeSP()) {
   // "Padrão = última usada ou a primeira" (R5).
   const ultima = [...transacoes]
     .filter((t) => t.carteira_id && ativas.has(t.carteira_id) && !t.ajuste)
-    .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))[0]?.carteira_id;
+    .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? '') || a.data.localeCompare(b.data) || a.id.localeCompare(b.id))[0]?.carteira_id;
   return {
     hojeISO,
     competencia,
@@ -241,8 +244,7 @@ export async function painelSaldo(userId: string, hojeISO = hojeSP()) {
     /** `null`: banco sem a 014 (a tela mostra o total dos bancos como antes). */
     cofrinho,
     carteiraPadraoId: ultima ?? saldos[0]?.carteira.id ?? null,
-    transacoesCarteiras: transacoes,
-    transferencias,
+    ...(agregado ? painelDeSaldosAgregados(agregado.carteiras, competencia, agregado.ultimaCarteiraId) : {}),
   };
 }
 
@@ -252,3 +254,28 @@ export async function criarCarteiraOnboarding(userId: string, id: string, data: 
   usuario(userId);
   return carteirasRepository.createIdempotente(userId, id, carteiraInsertSchema.parse(data));
 }
+
+/** Lista independente do painel: paginação por chave até esgotar. */
+export async function transferenciasRecentes(userId: string) {
+  usuario(userId);
+  return transferenciasRepository.findAll(userId);
+}
+
+export async function historicoSaldoMes(userId: string, competencia: string) {
+  usuario(userId);
+  competenciaSchema.parse(competencia);
+  const fimAnterior = somarDias(`${competencia}-01`, -1);
+  const [agregado, transferencias] = await Promise.all([
+    carteirasRepository.rpcSaldosCarteirasEm(fimAnterior),
+    transferenciasRepository.findEntre(userId, `${competencia}-01`, fimDoMes(competencia)),
+  ]);
+  if (agregado) return { bases: agregado, transferencias };
+  const carteiras = await carteirasRepository.findAll(userId);
+  const desde = carteiras.map(dataAncora).sort()[0];
+  const [ts, trs] = desde ? await Promise.all([
+    transacaoRepository.findComCarteiraDesde(userId, desde), transferenciasRepository.findDesde(userId, desde),
+  ]) : [[], []];
+  return { bases: Object.fromEntries(carteiras.map((c) => [c.id, saldoCarteira(c, ts, trs, fimAnterior)])), transferencias };
+}
+
+export type HistoricoSaldoMes = Awaited<ReturnType<typeof historicoSaldoMes>>;

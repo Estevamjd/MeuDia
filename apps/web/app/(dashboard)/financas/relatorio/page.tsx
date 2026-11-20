@@ -1,8 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useQueries } from '@tanstack/react-query';
-import { financasService } from '@meudia/api';
 import Link from 'next/link';
 import { FileText } from 'lucide-react';
 import { competenciaDe, hojeSP } from '@meudia/shared';
@@ -10,20 +8,20 @@ import { Button, SkeletonCard } from '../../../../components/ui';
 import { SeletorMes } from '../../../../components/financas/SeletorMes';
 import { CabecalhoPagina, primeiroNome } from '../../../../components/financas/resumo/CabecalhoPagina';
 import { PainelView } from '../../../../components/financas/painel/PainelView';
-import { gastoAcumulado, numerosPainel, sobraPorMes, ultimosMeses } from '../../../../components/financas/painel/montarPainel';
+import { faixaDosMeses, gastoAcumulado, numerosPainel, separarPorCompetencia, sobraPorMes, ultimosMeses } from '../../../../components/financas/painel/montarPainel';
 import { montarResumoMes } from '../../../../components/financas/resumo/montarResumoMes';
 import { montarDashboard } from '../../../../components/financas/home/montarDashboard';
-import { usePainelSaldo, useTransacoesMes } from '../../../../hooks';
+import { usePainelSaldo, useTransacoesFaixa } from '../../../../hooks';
 import { useProfile } from '../../../../hooks/useProfile';
-import { useAuth } from '../../../../hooks/useAuth';
 import { deslocarCompetencia, partesCompetencia } from '../../../../lib/financas-ui';
 import { lerEsconderValores } from '../../../../lib/carteiras-ui';
 
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
 /**
- * Painel (aba Relatório; v4 aprovado em 19/11/2026): seu dinheiro em gráficos, com dados reais do mês. Os 5 meses
- * anteriores só alimentam "Quanto sobrou por mês" (mesma chave de cache de `useTransacoesMes`).
+ * Painel (aba Relatório; v4 aprovado em 19/11/2026): seu dinheiro em gráficos, com dados reais do mês. Uma consulta só
+ * cobre os 6 meses (1º dia do mais antigo → último dia do mostrado) e é separada por competência em memória: o mês
+ * mostrado alimenta tudo; os 5 anteriores só "Quanto sobrou por mês".
  */
 export default function RelatorioPage() {
   const hojeISO = useMemo(() => hojeSP(), []);
@@ -33,43 +31,34 @@ export default function RelatorioPage() {
   const nomeMes = MESES[mes - 1]!;
   const { data: profile } = useProfile();
   const nome = primeiroNome(profile?.nome);
-  const transacoes = useTransacoesMes(ano, mes);
+  const competencias = useMemo(() => ultimosMeses(competencia, 6), [competencia]);
+  const faixa = useMemo(() => faixaDosMeses(competencias), [competencias]);
+  const transacoes = useTransacoesFaixa(faixa.inicio, faixa.fim);
+  const porMes = useMemo(
+    () => (transacoes.data ? separarPorCompetencia(transacoes.data, competencias) : null),
+    [transacoes.data, competencias],
+  );
+  const doMes = porMes?.get(competencia);
   const painel = usePainelSaldo(hojeISO);
   const [escondido, setEscondido] = useState(false);
   useEffect(() => setEscondido(lerEsconderValores()), []);
 
-  const { user } = useAuth();
-  const competencias = useMemo(() => ultimosMeses(competencia, 6), [competencia]);
-  const anteriores = useQueries({
-    queries: competencias.slice(0, -1).map((c) => {
-      const p = partesCompetencia(c);
-      return {
-        queryKey: ['transacoes-mes', user?.id, p.ano, p.mes],
-        queryFn: () => financasService.transacoesDoMes(user!.id, p.ano, p.mes),
-        enabled: !!user?.id,
-        staleTime: 5 * 60_000,
-      };
-    }),
-  });
-
   const painelMes = useMemo(() => {
-    if (!transacoes.data) return null;
-    const dash = painel.data ? montarDashboard(competencia, hojeISO, painel.data, transacoes.data) : null;
-    const resumo = montarResumoMes(competencia, transacoes.data, dash?.sobraMes ?? null);
+    if (!doMes) return null;
+    const dash = painel.data ? montarDashboard(competencia, hojeISO, painel.data, doMes) : null;
+    const resumo = montarResumoMes(competencia, doMes, dash?.sobraMes ?? null);
     const numeros = dash?.sobraMes ? numerosPainel(dash.sobraMes) : null;
     return { resumo, numeros, acumulado: dash ? gastoAcumulado(dash.evolucao, competencia, numeros?.faltaPagar ?? 0) : [] };
-  }, [competencia, hojeISO, painel.data, transacoes.data]);
+  }, [competencia, hojeISO, painel.data, doMes]);
   const resumo = painelMes?.resumo ?? null;
 
-  const dadosAnteriores = anteriores.map((q) => q.data);
   const meses = useMemo(
     () =>
       sobraPorMes(
-        competencias.map((c, i) => ({ competencia: c, transacoes: i < competencias.length - 1 ? dadosAnteriores[i] : transacoes.data })),
+        competencias.map((c) => ({ competencia: c, transacoes: porMes?.get(c) })),
         painelMes?.numeros ? { competencia, valor: painelMes.numeros.sobra } : null,
       ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [competencias, competencia, painelMes, transacoes.data, ...dadosAnteriores],
+    [competencias, competencia, painelMes, porMes],
   );
 
   const pelaApp = resumo ? resumo.quantidade.total - resumo.quantidade.whatsapp : 0;

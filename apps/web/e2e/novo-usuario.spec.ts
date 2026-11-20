@@ -302,12 +302,15 @@ test('novo usuário: cadastro → onboarding → finanças → logout → login'
 
   // ── 10. Logout ─────────────────────────────────────────────────────────────
   drawer = await abrirDrawer();
+  // /registro e /esqueci-senha são estáticas: o <Link> da tela de login pré-carrega o RSC inteiro delas. Abortado
+  // pelo goto, o WebKit loga "Failed to fetch RSC payload ... Load failed"; espera os dois prefetches terminarem.
+  const prefetchesLogin = ['/registro', '/esqueci-senha'].map((rota) =>
+    page.waitForResponse((r) => new URL(r.url()).pathname === rota && r.request().headers()['rsc'] === '1', { timeout: 15_000 }).catch(() => null));
   await drawer.getByRole('button', { name: 'Sair' }).click();
   await page.waitForURL(/\/login/);
   await expect(page.getByRole('button', { name: 'Entrar' })).toBeVisible();
   await shot('logout');
-  // Antes de "digitar" outra URL, deixa terminar o prefetch de /registro da tela de login
-  // (abortado pelo goto, o WebKit loga "Failed to fetch RSC payload ... Load failed").
+  await Promise.all(prefetchesLogin);
   await page.waitForLoadState('networkidle');
   // Rota protegida sem sessão → /login.
   await page.goto('/financas');

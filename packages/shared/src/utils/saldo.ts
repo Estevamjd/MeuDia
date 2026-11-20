@@ -335,3 +335,34 @@ export function evolucaoMes(
   }
   return pontos;
 }
+
+/** Saldos calculados pelo banco, preservando os metadados originais da carteira. */
+export type CarteiraComSaldoAgregado = Carteira & { saldo: number; saldo_fim_mes_anterior: number };
+
+export function painelDeSaldosAgregados(rows: readonly CarteiraComSaldoAgregado[], competencia: string, ultimaCarteiraId: string | null) {
+  const carteiras = rows.map(({ saldo: _saldo, saldo_fim_mes_anterior: _anterior, ...c }) => c);
+  const porId = new Map(rows.map((c) => [c.id, c]));
+  const saldos = carteiras.filter((c) => !c.arquivada)
+    .sort((a, b) => a.ordem - b.ordem || (a.created_at ?? '').localeCompare(b.created_at ?? ''))
+    .map((carteira) => ({ carteira, saldo: Number(porId.get(carteira.id)!.saldo) }));
+  const existentes = rows.filter((c) => !c.arquivada && c.incluir_no_total && dataAncora(c) <= somarDias(`${competencia}-01`, -1));
+  return {
+    carteiras: saldos,
+    arquivadas: carteiras.filter((c) => c.arquivada),
+    saldoHoje: centavos(saldos.filter((s) => s.carteira.incluir_no_total).reduce((n, s) => n + s.saldo, 0)),
+    comecouMes: existentes.length ? centavos(existentes.reduce((n, c) => n + Number(c.saldo_fim_mes_anterior), 0)) : null,
+    carteiraPadraoId: ultimaCarteiraId ?? saldos[0]?.carteira.id ?? null,
+  };
+}
+
+/** Evolução com base no fechamento anterior e somente os movimentos do mês. */
+export function evolucaoMesComBase(
+  competencia: string, hojeISO: string,
+  transacoesMes: readonly (TransacaoMes & Partial<TransacaoSaldo>)[],
+  carteiras: readonly Carteira[], bases: Readonly<Record<string, number>>,
+  transferenciasMes: readonly TransferenciaSaldo[],
+): PontoEvolucao[] {
+  const rebased = carteiras.map((c) => ({ ...c, saldo_inicial: bases[c.id] ?? c.saldo_inicial }));
+  return evolucaoMes(competencia, hojeISO, transacoesMes, rebased,
+    transacoesMes.filter((t): t is TransacaoMes & TransacaoSaldo => !!t.carteira_id), transferenciasMes);
+}

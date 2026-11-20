@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import { TrendingUp } from 'lucide-react';
 import type { PontoEvolucao } from '@meudia/shared';
-import { Skeleton } from '../../ui';
+import { Button, Skeleton } from '../../ui';
 import { formatBRL } from '../../../lib/financas-ui';
 import { CardDashboard } from './CardDashboard';
 
@@ -15,17 +15,33 @@ const EvolucaoMesChart = dynamic(() => import('./EvolucaoMesChart'), {
 export interface GraficoEvolucaoProps {
   pontos: PontoEvolucao[];
   escondido: boolean;
+  /** Estado da base da linha de saldo: carregando não afirma "sem dados"; erro mostra "Tentar de novo". */
+  estado?: 'ok' | 'carregando' | 'erro';
+  onTentarDeNovo?: () => void;
 }
 
 /** Evolução do mês: saldo no fim de cada dia (linha) e gasto por dia (barras). */
-export function GraficoEvolucao({ pontos, escondido }: GraficoEvolucaoProps) {
+export function GraficoEvolucao({ pontos, escondido, estado = 'ok', onTentarDeNovo }: GraficoEvolucaoProps) {
   const gastoTotal = pontos.reduce((s, p) => s + p.gasto, 0);
   const maior = pontos.reduce<PontoEvolucao | null>((m, p) => (p.gasto > (m?.gasto ?? 0) ? p : m), null);
   // Mesmas regras do gráfico: linha com 2+ dias de saldo, barras com algum gasto.
   const vazio = gastoTotal === 0 && pontos.filter((p) => p.saldo !== null).length < 2;
   return (
     <CardDashboard id="grafico-evolucao" titulo="Evolução do mês" icone={<TrendingUp size={20} />}>
-      {vazio ? (
+      {estado === 'erro' ? (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 text-[15px] text-text">
+          <span>Não foi possível carregar a evolução do saldo.</span>
+          {onTentarDeNovo && (
+            <Button variant="ghost" className="min-h-[44px]" onClick={onTentarDeNovo}>
+              Tentar de novo
+            </Button>
+          )}
+        </div>
+      ) : estado === 'carregando' ? (
+        <div role="status" aria-label="Carregando a evolução do saldo">
+          <Skeleton className="h-64 w-full" />
+        </div>
+      ) : vazio ? (
         <p className="text-[15px] text-muted">O gráfico aparece com o primeiro gasto do mês ou a partir do 2º dia com saldo.</p>
       ) : escondido ? (
         <p className="text-[15px] text-muted">Valores escondidos.</p>

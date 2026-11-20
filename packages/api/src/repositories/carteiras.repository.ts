@@ -1,6 +1,6 @@
-import type { Carteira, CarteiraInsert, TipoCarteira, Transacao } from '@meudia/shared';
+import type { Carteira, CarteiraComSaldoAgregado, CarteiraInsert, TipoCarteira, Transacao } from '@meudia/shared';
 import { AppError, logger } from '@meudia/shared';
-import { MENSAGEM_SCHEMA_DESATUALIZADO, erroDb } from './erros-db';
+import { MENSAGEM_SCHEMA_DESATUALIZADO, erroDb, schemaDesatualizado } from './erros-db';
 import { getSupabase } from './supabase';
 
 const COLUMNS = 'id, user_id, nome, tipo, saldo_inicial, saldo_inicial_em, incluir_no_total, arquivada, ordem, created_at, updated_at';
@@ -78,4 +78,25 @@ export async function remove(id: string, userId: string): Promise<void> {
     throw new AppError(`Schema desatualizado (${error.code}): ${error.message}`, 'SCHEMA_DESATUALIZADO', 503, MENSAGEM_SCHEMA_DESATUALIZADO);
   }
   if (error) erro(error);
+}
+
+export async function rpcResumoPainelSaldo(hojeISO: string): Promise<{ carteiras: CarteiraComSaldoAgregado[]; ultimaCarteiraId: string | null } | null> {
+  const { data, error } = await getSupabase().rpc('resumo_painel_saldo', { p_hoje: hojeISO });
+  if (schemaDesatualizado(error)) {
+    logger.warn('SCHEMA_DESATUALIZADO: resumo_painel_saldo ausente (015), cálculo legado', { code: error?.code });
+    return null;
+  }
+  if (error) erro(error);
+  const result = data as { carteiras: CarteiraComSaldoAgregado[]; ultima_carteira_id: string | null };
+  return { carteiras: result.carteiras.map((c) => ({ ...c, saldo_inicial: Number(c.saldo_inicial), saldo: Number(c.saldo), saldo_fim_mes_anterior: Number(c.saldo_fim_mes_anterior) })), ultimaCarteiraId: result.ultima_carteira_id };
+}
+
+export async function rpcSaldosCarteirasEm(ateISO: string): Promise<Record<string, number> | null> {
+  const { data, error } = await getSupabase().rpc('saldos_carteiras_em', { p_ate: ateISO });
+  if (schemaDesatualizado(error)) {
+    logger.warn('SCHEMA_DESATUALIZADO: saldos_carteiras_em ausente (015), cálculo legado', { code: error?.code });
+    return null;
+  }
+  if (error) erro(error);
+  return Object.fromEntries((data as { carteira_id: string; saldo: number }[]).map((c) => [c.carteira_id, Number(c.saldo)]));
 }

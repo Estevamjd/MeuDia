@@ -6,7 +6,7 @@ import { clsx } from 'clsx';
 import { Archive, ArchiveRestore, ArrowLeftRight, Landmark, Pencil, Plus, Scale, Trash2 } from 'lucide-react';
 import type { Carteira, TipoCarteira, Transferencia } from '@meudia/shared';
 import { hojeSP } from '@meudia/shared';
-import { useAtualizarCarteira, useCorrigirSaldo, useCriarCarteira, useExcluirCarteira, useExcluirTransferencia, usePainelSaldo } from '../../../../hooks';
+import { useAtualizarCarteira, useCorrigirSaldo, useCriarCarteira, useExcluirCarteira, useExcluirTransferencia, usePainelSaldo, useTransferencias } from '../../../../hooks';
 import { Button, ConfirmDialog, EmptyState, Input, Modal, Select, SkeletonList, useToast } from '../../../../components/ui';
 import { IconeCarteira } from '../../../../components/financas/SeletorCarteira';
 import { ConfirmarExclusao } from '../../../../components/financas/ConfirmarExclusao';
@@ -31,6 +31,7 @@ function CarteirasConteudo() {
   const searchParams = useSearchParams();
   const hojeISO = useMemo(() => hojeSP(), []);
   const painel = usePainelSaldo(hojeISO);
+  const listaTransferencias = useTransferencias();
   const atualizar = useAtualizarCarteira();
   const excluirCarteira = useExcluirCarteira();
   const excluirTransferencia = useExcluirTransferencia();
@@ -81,7 +82,15 @@ function CarteirasConteudo() {
   const ativas = painel.data?.carteiras ?? [];
   const arquivadas = painel.data?.arquivadas ?? [];
   const nomes = new Map([...ativas.map((s) => s.carteira), ...arquivadas].map((c) => [c.id, c.nome]));
-  const transferencias = [...(painel.data?.transferencias ?? [])].sort(
+  // Erro nas transferências não vira lista vazia. O react-query volta a consulta sem cache para `pending` no
+  // "Tentar de novo" (isError some), então a falha fica guardada aqui até um sucesso: a seção e o botão focado
+  // continuam montados (só trocam para "Carregando…"); no carregamento inicial nada de erro aparece.
+  const [falhouTransferencias, setFalhouTransferencias] = useState(false);
+  if (listaTransferencias.isError && !falhouTransferencias) setFalhouTransferencias(true);
+  if (listaTransferencias.isSuccess && falhouTransferencias) setFalhouTransferencias(false);
+  const erroTransferencias = falhouTransferencias || listaTransferencias.isError;
+  const recarregandoTransferencias = erroTransferencias && (listaTransferencias.isFetching || !listaTransferencias.isError);
+  const transferencias = [...(listaTransferencias.data ?? [])].sort(
     (a, b) => b.data.localeCompare(a.data) || (b.created_at ?? '').localeCompare(a.created_at ?? ''),
   );
 
@@ -206,9 +215,32 @@ function CarteirasConteudo() {
         </>
       )}
 
-      {transferencias.length > 0 && (
+      {(transferencias.length > 0 || erroTransferencias) && (
         <section aria-labelledby="transferencias" className="space-y-2">
           <h2 id="transferencias" className="text-[15px] font-semibold text-text">Transferências</h2>
+          {erroTransferencias && (
+            <div
+              role={recarregandoTransferencias ? 'status' : 'alert'}
+              className={clsx(
+                'flex items-center justify-between gap-3 rounded-card border bg-card p-3 text-sm',
+                recarregandoTransferencias ? 'border-border' : 'border-red/40',
+              )}
+            >
+              <span>{recarregandoTransferencias ? 'Carregando as transferências…' : 'Não foi possível carregar as transferências.'}</span>
+              {/* aria-disabled (não `disabled`): o botão segue focável e o foco não se perde durante o retry. */}
+              <Button
+                variant="ghost"
+                className="min-h-[44px]"
+                aria-busy={recarregandoTransferencias}
+                aria-disabled={recarregandoTransferencias}
+                onClick={() => {
+                  if (!recarregandoTransferencias) void listaTransferencias.refetch();
+                }}
+              >
+                {recarregandoTransferencias ? 'Carregando…' : 'Tentar de novo'}
+              </Button>
+            </div>
+          )}
           <ul className="space-y-2">
             {transferencias.map((tr) => (
               <li key={tr.id} className="flex items-center gap-3 rounded-card border border-border bg-card p-3">

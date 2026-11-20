@@ -1,6 +1,6 @@
-import type { PainelSaldo } from '@meudia/api';
+import type { HistoricoSaldoMes, PainelSaldo } from '@meudia/api';
 import type { Competencia, FatiaCategoria, PerguntaFechamento, PontoEvolucao, SobraDoMes, Transacao } from '@meudia/shared';
-import { evolucaoMes, gastosPorCategoria, perguntaFechamento, sobraDoMes } from '@meudia/shared';
+import { evolucaoMesComBase, gastosPorCategoria, perguntaFechamento, sobraDoMes } from '@meudia/shared';
 import { partesCompetencia } from '../../../lib/financas-ui';
 import type { CardSaldoHojeProps } from './CardSaldoHoje';
 import type { RendaAReceberItem } from './CardRendaAReceber';
@@ -17,11 +17,26 @@ export interface DadosDashboard {
   fechamento: PerguntaFechamento | null;
   rendasAReceber: RendaAReceberItem[];
   fatias: FatiaCategoria[];
+  /** Gasto por dia sempre; `saldo` só com `historico` (sem ele, `null` em todos os dias). */
   evolucao: PontoEvolucao[];
 }
 
+/**
+ * Evolução do mês: barras de gasto por dia; a linha de saldo só quando o `historico` (saldos de abertura + transferências
+ * do mês) foi lido. Quem não desenha a linha (Início, Painel) não passa o histórico e recebe `saldo: null`.
+ */
+function evolucao(
+  competencia: Competencia, hojeISO: string, transacoesMes: readonly Transacao[],
+  carteiras: PainelSaldo['arquivadas'], historico: HistoricoSaldoMes | undefined,
+): PontoEvolucao[] {
+  if (historico) return evolucaoMesComBase(competencia, hojeISO, transacoesMes, carteiras, historico.bases, historico.transferencias);
+  return evolucaoMesComBase(competencia, hojeISO, transacoesMes, [], {}, []);
+}
+
 /** Painel de saldo + lançamentos do mês exibido → dados dos cards e gráficos (puro, sem React). */
-export function montarDashboard(competencia: Competencia, hojeISO: string, painel: PainelSaldo, transacoesMes: readonly Transacao[]): DadosDashboard {
+export function montarDashboard(
+  competencia: Competencia, hojeISO: string, painel: PainelSaldo, transacoesMes: readonly Transacao[], historico?: HistoricoSaldoMes,
+): DadosDashboard {
   const mesCorrente = competencia === painel.competencia;
   const todas = [...painel.carteiras.map((s) => s.carteira), ...painel.arquivadas];
   // `transacoesMes` é da competência exibida: só no mês corrente ela casa com as entradas do painel.
@@ -48,6 +63,6 @@ export function montarDashboard(competencia: Competencia, hojeISO: string, paine
       ? painel.rendasAReceber.map((r) => ({ rendaId: r.renda.id, descricao: r.renda.descricao, valor: Number(r.renda.valor), data: r.data, competencia: r.competencia }))
       : [],
     fatias: gastosPorCategoria(transacoesMes),
-    evolucao: evolucaoMes(competencia, hojeISO, transacoesMes, todas, painel.transacoesCarteiras, painel.transferencias),
+    evolucao: evolucao(competencia, hojeISO, transacoesMes, todas, historico),
   };
 }

@@ -2,7 +2,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { PainelSaldo } from '@meudia/api';
-import type { Carteira, ContaPagar, Renda, SobraDoMes } from '@meudia/shared';
+import type { Carteira, ContaPagar, Renda, SobraDoMes, Transacao, Transferencia } from '@meudia/shared';
+import { evolucaoMes, fimDoMes, saldoCarteira, somarDias } from '@meudia/shared';
 import { CategoriaIcone } from '../CategoriaIcone';
 import { SeletorCategoria } from '../SeletorCategoria';
 import { SeletorCarteira } from '../SeletorCarteira';
@@ -209,7 +210,7 @@ describe('montarDashboard', () => {
     carteiras: [{ carteira: carteira('n', 'Nubank'), saldo: 675 }, { carteira: carteira('c', 'Caixa'), saldo: 100 }],
     arquivadas: [], mes: { rendas: [renda], recebimentos: [], contas: [contaLuz], pagamentos: [] },
     rendasAReceber: [{ renda: { id: 'r', descricao: 'Salário', valor: 900 }, competencia: '2026-10', data: '2026-10-05' }],
-    carteiraPadraoId: 'n', transacoesCarteiras: [], transferencias: [],
+    carteiraPadraoId: 'n',
   } as unknown as PainelSaldo;
   const gasto = { id: 't', user_id: 'u', tipo: 'despesa' as const, categoria: 'Comida', descricao: 'x', valor: 25, data: '2026-10-17', banco: null, automatico: false, created_at: '2026-10-17T15:10:00Z', carteira_id: 'n', ajuste: false };
 
@@ -230,6 +231,81 @@ describe('montarDashboard', () => {
     expect(d.sobraMes).toBeNull();
     expect(d.rendasAReceber).toEqual([]);
     expect(d.evolucao).toHaveLength(30);
+  });
+  it('sem histórico (Início, Painel): só as barras de gasto, saldo null em todos os dias', () => {
+    const d = montarDashboard('2026-10', '2026-10-17', painel, [gasto]);
+    expect(d.evolucao.every((p) => p.saldo === null)).toBe(true);
+    expect(d.evolucao.map((p) => p.gasto)).toEqual(evolucaoMes('2026-10', '2026-10-17', [gasto], [], [], []).map((p) => p.gasto));
+  });
+
+  describe('linha de saldo da Análise (Gastos): histórico do mês = histórico completo antigo', () => {
+    // Âncoras: antes do mês, no meio do mês (dia 10, 12:00 SP) e depois do mês; arquivada; fora do total.
+    const banco = (id: string, saldo: number, em: string, extra: Partial<Carteira> = {}): Carteira => ({
+      id, user_id: 'u', nome: id, tipo: 'banco', saldo_inicial: saldo, saldo_inicial_em: em,
+      incluir_no_total: true, arquivada: false, ordem: 0, created_at: '2026-08-01T12:00:00Z', updated_at: null, ...extra,
+    });
+    const cs = [
+      banco('antigo', 1000, '2026-08-20T15:00:00Z'),
+      banco('meio', 300, '2026-10-10T15:00:00.500Z'),
+      banco('depois', 50, '2026-11-03T15:00:00Z'),
+      banco('arq', 700, '2026-08-01T15:00:00Z', { arquivada: true }),
+      banco('fora', 9000, '2026-08-01T15:00:00Z', { incluir_no_total: false }),
+    ];
+    let n = 0;
+    const t = (carteira_id: string | null, tipo: 'receita' | 'despesa', valor: number, data: string, created_at: string | null, ajuste = false): Transacao => ({
+      id: `t${String(++n).padStart(3, '0')}`, user_id: 'u', tipo, categoria: ajuste ? 'Ajuste de saldo' : 'Comida', descricao: 'x', valor, data,
+      banco: null, automatico: false, created_at, carteira_id, ajuste,
+    } as Transacao);
+    const todas: Transacao[] = [
+      t('antigo', 'despesa', 120.35, '2026-09-02', '2026-09-02T12:00:00Z'),
+      t('antigo', 'receita', 2500, '2026-09-05', '2026-09-05T12:00:00Z'),
+      t('antigo', 'despesa', 33.1, '2026-09-30', '2026-09-30T23:00:00Z', true),
+      t('antigo', 'despesa', 45.9, '2026-10-01', '2026-10-01T12:00:00Z'),
+      t('antigo', 'despesa', 12, '2026-10-17', '2026-10-17T12:00:00Z'),
+      t('meio', 'despesa', 99, '2026-10-08', '2026-10-08T12:00:00Z'), // antes da âncora: não conta
+      t('meio', 'despesa', 7, '2026-10-10', '2026-10-10T15:00:00.400Z'), // mesmo dia, antes do instante
+      t('meio', 'despesa', 5, '2026-10-10', '2026-10-10T15:00:00.600Z'), // mesmo dia, depois: conta
+      t('meio', 'despesa', 3, '2026-10-10', null), // mesmo dia sem created_at: não conta
+      t('meio', 'receita', 18.4, '2026-10-21', '2026-10-21T12:00:00Z', true),
+      t('depois', 'despesa', 10, '2026-11-04', '2026-11-04T12:00:00Z'),
+      t('arq', 'despesa', 70, '2026-10-02', '2026-10-02T12:00:00Z'),
+      t('fora', 'despesa', 900, '2026-10-02', '2026-10-02T12:00:00Z'),
+      t(null, 'despesa', 270, '2026-10-03', '2026-10-03T12:00:00Z'),
+      t('antigo', 'despesa', 40, '2026-11-15', '2026-11-15T12:00:00Z'),
+    ];
+    const tr = (origem_id: string | null, destino_id: string | null, valor: number, data: string, created_at: string): Transferencia =>
+      ({ id: `tr${data}${valor}`, user_id: 'u', origem_id, destino_id, valor, data, descricao: null, created_at } as unknown as Transferencia);
+    const transferencias = [
+      tr('antigo', 'arq', 200, '2026-09-10', '2026-09-10T12:00:00Z'),
+      tr('antigo', 'meio', 150, '2026-10-12', '2026-10-12T12:00:00Z'),
+      tr('meio', 'antigo', 60, '2026-10-10', '2026-10-10T15:00:01Z'),
+      tr(null, 'antigo', 25, '2026-10-25', '2026-10-25T12:00:00Z'),
+      tr('antigo', null, 8, '2026-10-26', '2026-10-26T12:00:00Z'),
+      tr('antigo', 'depois', 30, '2026-11-05', '2026-11-05T12:00:00Z'),
+    ];
+    const painelCs = {
+      ...painel, carteiras: cs.filter((c) => !c.arquivada).map((carteira) => ({ carteira, saldo: 0 })), arquivadas: cs.filter((c) => c.arquivada),
+    } as unknown as PainelSaldo;
+    /** O que `historicoSaldoMes` devolve (RPC `saldos_carteiras_em` ou fallback, mesma regra). */
+    const historicoDe = (competencia: string) => {
+      const fimAnterior = somarDias(`${competencia}-01`, -1);
+      return {
+        bases: Object.fromEntries(cs.map((c) => [c.id, saldoCarteira(c, todas, transferencias, fimAnterior)])),
+        transferencias: transferencias.filter((x) => x.data >= `${competencia}-01` && x.data <= fimDoMes(competencia)),
+      };
+    };
+    it.each([
+      ['mês corrente, âncora no meio do mês', '2026-10', '2026-10-27'],
+      ['mês passado (até o último dia)', '2026-10', '2026-11-20'],
+      ['mês com banco criado no meio', '2026-11', '2026-11-20'],
+      ['mês antes de qualquer âncora do "meio"', '2026-09', '2026-11-20'],
+    ])('%s', (_nome, competencia, hojeISO) => {
+      const doMes = todas.filter((x) => x.data.startsWith(competencia));
+      const antigo = evolucaoMes(competencia, hojeISO, doMes, cs, todas, transferencias);
+      const novo = montarDashboard(competencia, hojeISO, painelCs, doMes, historicoDe(competencia)).evolucao;
+      expect(antigo.some((p) => p.saldo !== null)).toBe(true);
+      expect(novo).toEqual(antigo);
+    });
   });
 });
 

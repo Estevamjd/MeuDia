@@ -16,6 +16,9 @@ export interface AnaliseMesProps {
   escondido: boolean;
   /** Lista das entradas do mês (editar/excluir; o Recebi vira desfazer). */
   listaEntradas?: ReactNode;
+  /** Estado da linha de saldo (histórico do mês); padrão 'ok'. */
+  estadoEvolucao?: 'ok' | 'carregando' | 'erro';
+  onTentarEvolucao?: () => void;
 }
 
 function Linha({ rotulo, children }: { rotulo: string; children: ReactNode }) {
@@ -41,7 +44,7 @@ function Chip({ rotulo, valor }: { rotulo: string; valor: string }) {
  * (pagas/faltam); comparação só com dados no mês anterior; percentuais com a base escrita. A única sobra do app é o
  * "No fim do mês sobra" da Início: aqui não há outra.
  */
-export function AnaliseMes({ analise: a, fatias, evolucao, escondido, listaEntradas }: AnaliseMesProps) {
+export function AnaliseMes({ analise: a, fatias, evolucao, escondido, listaEntradas, estadoEvolucao, onTentarEvolucao }: AnaliseMesProps) {
   const v = (n: number) => (escondido ? VALOR_OCULTO : formatBRL(n));
   return (
     <div className="space-y-4">
@@ -81,7 +84,7 @@ export function AnaliseMes({ analise: a, fatias, evolucao, escondido, listaEntra
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <GraficoCategorias fatias={fatias} escondido={escondido} />
-        <GraficoEvolucao pontos={evolucao} escondido={escondido} />
+        <GraficoEvolucao pontos={evolucao} escondido={escondido} estado={estadoEvolucao} onTentarDeNovo={onTentarEvolucao} />
       </div>
     </div>
   );

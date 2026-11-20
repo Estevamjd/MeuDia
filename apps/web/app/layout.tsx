@@ -1,10 +1,7 @@
 import type { Metadata, Viewport } from 'next';
-import { unstable_noStore as noStore } from 'next/cache';
 import localFont from 'next/font/local';
 import './globals.css';
 import { Providers } from './providers';
-import { AppModeProvider } from '../components/AppModeProvider';
-import { getAppMode } from '../lib/app-mode';
 import { SCRIPT_TEMA } from '../lib/tema';
 
 // Geist / Geist Mono auto-hospedadas (OFL, app/fonts): mesma tipografia do Mestres CRM (Astro G), sem Google Fonts.
@@ -70,8 +67,8 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // Força render por request: sem isso o layout é pré-renderizado no build e o APP_MODE congela no valor do build.
-  noStore();
+  // Sem noStore aqui: o layout raiz é estático para as páginas públicas (login, termos…) poderem ser pré-renderizadas.
+  // APP_MODE/VAPID são lidos por request em RuntimeAppConfig, nos layouts de (dashboard) e de onboarding.
   return (
     // data-mode e color-scheme são postos pelo SCRIPT_TEMA antes da hidratação (por isso o suppressHydrationWarning).
     <html lang="pt-BR" data-mode="dark" className={`${geist.variable} ${geistMono.variable}`} suppressHydrationWarning>
@@ -85,9 +82,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body className="astrog-ceu bg-bg font-dm text-text antialiased">
-        <AppModeProvider mode={getAppMode()} vapidPublicKey={process.env.VAPID_PUBLIC_KEY || null}>
-          <Providers>{children}</Providers>
-        </AppModeProvider>
+        <Providers>{children}</Providers>
         <script
           dangerouslySetInnerHTML={{
             __html: `

@@ -31,6 +31,34 @@ services:
       - traefik.http.routers.meudia.entrypoints=websecure
       - traefik.http.routers.meudia.tls.certresolver=letsencrypt
       - traefik.http.services.meudia.loadbalancer.server.port=3000
+      - traefik.http.routers.meudia.priority=1
+      - traefik.http.routers.meudia-api.rule=Host(`meudia.srv2176785.hstgr.cloud`) && PathPrefix(`/api/`)
+      - traefik.http.routers.meudia-api.priority=100
+      - traefik.http.routers.meudia-api.entrypoints=websecure
+      - traefik.http.routers.meudia-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.meudia-api.service=meudia
+      - traefik.http.routers.meudia-api.middlewares=meudia-api-limit
+      - traefik.http.middlewares.meudia-api-limit.ratelimit.average=60
+      - traefik.http.middlewares.meudia-api-limit.ratelimit.period=1m
+      - traefik.http.middlewares.meudia-api-limit.ratelimit.burst=30
+      - traefik.http.routers.meudia-login.rule=Host(`meudia.srv2176785.hstgr.cloud`) && (Path(`/login`) || Path(`/registro`) || Path(`/esqueci-senha`))
+      - traefik.http.routers.meudia-login.priority=100
+      - traefik.http.routers.meudia-login.entrypoints=websecure
+      - traefik.http.routers.meudia-login.tls.certresolver=letsencrypt
+      - traefik.http.routers.meudia-login.service=meudia
+      - traefik.http.routers.meudia-login.middlewares=meudia-login-limit
+      - traefik.http.middlewares.meudia-login-limit.ratelimit.average=30
+      - traefik.http.middlewares.meudia-login-limit.ratelimit.period=1m
+      - traefik.http.middlewares.meudia-login-limit.ratelimit.burst=20
+      - traefik.http.routers.meudia-ganchos.rule=Host(`meudia.srv2176785.hstgr.cloud`) && (PathPrefix(`/api/whatsapp/`) || PathPrefix(`/api/cron/`))
+      - traefik.http.routers.meudia-ganchos.priority=200
+      - traefik.http.routers.meudia-ganchos.entrypoints=websecure
+      - traefik.http.routers.meudia-ganchos.tls.certresolver=letsencrypt
+      - traefik.http.routers.meudia-ganchos.service=meudia
+      - traefik.http.routers.meudia-ganchos.middlewares=meudia-ganchos-limit
+      - traefik.http.middlewares.meudia-ganchos-limit.ratelimit.average=600
+      - traefik.http.middlewares.meudia-ganchos-limit.ratelimit.period=1m
+      - traefik.http.middlewares.meudia-ganchos-limit.ratelimit.burst=200
     healthcheck:
       test:
         [

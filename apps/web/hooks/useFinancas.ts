@@ -27,6 +27,20 @@ export function useTransacoesMes(ano: number, mes: number) {
   });
 }
 
+/**
+ * Lançamentos de uma faixa de datas numa consulta só (paginada por chave no repositório). Fica sob o prefixo
+ * `transacoes-mes` para herdar as invalidações de `chavesAfetadasPorLancamento`/`chavesAfetadasPorPagamento`.
+ */
+export function useTransacoesFaixa(inicio: string, fim: string) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['transacoes-mes', user?.id, 'faixa', inicio, fim],
+    queryFn: () => financasService.transacoesEntre(user!.id, inicio, fim),
+    enabled: !!user?.id,
+  });
+}
+
 export function useResumoMensal(ano: number, mes: number) {
   const { user } = useAuth();
 

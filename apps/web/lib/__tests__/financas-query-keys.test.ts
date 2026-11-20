@@ -68,4 +68,12 @@ describe('carteirasKeys', () => {
     expect(chavesAfetadasPorLancamento()).toContainEqual(carteirasKeys.lista('u1').slice(0, 1));
     expect(chavesAfetadasPorLancamento()).toContainEqual(['transacoes-mes']);
   });
+  it('histórico do mês (linha de saldo) e transferências ficam sob o prefixo ["carteiras"] (lançamento, transferência, orçamento)', () => {
+    const prefixo = (k: readonly unknown[]) => k.slice(0, 1);
+    expect(carteirasKeys.historicoMes('u1', '2026-10')).toEqual(['carteiras', 'u1', 'historico-mes', '2026-10']);
+    expect(carteirasKeys.transferencias('u1')).toEqual(['carteiras', 'u1', 'transferencias']);
+    expect(chavesAfetadasPorLancamento()).toContainEqual(prefixo(carteirasKeys.historicoMes('u1', '2026-10')));
+    expect(chavesAfetadasPorLancamento()).toContainEqual(prefixo(carteirasKeys.transferencias('u1')));
+    expect(chavesAfetadasPorOrcamento()).toContainEqual(prefixo(carteirasKeys.historicoMes('u1', '2026-10')));
+  });
 });

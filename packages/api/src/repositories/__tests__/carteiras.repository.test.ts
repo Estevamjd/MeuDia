@@ -14,7 +14,7 @@ vi.mock('../supabase', () => ({ getSupabase }));
 
 function mockClient(result: { data?: unknown; error?: unknown } = { data: [], error: null }) {
   const query: Record<string, unknown> = {};
-  for (const m of ['range', 'select', 'eq', 'in', 'not', 'gte', 'order', 'or', 'limit', 'single', 'insert', 'update', 'delete']) query[m] = vi.fn(() => query);
+  for (const m of ['range', 'select', 'eq', 'in', 'not', 'gte', 'lte', 'order', 'or', 'limit', 'single', 'insert', 'update', 'delete']) query[m] = vi.fn(() => query);
   query.then = (resolve: (v: unknown) => unknown) => Promise.resolve({ data: null, error: null, ...result }).then(resolve);
   const client = { from: vi.fn(() => query), rpc: vi.fn().mockResolvedValue({ data: null, error: null, ...result }) };
   getSupabase.mockReturnValue(client);
@@ -72,7 +72,10 @@ describe('repositórios de carteiras, transferências e recebimentos (sem banco)
     return query;
   }
   const id = (i: number) => `id-${String(i).padStart(5, '0')}`;
-  const buscas = [transacoes.findComCarteiraDesde, transferencias.findDesde];
+  const buscas = [transacoes.findComCarteiraDesde, transferencias.findDesde,
+    (u: string, _de: string) => transferencias.findAll(u),
+    (u: string, de: string) => transferencias.findEntre(u, de, '2026-10-31'),
+  ];
 
   it.each(buscas)('pagina por chave (data,id) em lotes de TAMANHO_PAGINA até esgotar', async (buscar) => {
     const linhas = Array.from({ length: 1201 }, (_, i) => ({ id: id(i), data: i < 600 ? '2026-10-16' : '2026-10-17' }));
@@ -197,4 +200,33 @@ describe('excluir carteira (007)', () => {
     await expect(carteiras.remove('id', 'user')).rejects.toMatchObject({ code: 'SCHEMA_DESATUALIZADO', status: 503 });
     expect(warn).toHaveBeenCalled();
   });
+});
+
+describe('RPCs de saldo 015', () => {
+  it.each(['PGRST202', '42883'])('função ausente (%s) devolve null', async (code) => {
+    mockClient({ error: { code, message: 'missing function' } });
+    expect(await carteiras.rpcResumoPainelSaldo('2026-11-20')).toBeNull();
+    expect(await carteiras.rpcSaldosCarteirasEm('2026-10-31')).toBeNull();
+  });
+  it('coage números e passa somente a data (dono vem da sessão)', async () => {
+    const { client } = mockClient({ data: { carteiras: [{ id: 'c', saldo_inicial: '10.10', saldo: '12.20', saldo_fim_mes_anterior: '11.00' }], ultima_carteira_id: 'c' } });
+    expect(await carteiras.rpcResumoPainelSaldo('2026-11-20')).toEqual({ carteiras: [{ id: 'c', saldo_inicial: 10.1, saldo: 12.2, saldo_fim_mes_anterior: 11 }], ultimaCarteiraId: 'c' });
+    expect(client.rpc).toHaveBeenCalledWith('resumo_painel_saldo', { p_hoje: '2026-11-20' });
+    client.rpc.mockResolvedValue({ data: [{ carteira_id: 'c', saldo: '11.00' }], error: null });
+    expect(await carteiras.rpcSaldosCarteirasEm('2026-10-31')).toEqual({ c: 11 });
+    expect(client.rpc).toHaveBeenLastCalledWith('saldos_carteiras_em', { p_ate: '2026-10-31' });
+  });
+  it('erros de permissão/rede não são tratados como função ausente', async () => {
+    mockClient({ error: { code: '42501', message: 'permission denied' } });
+    await expect(carteiras.rpcResumoPainelSaldo('2026-11-20')).rejects.toMatchObject({ code: 'DB_ERROR' });
+    await expect(carteiras.rpcSaldosCarteirasEm('2026-10-31')).rejects.toMatchObject({ code: 'DB_ERROR' });
+  });
+});
+
+it('transferências mensais filtram dono e ambas as datas antes de paginar', async () => {
+  const { query } = mockClient({ data: [], error: null });
+  await transferencias.findEntre('u', '2026-10-01', '2026-10-31');
+  expect(query.eq).toHaveBeenCalledWith('user_id', 'u');
+  expect(query.gte).toHaveBeenCalledWith('data', '2026-10-01');
+  expect(query.lte).toHaveBeenCalledWith('data', '2026-10-31');
 });

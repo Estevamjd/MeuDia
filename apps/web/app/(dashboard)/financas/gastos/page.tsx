@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { clsx } from 'clsx';
 import { ChevronDown, Plus } from 'lucide-react';
 import { hojeSP, ultimasDespesas, type OcorrenciaConta, type Transacao } from '@meudia/shared';
-import { useContasMes, usePainelSaldo, useResumoFinanceiroMes, useTransacoesMes } from '../../../../hooks';
+import { useContasMes, useHistoricoSaldoMes, usePainelSaldo, useResumoFinanceiroMes, useTransacoesMes } from '../../../../hooks';
 import { Button, SkeletonList } from '../../../../components/ui';
 import { ConfirmarExclusao } from '../../../../components/financas/ConfirmarExclusao';
 import { LancamentoRapidoSheet } from '../../../../components/financas/LancamentoRapidoSheet';
@@ -212,15 +212,25 @@ function Analise({ competencia, hojeISO, transacoes, vinculos, acoes }: AnaliseP
   const { ano, mes } = partesCompetencia(competencia);
   const resumo = useResumoFinanceiroMes(ano, mes);
   const painel = usePainelSaldo(hojeISO);
+  // Linha de saldo: abertura de cada banco no fim do mês anterior + movimentos do mês (sem o histórico inteiro).
+  const historico = useHistoricoSaldoMes(competencia);
   const [escondido] = useState(lerEsconderValores);
   const graficos = useMemo(
-    () => (painel.data ? montarDashboard(competencia, hojeISO, painel.data, transacoes) : null),
-    [competencia, hojeISO, painel.data, transacoes],
+    () => (painel.data ? montarDashboard(competencia, hojeISO, painel.data, transacoes, historico.data) : null),
+    [competencia, hojeISO, painel.data, transacoes, historico.data],
   );
   if (resumo.isLoading) return <SkeletonList count={3} />;
   if (!resumo.data) {
     return <p role="alert" className="rounded-card border border-red/40 bg-card p-4 text-[15px] text-text">Não foi possível carregar a análise do mês.</p>;
   }
+  // Sem o histórico (ou sem o painel) a linha de saldo some: enquanto carrega não diz "sem dados"; no erro oferece
+  // tentar de novo, refazendo só as consultas que falharam.
+  const painelFalhou = painel.isError && !painel.data;
+  const estadoEvolucao = historico.isError || painelFalhou ? 'erro' : historico.isPending || painel.isPending ? 'carregando' : 'ok';
+  const tentarEvolucao = () => {
+    if (painelFalhou) void painel.refetch();
+    if (historico.isError) void historico.refetch();
+  };
   const entradas = transacoes
     .filter((t) => t.tipo === 'receita' && !t.ajuste)
     .sort((a, b) => b.data.localeCompare(a.data) || (b.created_at ?? '').localeCompare(a.created_at ?? ''));
@@ -230,6 +240,8 @@ function Analise({ competencia, hojeISO, transacoes, vinculos, acoes }: AnaliseP
       fatias={graficos?.fatias ?? []}
       evolucao={graficos?.evolucao ?? []}
       escondido={escondido}
+      estadoEvolucao={estadoEvolucao}
+      onTentarEvolucao={tentarEvolucao}
       listaEntradas={
         entradas.length > 0 && (
           <ul aria-label="Entradas do mês" className="border-t border-border pt-1">

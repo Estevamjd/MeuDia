@@ -219,6 +219,39 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await listaContas.evaluate((el) => el.scrollIntoView({ block: 'center' }));
   await shot('08-contas-fixas.png');
 
+  // "A receber" em Contas a vencer (tema escuro): título e nota inteiros, até 2 linhas, sem reticências, em 390 e em
+  // 360 de largura (QA: "A receber: Renda principal dia 5" e "R$ 900,00 · era para cair em 05/10" cortados com "…").
+  const viewportOriginal = page.viewportSize()!;
+  const linhaAReceber = page.getByTestId('renda-a-receber-texto');
+  for (const largura of [390, 360]) {
+    await page.setViewportSize({ width: largura, height: 844 });
+    await linhaAReceber.scrollIntoViewIfNeeded();
+    await expect(linhaAReceber).toContainText('A receber: Renda principal dia 5');
+    const medidas = await linhaAReceber.evaluate((bloco) =>
+      Array.from(bloco.querySelectorAll('p')).map((p) => {
+        const css = getComputedStyle(p);
+        return {
+          texto: p.textContent,
+          cortadoLado: p.scrollWidth > p.clientWidth,
+          cortadoAltura: p.scrollHeight > p.clientHeight + 1,
+          linhas: Math.round(p.getBoundingClientRect().height / parseFloat(css.lineHeight)),
+          reticencias: css.textOverflow === 'ellipsis' && css.whiteSpace === 'nowrap',
+        };
+      }));
+    expect(medidas, `linha "A receber" em ${largura}px`).toHaveLength(2);
+    for (const m of medidas) {
+      expect(m.cortadoLado || m.cortadoAltura || m.reticencias, `"${m.texto}" cortado em ${largura}px`).toBe(false);
+      expect(m.linhas, `"${m.texto}" com mais de 2 linhas em ${largura}px`).toBeLessThanOrEqual(2);
+    }
+    const recebi = (await page.getByRole('button', { name: 'Recebi Renda principal' }).boundingBox())!;
+    const texto = (await linhaAReceber.boundingBox())!;
+    expect(recebi.width, `Recebi ≥ 44px de largura em ${largura}px`).toBeGreaterThanOrEqual(44);
+    expect(recebi.height, `Recebi ≥ 44px de altura em ${largura}px`).toBeGreaterThanOrEqual(44);
+    expect(texto.x + texto.width, `texto por baixo do Recebi em ${largura}px`).toBeLessThanOrEqual(recebi.x);
+    await semScrollHorizontal();
+  }
+  await page.setViewportSize(viewportOriginal);
+
   // Recebi: R$ 900 no Nubank → a renda deixa de ser previsão; a sobra não muda e o Cofrinho também não.
   await tocar(page.getByRole('button', { name: 'Recebi Renda principal' }));
   const modalRecebi = page.getByRole('dialog', { name: 'Recebi o salário' });
@@ -240,6 +273,12 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await expect(page.getByRole('region', { name: 'Entrou' })).toContainText(/Salário\s*recebido R\$\s900,00 de R\$\s900,00/);
   await expect(page.getByRole('region', { name: 'Entrou' })).toContainText(/Extras\s*R\$\s100,00/);
   await expect(page.getByRole('region', { name: 'Saiu' })).toContainText(/Saiu\s*R\$\s25,00/);
+  // 015: painel e linha de saldo pelo caminho rápido (RPCs do mock, fiéis ao SQL), sem baixar o histórico inteiro.
+  await expect(page.getByRole('region', { name: 'Evolução do mês' })).toBeVisible();
+  await expect.poll(async () => {
+    const { rotas } = await (await fetch(`${MOCK_URL}/__mock/stats`)).json();
+    return [rotas['POST /rest/v1/rpc/resumo_painel_saldo'] > 0, rotas['POST /rest/v1/rpc/saldos_carteiras_em'] > 0];
+  }).toEqual([true, true]);
   await page.getByRole('region', { name: 'Gastos do mês por categoria' }).evaluate((el) => el.scrollIntoView({ block: 'start' }));
   await page.evaluate(() => window.scrollBy(0, -72)); // folga para o header fixo não cobrir o título do card
   await shot('02b-analise-graficos-viewport.png', false);
@@ -282,6 +321,9 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await expect(cartaoBanco('Caixa')).toContainText(/R\$\s100,00/);
   await expect(page.getByTestId('total-bancos')).toContainText(/Total nos bancos: R\$\s1\.675,00/);
   await expect(page.getByTestId('cofrinho-valor')).toHaveText(brl('700,00'));
+  // Lista de transferências vem da própria consulta (transferenciasRecentes), não mais do painel.
+  await expect(page.getByRole('region', { name: 'Transferências' })).toContainText(/Caixa → Nubank/);
+  await expect(page.getByRole('region', { name: 'Transferências' })).toContainText(/R\$\s50,00/);
   await semScrollHorizontal();
   await shot('07-carteiras.png');
 

@@ -13,9 +13,9 @@ import {
 } from '../../repositories';
 
 vi.mock('../../repositories', () => ({
-  carteirasRepository: { rpcCorrigirSaldo: vi.fn(), findAll: vi.fn(), findById: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn() },
+  carteirasRepository: { rpcResumoPainelSaldo: vi.fn(), rpcSaldosCarteirasEm: vi.fn(), rpcCorrigirSaldo: vi.fn(), findAll: vi.fn(), findById: vi.fn(), create: vi.fn(), update: vi.fn(), remove: vi.fn() },
   transacaoRepository: { create: vi.fn(), findComCarteiraDesde: vi.fn(), findByDateRange: vi.fn(), findByIds: vi.fn() },
-  transferenciasRepository: { create: vi.fn(), findDesde: vi.fn(), remove: vi.fn() },
+  transferenciasRepository: { findAll: vi.fn(), findEntre: vi.fn(), create: vi.fn(), findDesde: vi.fn(), remove: vi.fn() },
   recebimentosRendaRepository: { findByCompetencias: vi.fn(), rpcReceber: vi.fn(), rpcDesfazer: vi.fn() },
   rendasRepository: { findAll: vi.fn() },
   contasPagarRepository: { findAll: vi.fn() },
@@ -33,6 +33,8 @@ const carteira = (id: string, nome: string, saldo: number, over: Partial<Carteir
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(carteiras.rpcResumoPainelSaldo).mockResolvedValue(null);
+  vi.mocked(carteiras.rpcSaldosCarteirasEm).mockResolvedValue(null);
   vi.mocked(carteiras.findById).mockImplementation(async (id) => carteira(id, id === NU ? 'Nubank' : 'Caixa', 0));
   vi.mocked(transacoes.create).mockImplementation(async (_u, d) => ({ id: 't', ...d }) as never);
   vi.mocked(transacoes.findComCarteiraDesde).mockResolvedValue([]);
@@ -239,4 +241,84 @@ describe('excluir banco (007)', () => {
     expect(carteiras.remove).toHaveBeenCalledWith(NU, 'u');
     await expect(service.excluirCarteira('', NU)).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
   });
+});
+
+it('painel agregado equivale ao legado e não baixa históricos nem carteiras', async () => {
+  const cs = [carteira(NU, 'Nu', 150), carteira(CX, 'Caixa', 20, { arquivada: true })];
+  vi.mocked(carteiras.findAll).mockResolvedValue(cs);
+  const legado = await service.painelSaldo('u', HOJE);
+  vi.mocked(carteiras.rpcResumoPainelSaldo).mockResolvedValue({ carteiras: cs.map((c) => ({ ...c, saldo: c.saldo_inicial, saldo_fim_mes_anterior: c.saldo_inicial })), ultimaCarteiraId: null });
+  vi.mocked(carteiras.findAll).mockClear();
+  vi.mocked(transacoes.findComCarteiraDesde).mockClear();
+  vi.mocked(transferencias.findDesde).mockClear();
+  const rapido = await service.painelSaldo('u', HOJE);
+  expect(rapido).toEqual(legado);
+  expect(rapido).not.toHaveProperty('transacoesCarteiras');
+  expect(rapido).not.toHaveProperty('transferencias');
+  expect(carteiras.findAll).not.toHaveBeenCalled();
+  expect(transacoes.findComCarteiraDesde).not.toHaveBeenCalled();
+  expect(transferencias.findDesde).not.toHaveBeenCalled();
+});
+
+it('histórico mensal usa RPC e lê transferências só no intervalo do mês', async () => {
+  vi.mocked(carteiras.rpcSaldosCarteirasEm).mockResolvedValue({ [NU]: 12.34 });
+  vi.mocked(transferencias.findEntre).mockResolvedValue([]);
+  expect(await service.historicoSaldoMes('u', '2026-11')).toEqual({ bases: { [NU]: 12.34 }, transferencias: [] });
+  expect(carteiras.rpcSaldosCarteirasEm).toHaveBeenCalledWith('2026-10-31');
+  expect(transferencias.findEntre).toHaveBeenCalledWith('u', '2026-11-01', '2026-11-30');
+  expect(carteiras.findAll).not.toHaveBeenCalled();
+  expect(transacoes.findComCarteiraDesde).not.toHaveBeenCalled();
+});
+
+it('histórico mensal sem 015 calcula a mesma base pelo legado', async () => {
+  vi.mocked(carteiras.findAll).mockResolvedValue([carteira(NU, 'Nu', 100, { saldo_inicial_em: '2026-10-01T12:00:00Z' })]);
+  vi.mocked(transacoes.findComCarteiraDesde).mockResolvedValue([{ carteira_id: NU, tipo: 'despesa', valor: 30, data: '2026-10-10' }] as never);
+  vi.mocked(transferencias.findEntre).mockResolvedValue([]);
+  expect(await service.historicoSaldoMes('u', '2026-11')).toEqual({ bases: { [NU]: 70 }, transferencias: [] });
+});
+
+it('lista transferências independente do painel e valida o usuário', async () => {
+  vi.mocked(transferencias.findAll).mockResolvedValue([]);
+  expect(await service.transferenciasRecentes('u')).toEqual([]);
+  expect(transferencias.findAll).toHaveBeenCalledWith('u');
+  await expect(service.transferenciasRecentes('')).rejects.toThrow();
+  await expect(service.historicoSaldoMes('u', 'inválido')).rejects.toThrow();
+});
+
+it('equivalência do painel com os números fixos do teste SQL 015', async () => {
+  const cs = [
+    carteira(NU, 'Banco 1', 240, { saldo_inicial_em: '2026-10-18T05:00:00Z' }),
+    carteira(CX, 'Banco 2', 50, { saldo_inicial_em: '2026-10-18T05:00:00Z' }),
+    carteira('fora', 'Fora', 1000, { saldo_inicial_em: '2026-10-18T05:00:00Z', incluir_no_total: false }),
+    carteira('arquivada', 'Arquivado', 500, { saldo_inicial_em: '2026-10-18T05:00:00Z', arquivada: true }),
+  ];
+  const t = (id: string, carteira_id: string, tipo: string, valor: number, data: string, created_at: string, ajuste = false) => ({ id, carteira_id, tipo, valor, data, created_at, ajuste });
+  vi.mocked(carteiras.findAll).mockResolvedValue(cs);
+  vi.mocked(transacoes.findComCarteiraDesde).mockResolvedValue([
+    t('before', NU, 'despesa', 100, '2026-10-16', '2026-10-17T00:08:00Z'),
+    t('samebefore', NU, 'despesa', 7, '2026-10-18', '2026-10-18T04:30:00Z'),
+    t('sameafter', NU, 'despesa', 5, '2026-10-18', '2026-10-18T06:00:00Z'),
+    t('ms', NU, 'receita', 999, '2026-10-18', '2026-10-18T05:00:00.000999Z'),
+    t('adj1', NU, 'despesa', 20.10, '2026-10-25', '2026-10-25T19:28:38Z', true),
+    t('adj2', NU, 'receita', 11.87, '2026-10-31', '2026-10-31T03:14:58Z', true),
+    t('b2', CX, 'despesa', 20, '2026-11-05', '2026-11-05T17:59:32Z'),
+    t('out', 'fora', 'despesa', 300, '2026-11-05', '2026-11-05T17:59:32Z'),
+    t('future', NU, 'despesa', 999, '2027-01-01', '2027-01-01T12:00:00Z'),
+  ] as never);
+  vi.mocked(transferencias.findDesde).mockResolvedValue([
+    { origem_id: NU, destino_id: CX, valor: 30, data: '2026-11-01' },
+    { origem_id: 'fora', destino_id: NU, valor: 40, data: '2026-11-02' },
+    { origem_id: null, destino_id: NU, valor: 3, data: '2026-11-03' },
+    { origem_id: NU, destino_id: null, valor: 2, data: '2026-11-03' },
+    { origem_id: null, destino_id: NU, valor: 999, data: '2026-10-18', created_at: '2026-10-18T05:00:00.000999Z' },
+    { origem_id: null, destino_id: NU, valor: 999, data: '2027-01-01' },
+  ] as never);
+  const legado = await service.painelSaldo('u', '2026-11-20');
+  const valores = [237.77, 60, 660, 500];
+  const anteriores = [226.77, 50, 1000, 500];
+  vi.mocked(carteiras.rpcResumoPainelSaldo).mockResolvedValue({ carteiras: cs.map((c, i) => ({ ...c, saldo: valores[i]!, saldo_fim_mes_anterior: anteriores[i]! })), ultimaCarteiraId: NU });
+  const rapido = await service.painelSaldo('u', '2026-11-20');
+  expect(rapido).toEqual(legado);
+  expect(rapido.saldoHoje).toBe(297.77);
+  expect(rapido.comecouMes).toBe(276.77);
 });

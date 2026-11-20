@@ -38,6 +38,29 @@ export function usePainelSaldo(hojeISO: string) {
   });
 }
 
+/**
+ * Saldo de cada banco no fim do mês anterior + transferências do mês: base da linha de saldo da Análise
+ * (`evolucaoMesComBase`), sem baixar o histórico inteiro. Sob `carteiras` para herdar as invalidações.
+ */
+export function useHistoricoSaldoMes(competencia: Competencia, enabled = true) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: carteirasKeys.historicoMes(user?.id, competencia),
+    queryFn: () => carteirasService.historicoSaldoMes(requireUserId(user?.id), competencia),
+    enabled: enabled && !!user?.id,
+  });
+}
+
+/** Todas as transferências (tela de bancos), paginadas por chave no repositório. */
+export function useTransferencias() {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: carteirasKeys.transferencias(user?.id),
+    queryFn: () => carteirasService.transferenciasRecentes(requireUserId(user?.id)),
+    enabled: !!user?.id,
+  });
+}
+
 export function useCriarCarteira() {
   const { user } = useAuth();
   const invalidar = useInvalidarSaldo();

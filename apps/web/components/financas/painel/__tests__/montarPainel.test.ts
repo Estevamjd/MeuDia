@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PontoEvolucao, SobraDoMes } from '@meudia/shared';
-import { fatiasComCor, gastoAcumulado, numerosPainel, sobraPorMes, ultimosMeses } from '../montarPainel';
+import { faixaDosMeses, fatiasComCor, gastoAcumulado, numerosPainel, separarPorCompetencia, sobraPorMes, ultimosMeses } from '../montarPainel';
 
 const sobra = (p: Partial<SobraDoMes>): SobraDoMes => ({
   competencia: '2026-11', renda: { total: 943 } as SobraDoMes['renda'], rendasAReceber: [], previsao: false,
@@ -79,5 +79,24 @@ describe('sobraPorMes ("Quanto sobrou por mês")', () => {
       { competencia: '2026-10', rotulo: 'out', valor: 110, previsao: false },
       { competencia: '2026-11', rotulo: 'nov', valor: 139.1, previsao: true },
     ]);
+  });
+});
+
+describe('faixaDosMeses / separarPorCompetencia (Painel: uma consulta para 6 meses)', () => {
+  it('1º dia do mais antigo → último dia do mostrado (fevereiro bissexto, virada de ano)', () => {
+    expect(faixaDosMeses(ultimosMeses('2026-11', 6))).toEqual({ inicio: '2026-06-01', fim: '2026-11-30' });
+    expect(faixaDosMeses(ultimosMeses('2028-02', 6))).toEqual({ inicio: '2027-09-01', fim: '2028-02-29' });
+    expect(faixaDosMeses(ultimosMeses('2027-01', 6))).toEqual({ inicio: '2026-08-01', fim: '2027-01-31' });
+  });
+  it('separa por data.slice(0,7), em (data, id) decrescente; mês vazio = []; fora das competências é ignorado', () => {
+    const linhas = [
+      { id: 'a', data: '2026-10-31' }, { id: 'b', data: '2026-11-01' }, { id: 'c', data: '2026-11-01' },
+      { id: 'd', data: '2026-11-30' }, { id: 'x', data: '2026-12-01' },
+    ];
+    const r = separarPorCompetencia(linhas, ['2026-09', '2026-10', '2026-11']);
+    expect(r.get('2026-09')).toEqual([]);
+    expect(r.get('2026-10')!.map((l) => l.id)).toEqual(['a']);
+    expect(r.get('2026-11')!.map((l) => l.id)).toEqual(['d', 'c', 'b']);
+    expect([...r.values()].flat().some((l) => l.id === 'x')).toBe(false);
   });
 });

@@ -8,6 +8,7 @@
 import http from 'node:http';
 import { corrigirSaldo } from './corrigir-saldo.mjs';
 import { rpcCofrinho } from './cofrinho.mjs';
+import { rpcSaldoPainel } from './saldo-painel.mjs';
 import crypto from 'node:crypto';
 
 const PORT = Number(process.argv[2] || process.env.MOCK_SUPABASE_PORT || 54329);
@@ -687,7 +688,7 @@ function excluirEmCascata(table, row) {
   }
 }
 
-// ─── RPCs (fiéis a packages/database/migrations/005_financas.sql, 006_carteiras.sql e 007_excluir_metas.sql) ─
+// ─── RPCs (fiéis a packages/database/migrations/005_financas.sql, 006_carteiras.sql, 007_excluir_metas.sql e 015 em saldo-painel.mjs) ─
 const RE_COMP = /^[0-9]{4}-(0[1-9]|1[0-2])$/;
 function carteiraAtivaDe(uid, id) {
   const c = rowsOf('carteiras').find((x) => x.id === id && x.user_id === uid && !x.arquivada);
@@ -734,6 +735,10 @@ function handleRpc(req, res, fn, args = {}, uid) {
   if (!uid) throw new PgError(401, '42501', `permission denied for function ${fn}`);
   if (fn === 'corrigir_saldo') return send(res, 200, corrigirSaldo({ uid, args, rowsOf, carteiraAtivaDe, PgError, hojeSP, defaults: DEFAULTS.transacoes }));
   if (fn === 'pagar_conta') return send(res, 200, pagarConta(uid, args));
+  {
+    const r = rpcSaldoPainel(fn, { uid, args, rowsOf, PgError });
+    if (r !== undefined) return send(res, 200, r);
+  }
   if (fn.startsWith('cofrinho_')) {
     const r = rpcCofrinho(fn, { uid, args, rowsOf, PgError, hojeSP, nowIso });
     if (r !== undefined) return send(res, 200, r);
