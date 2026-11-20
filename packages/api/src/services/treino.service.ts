@@ -1,3 +1,4 @@
+import { usuarioAtualId } from './usuario-atual';
 import { AppError, seriesAnteriores } from '@meudia/shared';
 import type { SerieRealizada } from '@meudia/shared';
 import { startOfWeek, endOfWeek, format } from 'date-fns';
@@ -58,7 +59,7 @@ export async function finalizarSessao(sessaoId: string, duracao: number) {
   return sessaoRepository.update(sessaoId, {
     concluido: true,
     duracao_minutos: duracao,
-  });
+  }, await usuarioAtualId());
 }
 
 export async function registrarSerie(data: unknown) {

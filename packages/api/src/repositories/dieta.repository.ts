@@ -27,11 +27,12 @@ export async function createRefeicao(userId: string, input: RefeicaoInsert): Pro
   return (data as unknown) as Refeicao;
 }
 
-export async function updateRefeicao(refeicaoId: string, input: Partial<RefeicaoInsert>): Promise<Refeicao> {
+export async function updateRefeicao(refeicaoId: string, input: Partial<RefeicaoInsert>, userId: string): Promise<Refeicao> {
   const { data, error } = await getSupabase()
     .from('refeicoes')
     .update(input)
     .eq('id', refeicaoId)
+    .eq('user_id', userId)
     .select('id, user_id, tipo, data, items, total_calorias, total_proteina, total_carbo, total_gordura')
     .single();
 
@@ -39,11 +40,12 @@ export async function updateRefeicao(refeicaoId: string, input: Partial<Refeicao
   return (data as unknown) as Refeicao;
 }
 
-export async function removeRefeicao(refeicaoId: string): Promise<void> {
+export async function removeRefeicao(refeicaoId: string, userId: string): Promise<void> {
   const { error } = await getSupabase()
     .from('refeicoes')
     .delete()
-    .eq('id', refeicaoId);
+    .eq('id', refeicaoId)
+    .eq('user_id', userId);
 
   if (error) throw new AppError(error.message, 'DB_ERROR');
 }

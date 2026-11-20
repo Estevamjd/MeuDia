@@ -28,46 +28,12 @@ export async function DELETE() {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Delete user data from all tables (order matters for foreign keys)
-    const userIdTables = [
-      'series_realizadas',
-      'sessoes_treino',
-      'exercicios',
-      'treinos',
-      'registros_habito',
-      'habitos',
-      'compromissos',
-      'transacoes',
-      'assinaturas',
-      'notas',
-      'itens_compras',
-      'listas_compras',
-      'registro_medicamentos',
-      'medicamentos',
-      'refeicoes',
-      'registros_agua',
-      'registros_peso',
-      'manutencoes',
-      'veiculos',
-      'scores_diarios',
-      'conquistas',
-      'chat_agente',
-      'acoes_agente',
-      'notificacoes_agente',
-      'preferencias_agente',
-    ];
-
-    for (const table of userIdTables) {
-      await adminClient.from(table).delete().eq('user_id', user.id);
-    }
-
-    // profiles uses 'id' not 'user_id'
-    await adminClient.from('profiles').delete().eq('id', user.id);
-
+    // Uma única transação em auth.users apaga as cascatas (ver INVENTARIO.md).
+    // Não pré-apagar vínculos: proteger_vinculo bloqueia DELETE direto.
     const { error: deleteError } = await adminClient.auth.admin.deleteUser(user.id);
 
     if (deleteError) {
-      console.error('Erro ao deletar usuario:', deleteError);
+      console.error('[delete-account] falha na exclusao atomica');
       return NextResponse.json(
         { error: 'Erro ao excluir conta' },
         { status: 500 },
@@ -75,8 +41,8 @@ export async function DELETE() {
     }
 
     return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error('Erro inesperado ao deletar conta:', err);
+  } catch {
+    console.error('[delete-account] falha inesperada');
     return NextResponse.json(
       { error: 'Erro interno do servidor' },
       { status: 500 },

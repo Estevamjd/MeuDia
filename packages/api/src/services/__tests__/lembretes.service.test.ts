@@ -78,7 +78,7 @@ it.each([404, 410])('remove inscrição expirada %s e envia nas demais', async s
   vi.mocked(push.inscricoesDoUsuarioParaCron).mockResolvedValue([sub, { ...sub, id: 's2' }] as never);
   send.mockRejectedValueOnce({ statusCode });
   expect(await run()).toMatchObject({ enviados: 1, inscricoesRemovidas: 1 });
-  expect(push.removerInscricaoParaCron).toHaveBeenCalledWith(client, 's');
+  expect(push.removerInscricaoParaCron).toHaveBeenCalledWith(client, 's', sub.user_id);
 });
 it.each([undefined, 429, 500, 503, 599])('falha transitória %s libera reserva e permite nova tentativa', async statusCode => {
   const log = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -117,7 +117,7 @@ it.each([404, 410])('expirada %s mantém reserva mesmo sem sucesso', async statu
   expect(await run()).toMatchObject({ enviados: 0, inscricoesRemovidas: 1 });
   await run();
   expect(send).toHaveBeenCalledTimes(1);
-  expect(push.removerInscricaoParaCron).toHaveBeenCalledWith(client, sub.id);
+  expect(push.removerInscricaoParaCron).toHaveBeenCalledWith(client, sub.id, sub.user_id);
   expect(lembretes.liberarLembreteParaCron).not.toHaveBeenCalled();
 });
 it.each([true, false])('sucesso parcial mantém reserva (falha primeiro: %s)', async falhaPrimeiro => {

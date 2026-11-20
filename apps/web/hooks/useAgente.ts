@@ -33,14 +33,21 @@ export function useNotificacoesNaoLidas() {
   });
 }
 
-export function useContarNaoLidas() {
+/** Intervalo do badge do FAB no modo padrão. */
+export const INTERVALO_CONTAR_NAO_LIDAS = 1000 * 60;
+
+/**
+ * Contador de não lidas. Por padrão consulta a cada 60s (badge do FAB no modo padrão);
+ * `poll: false` consulta só ao montar/invalidar/focar; `enabled: false` não consulta.
+ */
+export function useContarNaoLidas({ enabled = true, poll = true }: { enabled?: boolean; poll?: boolean } = {}) {
   const { user } = useAuth();
   return useQuery({
     queryKey: ['notificacoes-agente-count', user?.id],
     queryFn: () => agenteService.contarNaoLidas(user!.id),
-    enabled: !!user?.id,
+    enabled: enabled && !!user?.id,
     staleTime: 1000 * 30, // 30s
-    refetchInterval: 1000 * 60, // Poll every 60s
+    refetchInterval: poll ?INTERVALO_CONTAR_NAO_LIDAS : false,
   });
 }
 

@@ -93,7 +93,7 @@ describe('BE-03: repositories (sem banco)', () => {
     expect(query.in).toHaveBeenCalledWith('competencia', ['2026-10', '2026-11']);
     await push.inscricoesDoUsuarioParaCron(admin, 'user');
     expect(query.eq).toHaveBeenCalledWith('user_id', 'user');
-    await push.removerInscricaoParaCron(admin, 'inscricao');
+    await push.removerInscricaoParaCron(admin, 'inscricao', 'u');
     expect(query.eq).toHaveBeenCalledWith('id', 'inscricao');
     expect(query.delete).toHaveBeenCalledTimes(1);
     expect(client.from).toHaveBeenCalledWith('push_subscriptions');

@@ -1,5 +1,5 @@
 export const AUTH_CALLBACK_PATH = '/auth/callback';
-export const FALLBACK_SITE_URL = 'https://meudia.vercel.app';
+export const FALLBACK_SITE_URL = 'https://meudia.srv2176785.hstgr.cloud';
 
 /** URL absoluta para onde o Supabase redireciona após a confirmação de e-mail. */
 export function getAuthCallbackUrl(origin?: string): string {

@@ -1,3 +1,4 @@
+import { usuarioAtualId } from './usuario-atual';
 import { AppError } from '@meudia/shared';
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { medicamentoRepository } from '../repositories';
@@ -15,25 +16,25 @@ export async function criarMedicamento(userId: string, data: unknown) {
 
 export async function atualizarMedicamento(medicamentoId: string, data: unknown) {
   const parsed = medicamentoInsertSchema.partial().parse(data);
-  return medicamentoRepository.update(medicamentoId, parsed);
+  return medicamentoRepository.update(medicamentoId, parsed, await usuarioAtualId());
 }
 
 export async function excluirMedicamento(medicamentoId: string) {
-  return medicamentoRepository.remove(medicamentoId);
+  return medicamentoRepository.remove(medicamentoId, await usuarioAtualId());
 }
 
 export async function registrarTomado(userId: string, medicamentoId: string) {
+  const medicamento = await medicamentoRepository.findById(medicamentoId, userId);
   const registro = await medicamentoRepository.createRegistro(userId, {
     medicamento_id: medicamentoId,
     tomado: true,
   });
 
   // Decrement estoque
-  const medicamento = await medicamentoRepository.findById(medicamentoId);
   if (medicamento.estoque_atual > 0) {
     await medicamentoRepository.update(medicamentoId, {
       estoque_atual: medicamento.estoque_atual - 1,
-    });
+    }, userId);
   }
 
   return registro;

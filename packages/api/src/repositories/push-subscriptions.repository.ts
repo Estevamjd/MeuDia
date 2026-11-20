@@ -24,7 +24,7 @@ export async function inscricoesDoUsuarioParaCron(client: SupabaseClient, userId
   return await paginas(() => client.from('push_subscriptions').select(COLUMNS).eq('user_id', userId).order('id')) as unknown as PushSubscriptionRow[];
 }
 
-export async function removerInscricaoParaCron(client: SupabaseClient, id: string): Promise<void> {
-  const { error } = await client.from('push_subscriptions').delete().eq('id', id);
+export async function removerInscricaoParaCron(client: SupabaseClient, id: string, userId: string): Promise<void> {
+  const { error } = await client.from('push_subscriptions').delete().eq('id', id).eq('user_id', userId);
   if (error) throw new AppError(error.code === '23505' ? 'Inscrição duplicada' : 'Falha na inscrição push', error.code === '23505' ? 'CONFLICT' : 'DB_ERROR', error.code === '23505' ? 409 : 500);
 }

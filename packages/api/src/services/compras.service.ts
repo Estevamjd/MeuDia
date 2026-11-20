@@ -1,3 +1,4 @@
+import { usuarioAtualId } from './usuario-atual';
 import { AppError } from '@meudia/shared';
 import { comprasRepository } from '../repositories';
 import { listaInsertSchema, itemInsertSchema } from '../validators';
@@ -16,11 +17,11 @@ export async function criarLista(userId: string, data: unknown) {
 
 export async function atualizarLista(listaId: string, data: unknown) {
   const parsed = listaInsertSchema.partial().parse(data);
-  return comprasRepository.updateLista(listaId, parsed);
+  return comprasRepository.updateLista(listaId, parsed, await usuarioAtualId());
 }
 
 export async function excluirLista(listaId: string) {
-  return comprasRepository.removeLista(listaId);
+  return comprasRepository.removeLista(listaId, await usuarioAtualId());
 }
 
 /* ── Itens ── */

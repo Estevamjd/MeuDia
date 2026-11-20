@@ -44,7 +44,7 @@ export async function enviarLembretesDoDia({ client, sender, hojeISO = hojeSP() 
         if (status === 404 || status === 410) {
           inscricoes.set(conta.user_id, inscricoes.get(conta.user_id)!.filter(s => s.id !== sub.id));
           try {
-            await pushSubscriptionsRepository.removerInscricaoParaCron(client, sub.id);
+            await pushSubscriptionsRepository.removerInscricaoParaCron(client, sub.id, sub.user_id);
             resultado.inscricoesRemovidas++;
           } catch { console.error('Falha ao remover inscrição push expirada'); }
         } else if (status !== undefined && status >= 200 && status < 300) {

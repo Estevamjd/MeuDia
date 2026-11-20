@@ -79,6 +79,7 @@ async function comFallback<T>(consulta: (com008: boolean) => PromiseLike<Resulta
   return r.data as T;
 }
 
+// exercicios: RLS confere treinos.user_id; não existe user_id na filha.
 export async function findByTreinoId(treinoId: string): Promise<Exercicio[]> {
   const rows = await comFallback<ExercicioRow[]>((com008) =>
     getSupabase()

@@ -2,6 +2,7 @@ const { withSentryConfig } = require('@sentry/nextjs');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: { instrumentationHook: true },
   transpilePackages: ['@meudia/shared', '@meudia/api', '@meudia/ai'],
   images: {
     remotePatterns: [

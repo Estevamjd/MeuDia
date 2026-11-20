@@ -54,7 +54,7 @@ it('create/update gravam `concluida`, nunca `data`/`concluido`', async () => {
   result = { data: row, error: null };
   await repo.create('u', { treino_id: 't', data: '2026-11-02', concluido: false });
   expect(query.insert).toHaveBeenCalledWith({ treino_id: 't', concluida: false, user_id: 'u' });
-  await repo.update('s', { concluido: true, duracao_minutos: 30 });
+  await repo.update('s', { concluido: true, duracao_minutos: 30 }, 'u');
   expect(query.update).toHaveBeenCalledWith({ concluida: true, duracao_minutos: 30 });
   for (const c of colunasUsadas()) expect(COLUNAS_REAIS).toContain(c);
 });

@@ -1,12 +1,23 @@
 // @vitest-environment jsdom
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render as renderRTL, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactElement, ReactNode } from 'react';
 import type { NotificacaoAgente } from '@meudia/shared';
 import { AppModeProvider } from '../../AppModeProvider';
 import { AgentPanel, LIMIAR_ARRASTE_FECHAR } from '../AgentPanel';
 
+// QueryClient real (as queries do painel são mockadas): prova a invalidação do chat sem refetch inativo.
+let queryClient: QueryClient;
+beforeEach(() => {
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+});
+const Wrapper = ({ children }: { children: ReactNode }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+const render = (ui: ReactElement) => renderRTL(ui, { wrapper: Wrapper });
+
 const push = vi.fn();
 const gasteiMutate = vi.fn();
+const gasteiMutateAsync = vi.fn();
 const marcarLida = vi.fn();
 const marcarTodasLidas = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
@@ -28,32 +39,59 @@ const NOTIFICACOES = [notif('n1', 'financas', '/financas/contas'), notif('n2', '
 const refetchChat = vi.fn().mockResolvedValue({});
 const mutation = { mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false };
 
+// Spies: provam que fechado nenhum hook de dados/polling roda e quais consultam no modo Finanças.
+const h = vi.hoisted(() => ({
+  useNotificacoes: vi.fn(),
+  useMensagensChat: vi.fn(),
+  useContarNaoLidas: vi.fn(),
+  useEnviarMensagem: vi.fn(),
+  useProfile: vi.fn(),
+  useTreinos: vi.fn(),
+  useSessoesSemana: vi.fn(),
+  useHabitos: vi.fn(),
+  useRegistrosHoje: vi.fn(),
+  useResumoMensal: vi.fn(),
+  useCriarCompromisso: vi.fn(),
+}));
+h.useNotificacoes.mockImplementation(() => ({ data: NOTIFICACOES, isLoading: false }));
+h.useMensagensChat.mockImplementation(() => ({ data: [], isLoading: false, refetch: refetchChat }));
+h.useContarNaoLidas.mockImplementation(() => ({ data: 2 }));
+h.useEnviarMensagem.mockImplementation(() => mutation);
+h.useCriarCompromisso.mockImplementation(() => mutation);
+h.useProfile.mockImplementation(() => ({ data: { nome: 'Ana', objetivo: null } }));
+h.useTreinos.mockImplementation(() => ({
+  data: [0, 1, 2, 3, 4, 5, 6].map((d) => ({ id: `t${d}`, nome: 'Treino A', dia_semana: d, exercicios: [] })),
+}));
+h.useSessoesSemana.mockImplementation(() => ({ data: [] }));
+// Como o hook real: com `enabled: false` não há dados.
+h.useHabitos.mockImplementation((op?: { enabled?: boolean }) => ({
+  data: op?.enabled === false ? undefined : [{ id: 'h1', nome: 'Ler', ativo: true, frequencia: 'diario', dias_semana: [] }],
+}));
+h.useRegistrosHoje.mockImplementation((op?: { enabled?: boolean }) => ({ data: op?.enabled === false ? undefined : [] }));
+h.useResumoMensal.mockImplementation(() => ({ data: { saldo: 0, totalDespesas: 0, totalReceitas: 0 } }));
+
 vi.mock('../../../hooks/useAgente', () => ({
-  useNotificacoes: () => ({ data: NOTIFICACOES, isLoading: false }),
-  useMensagensChat: () => ({ data: [], isLoading: false, refetch: refetchChat }),
-  useEnviarMensagem: () => mutation,
+  useNotificacoes: h.useNotificacoes,
+  useMensagensChat: h.useMensagensChat,
+  useEnviarMensagem: h.useEnviarMensagem,
   useMarcarNotificacaoLida: () => ({ ...mutation, mutate: marcarLida }),
   useMarcarTodasLidas: () => ({ ...mutation, mutate: marcarTodasLidas }),
   useDispensarNotificacao: () => mutation,
-  useContarNaoLidas: () => ({ data: 2 }),
+  useContarNaoLidas: h.useContarNaoLidas,
 }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'u1', email: 'a@b.c' } }) }));
-vi.mock('../../../hooks/useAgenda', () => ({ useCriarCompromisso: () => mutation }));
+vi.mock('../../../hooks/useAgenda', () => ({ useCriarCompromisso: h.useCriarCompromisso }));
 vi.mock('../../../hooks', () => ({
-  useProfile: () => ({ data: { nome: 'Ana', objetivo: null } }),
-  useTreinos: () => ({
-    data: [0, 1, 2, 3, 4, 5, 6].map((d) => ({ id: `t${d}`, nome: 'Treino A', dia_semana: d, exercicios: [] })),
-  }),
-  useSessoesSemana: () => ({ data: [] }),
-  useHabitos: () => ({
-    data: [{ id: 'h1', nome: 'Ler', ativo: true, frequencia: 'diario', dias_semana: [] }],
-  }),
-  useRegistrosHoje: () => ({ data: [] }),
-  useResumoMensal: () => ({ data: { saldo: 0, totalDespesas: 0, totalReceitas: 0 } }),
+  useProfile: h.useProfile,
+  useTreinos: h.useTreinos,
+  useSessoesSemana: h.useSessoesSemana,
+  useHabitos: h.useHabitos,
+  useRegistrosHoje: h.useRegistrosHoje,
+  useResumoMensal: h.useResumoMensal,
   // Card do gasto (IA): grava só pelo "Gastei".
   useCarteiras: () => ({ data: [{ id: 'c1', nome: 'Banco Teste', tipo: 'banco', arquivada: false }], isLoading: false }),
   usePainelSaldo: () => ({ data: { carteiraPadraoId: 'c1' } }),
-  useGastei: () => ({ mutate: gasteiMutate, isPending: false }),
+  useGastei: () => ({ mutate: gasteiMutate, mutateAsync: gasteiMutateAsync, isPending: false }),
 }));
 
 // Relógio fixo (sábado 17/10/2026 10:00): depois das 20h o resumo repete o treino pendente e o teste dependia da hora.
@@ -77,6 +115,57 @@ const renderPanel = (mode: 'financas' | 'padrao') =>
   );
 
 const textoBotoes = () => screen.getAllByRole('button').map((b) => b.textContent ?? '');
+
+describe('AgentPanel: lazy-mount (P0.1, sem consulta nem polling em segundo plano)', () => {
+  const hooksDeDados = Object.entries(h);
+
+  it.each(['financas', 'padrao'] as const)('fechado (%s): nenhum hook de dados/polling é chamado', (mode) => {
+    render(
+      <AppModeProvider mode={mode} vapidPublicKey={null}>
+        <AgentPanel isOpen={false} onClose={vi.fn()} />
+      </AppModeProvider>,
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+    for (const [nome, spy] of hooksDeDados) expect({ nome, chamadas: spy.mock.calls.length }).toEqual({ nome, chamadas: 0 });
+  });
+
+  it('financas aberto: funciona, sem consultar Hábitos nem o contador (e sem polling)', () => {
+    renderPanel('financas');
+    expect(screen.getByRole('dialog', { name: 'Agente MeuDia' })).toBeTruthy();
+    expect(h.useHabitos).toHaveBeenCalled();
+    for (const spy of [h.useHabitos, h.useRegistrosHoje]) {
+      for (const [op] of spy.mock.calls) expect(op).toEqual({ enabled: false });
+    }
+    for (const [op] of h.useContarNaoLidas.mock.calls) expect(op).toEqual({ enabled: false, poll: false });
+    // Treino segue: o módulo aparece para todos e o chat responde o treino de hoje.
+    expect(h.useTreinos).toHaveBeenCalled();
+  });
+
+  it('padrão aberto: Hábitos consultados; contador sem polling (o FAB já faz o de 60s)', () => {
+    renderPanel('padrao');
+    for (const spy of [h.useHabitos, h.useRegistrosHoje]) {
+      for (const [op] of spy.mock.calls) expect(op).toEqual({ enabled: true });
+    }
+    for (const [op] of h.useContarNaoLidas.mock.calls) expect(op).toEqual({ enabled: true, poll: false });
+  });
+
+  it('abre ao trocar isOpen para true e só então consulta', () => {
+    const { rerender } = render(
+      <AppModeProvider mode="financas" vapidPublicKey={null}>
+        <AgentPanel isOpen={false} onClose={vi.fn()} />
+      </AppModeProvider>,
+    );
+    expect(h.useNotificacoes).not.toHaveBeenCalled();
+    rerender(
+      <AppModeProvider mode="financas" vapidPublicKey={null}>
+        <AgentPanel isOpen onClose={vi.fn()} />
+      </AppModeProvider>,
+    );
+    expect(screen.getByRole('dialog', { name: 'Agente MeuDia' })).toBeTruthy();
+    expect(h.useNotificacoes).toHaveBeenCalled();
+    expect(h.useMensagensChat).toHaveBeenCalled();
+  });
+});
 
 describe('AgentPanel acessível', () => {
   it.each(['financas', 'padrao'] as const)('é um dialog modal rotulado (%s)', (mode) => {
@@ -231,12 +320,31 @@ describe('AgentPanel: fechar e camadas (bug do X inalcançável no iPhone)', () 
 
 describe('AgentPanel: gasto por linguagem natural (IA F1, LLM mockado)', () => {
   const fetchMock = vi.fn();
+  // `invalidateQueries` é genérico: o spy tipado esbarra no vi.spyOn; para as asserções basta um mock.
+  let invalidar: ReturnType<typeof vi.fn>;
   beforeAll(() => vi.stubGlobal('fetch', fetchMock));
   afterAll(() => vi.unstubAllGlobals());
   beforeEach(() => {
     fetchMock.mockReset();
+    gasteiMutateAsync.mockReset();
     mutation.mutateAsync.mockResolvedValue(undefined);
+    invalidar = vi.spyOn(queryClient, 'invalidateQueries') as unknown as ReturnType<typeof vi.fn>;
   });
+
+  const comProposta = () => ({
+    fallback: false,
+    gravada: true,
+    proposta: { valor: 45, categoria: 'Mercado', descricao: 'Mercado', data: hoje(), carteira_id: null },
+  });
+  const adiado = <T,>() => {
+    let resolve!: (v: T) => void;
+    let reject!: (e: unknown) => void;
+    const promise = new Promise<T>((r, j) => {
+      resolve = r;
+      reject = j;
+    });
+    return { promise, resolve, reject };
+  };
 
   const hoje = () =>
     new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
@@ -262,27 +370,188 @@ describe('AgentPanel: gasto por linguagem natural (IA F1, LLM mockado)', () => {
     expect(screen.getByTestId('ia-data').textContent).toBe('Hoje');
     // A rota grava a mensagem; o navegador só atualiza o histórico.
     expect(mutation.mutateAsync.mock.calls.map((c) => c[0].role)).toEqual([]);
-    expect(refetchChat).toHaveBeenCalledOnce();
-    expect(gasteiMutate).not.toHaveBeenCalled();
+    expect(refetchChat).not.toHaveBeenCalled();
+    expect(invalidar).toHaveBeenCalledWith({ queryKey: ['chat-agente'], refetchType: 'active' });
+    expect(gasteiMutateAsync).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     expect(screen.queryByTestId('card-gasto-ia')).toBeNull();
-    expect(gasteiMutate).not.toHaveBeenCalled();
+    expect(gasteiMutateAsync).not.toHaveBeenCalled();
     expect(agentes()).toEqual([{ role: 'agent', conteudo: 'Tudo bem, não salvei esse gasto.' }]);
   });
 
   it('Confirmar grava uma vez pelo "Gastei" e fecha o card', async () => {
-    fetchMock.mockImplementation(() =>
-      respostaIa({ fallback: false, gravada: true, proposta: { valor: 45, categoria: 'Mercado', descricao: 'Mercado', data: hoje(), carteira_id: null } }),
-    );
+    fetchMock.mockImplementation(() => respostaIa(comProposta()));
+    gasteiMutateAsync.mockResolvedValue(undefined);
     enviar('gastei 45 no mercado');
     await screen.findByTestId('card-gasto-ia');
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
-    expect(gasteiMutate).toHaveBeenCalledTimes(1);
-    expect(gasteiMutate.mock.calls[0]![0]).toEqual({ valor: 45, categoria: 'Mercado', descricao: 'Mercado', carteira_id: 'c1', data: hoje() });
-    gasteiMutate.mock.calls[0]![1].onSuccess();
+    expect(gasteiMutateAsync).toHaveBeenCalledTimes(1);
+    expect(gasteiMutateAsync.mock.calls[0]![0]).toEqual({ valor: 45, categoria: 'Mercado', descricao: 'Mercado', carteira_id: 'c1', data: hoje() });
     await waitFor(() => expect(screen.queryByTestId('card-gasto-ia')).toBeNull());
     expect(agentes()[0].conteudo).toMatch(/Gasto salvo: R\$\s*45,00 em Mercado/);
+  });
+
+  describe('fechar e reabrir (P0.1: estado do card no AgentPanel externo, sem consulta fechado)', () => {
+    const elemento = (isOpen: boolean) => (
+      <AppModeProvider mode="financas" vapidPublicKey={null}>
+        <AgentPanel isOpen={isOpen} onClose={vi.fn()} />
+      </AppModeProvider>
+    );
+    const chamadasDosHooks = () => Object.fromEntries(Object.entries(h).map(([nome, spy]) => [nome, spy.mock.calls.length]));
+    const enviarNoPainel = (texto: string) => {
+      const input = screen.getByPlaceholderText('Pergunte algo ao agente...');
+      fireEvent.change(input, { target: { value: texto } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+    };
+
+    it('(a) proposta pronta sobrevive a fechar e reabrir', async () => {
+      fetchMock.mockImplementation(() => respostaIa(comProposta()));
+      const { rerender } = render(elemento(true));
+      enviarNoPainel('gastei 45 no mercado');
+      await screen.findByTestId('card-gasto-ia');
+
+      rerender(elemento(false));
+      expect(screen.queryByRole('dialog')).toBeNull();
+      rerender(elemento(true));
+      // Abre de novo no Chat (Finanças) com o mesmo card pendente.
+      expect(screen.getByTestId('card-gasto-ia').textContent).toMatch(/R\$\s*45,00/);
+      expect(screen.getByTestId('ia-categoria').textContent).toBe('Mercado');
+      expect(gasteiMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('(b) resposta da IA que chega depois de fechar: sem refetch nem hooks de dados; a proposta aparece ao reabrir', async () => {
+      const resposta = adiado<Response>();
+      fetchMock.mockImplementation(() => resposta.promise);
+      // Histórico do chat no cache sem observador (como fica com o painel fechado): não pode ser consultado.
+      const buscarChat = vi.fn().mockResolvedValue([]);
+      await queryClient.prefetchQuery({ queryKey: ['chat-agente', 'u1'], queryFn: buscarChat });
+      expect(buscarChat).toHaveBeenCalledTimes(1);
+
+      const { rerender } = render(elemento(true));
+      enviarNoPainel('gastei 45 no mercado');
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      rerender(elemento(false));
+      const antes = chamadasDosHooks();
+
+      await act(async () => {
+        resposta.resolve(new Response(JSON.stringify(comProposta()), { status: 200 }));
+      });
+      await waitFor(() => expect(invalidar).toHaveBeenCalledWith({ queryKey: ['chat-agente'], refetchType: 'active' }));
+
+      expect(refetchChat).not.toHaveBeenCalled();
+      expect(buscarChat).toHaveBeenCalledTimes(1);
+      expect(queryClient.getQueryState(['chat-agente', 'u1'])?.isInvalidated).toBe(true);
+      expect(chamadasDosHooks()).toEqual(antes);
+      expect(screen.queryByRole('dialog')).toBeNull();
+      // A rota gravou (gravada: true) e veio card: nada de mensagem do navegador.
+      expect(mutation.mutateAsync).not.toHaveBeenCalled();
+
+      rerender(elemento(true));
+      expect(screen.getByTestId('card-gasto-ia').textContent).toMatch(/R\$\s*45,00/);
+    });
+
+    it('(c) fechado: nenhum hook de dados é chamado de novo, mesmo passando de 60s', () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(2026, 9, 17, 10, 0));
+      try {
+        const { rerender } = render(elemento(true));
+        expect(h.useMensagensChat).toHaveBeenCalled();
+        rerender(elemento(false));
+        const antes = chamadasDosHooks();
+        act(() => {
+          vi.advanceTimersByTime(61_000);
+        });
+        act(() => {
+          vi.advanceTimersByTime(5 * 60_000);
+        });
+        expect(chamadasDosHooks()).toEqual(antes);
+        expect(refetchChat).not.toHaveBeenCalled();
+        expect(screen.queryByRole('dialog')).toBeNull();
+      } finally {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date(2026, 9, 17, 10, 0));
+      }
+    });
+
+    it('Confirmar em curso ao fechar: o gasto termina, o card não volta ao reabrir e não grava 2x', async () => {
+      fetchMock.mockImplementation(() => respostaIa(comProposta()));
+      const gravacao = adiado<void>();
+      gasteiMutateAsync.mockImplementation(() => gravacao.promise);
+      const { rerender } = render(elemento(true));
+      enviarNoPainel('gastei 45 no mercado');
+      await screen.findByTestId('card-gasto-ia');
+      fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+
+      // Reaberto com a gravação em curso: o card segue travado (sem 2º Confirmar).
+      rerender(elemento(false));
+      rerender(elemento(true));
+      expect((screen.getByRole('button', { name: /Confirmar/ }) as HTMLButtonElement).disabled).toBe(true);
+
+      rerender(elemento(false));
+      await act(async () => {
+        gravacao.resolve();
+      });
+      expect(agentes()[0].conteudo).toMatch(/Gasto salvo: R\$\s*45,00 em Mercado/);
+      rerender(elemento(true));
+      expect(screen.queryByTestId('card-gasto-ia')).toBeNull();
+      expect(gasteiMutateAsync).toHaveBeenCalledTimes(1);
+    });
+
+    it('Confirmar que falha com o painel fechado: ao reabrir o card mostra o erro destravado; tentar de novo grava e limpa o erro', async () => {
+      fetchMock.mockImplementation(() => respostaIa(comProposta()));
+      const gravacao = adiado<void>();
+      gasteiMutateAsync.mockImplementationOnce(() => gravacao.promise);
+      const { rerender } = render(elemento(true));
+      enviarNoPainel('gastei 45 no mercado');
+      await screen.findByTestId('card-gasto-ia');
+      fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+
+      // Fecha com a gravação em curso; ela falha com o painel fechado.
+      rerender(elemento(false));
+      await act(async () => {
+        gravacao.reject(new Error('rede'));
+      });
+      rerender(elemento(true));
+      expect(screen.getByRole('alert').textContent).toBe('Não foi possível salvar o gasto. Tente de novo.');
+      for (const nome of [/Confirmar/, 'Editar', 'Cancelar']) {
+        expect((screen.getByRole('button', { name: nome }) as HTMLButtonElement).disabled).toBe(false);
+      }
+      expect(gasteiMutateAsync).toHaveBeenCalledTimes(1);
+
+      // Tentar de novo: o erro some e grava (2ª chamada), o card fecha.
+      gasteiMutateAsync.mockResolvedValueOnce(undefined);
+      fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+      expect(screen.queryByRole('alert')).toBeNull();
+      await waitFor(() => expect(screen.queryByTestId('card-gasto-ia')).toBeNull());
+      expect(gasteiMutateAsync).toHaveBeenCalledTimes(2);
+      expect(agentes()[0].conteudo).toMatch(/Gasto salvo: R\$\s*45,00 em Mercado/);
+    });
+
+    it('Confirmar → fechar → reabrir antes da falha: o card reaberto mostra o erro e destrava; Cancelar limpa', async () => {
+      fetchMock.mockImplementation(() => respostaIa(comProposta()));
+      const gravacao = adiado<void>();
+      gasteiMutateAsync.mockImplementationOnce(() => gravacao.promise);
+      const { rerender } = render(elemento(true));
+      enviarNoPainel('gastei 45 no mercado');
+      await screen.findByTestId('card-gasto-ia');
+      fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+
+      rerender(elemento(false));
+      rerender(elemento(true));
+      expect((screen.getByRole('button', { name: /Confirmar/ }) as HTMLButtonElement).disabled).toBe(true);
+      // A rejeição chega ao callback do card antigo (desmontado), mas o erro vive no pai.
+      await act(async () => {
+        gravacao.reject(new Error('rede'));
+      });
+      expect(screen.getByRole('alert').textContent).toBe('Não foi possível salvar o gasto. Tente de novo.');
+      expect((screen.getByRole('button', { name: /Confirmar/ }) as HTMLButtonElement).disabled).toBe(false);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+      expect(screen.queryByTestId('card-gasto-ia')).toBeNull();
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(gasteiMutateAsync).toHaveBeenCalledTimes(1);
+    });
   });
 
   it.each([

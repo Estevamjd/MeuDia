@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { hojeSP } from '@meudia/shared';
 import { useCarteiras, useGastei, usePainelSaldo } from '../../hooks';
@@ -14,13 +14,31 @@ interface CardGastoIAProps {
   onConfirmado: (resumo: string) => void;
   /** Cancelar: não grava nada. */
   onCancelado: () => void;
+  /** Gravação iniciada numa abertura anterior do painel ainda em curso (estado do pai, sobrevive a fechar). */
+  salvando?: boolean;
+  /** Avisa o pai que a gravação começou/terminou. */
+  onSalvando?: (salvando: boolean) => void;
+  /** Erro da gravação guardado no pai (sobrevive a fechar/reabrir). Sem `onErroGravacao`, fica no próprio card. */
+  erroGravacao?: string | null;
+  /** Guarda (string) ou limpa (null) o erro da gravação no pai. */
+  onErroGravacao?: (erro: string | null) => void;
 }
+
+const ERRO_GRAVACAO = 'Não foi possível salvar o gasto. Tente de novo.';
 
 /**
  * Card do gasto que o assistente entendeu. Nada é gravado antes do Confirmar, que usa o mesmo
  * caminho do "Gastei" (`useGastei` → `carteirasService.gastei`). Editar ajusta os campos no próprio card.
  */
-export function CardGastoIA({ proposta, onConfirmado, onCancelado }: CardGastoIAProps) {
+export function CardGastoIA({
+  proposta,
+  onConfirmado,
+  onCancelado,
+  salvando = false,
+  onSalvando,
+  erroGravacao: erroGravacaoPai = null,
+  onErroGravacao,
+}: CardGastoIAProps) {
   const hojeISO = useMemo(() => hojeSP(), []);
   const carteiras = useCarteiras();
   const painel = usePainelSaldo(hojeISO);
@@ -36,7 +54,23 @@ export function CardGastoIA({ proposta, onConfirmado, onCancelado }: CardGastoIA
   const [descricao, setDescricao] = useState(proposta.descricao);
   const [data, setData] = useState(proposta.data);
   const [carteira, setCarteira] = useState<string | null>(proposta.carteira_id);
+  // Erro de validação: local. Erro de gravação: no pai quando há `onErroGravacao`, porque o painel pode fechar
+  // (desmontar este card) com a gravação em curso e a rejeição chega ao callback do card antigo.
   const [erro, setErro] = useState<string | null>(null);
+  const [erroGravacaoLocal, setErroGravacaoLocal] = useState<string | null>(null);
+  const montado = useRef(true);
+  useEffect(() => {
+    montado.current = true;
+    return () => {
+      montado.current = false;
+    };
+  }, []);
+  const erroGravacao = onErroGravacao ? erroGravacaoPai : erroGravacaoLocal;
+  const definirErroGravacao = (e: string | null) => {
+    if (onErroGravacao) onErroGravacao(e);
+    else if (montado.current) setErroGravacaoLocal(e);
+  };
+  const ocupado = gastei.isPending || salvando;
 
   const { valor, exibicao } = mascaraBRL(digitos);
   const carteiraId = ativas.some((c) => c.id === carteira) ? carteira : padrao;
@@ -48,13 +82,23 @@ export function CardGastoIA({ proposta, onConfirmado, onCancelado }: CardGastoIA
     if (!data || data > hojeISO) return setErro('A data não pode ser depois de hoje.');
     if (!carteiraId) return setErro('Escolha de onde saiu.');
     setErro(null);
-    gastei.mutate(
-      { valor, categoria, descricao: descricao.trim() || undefined, carteira_id: carteiraId, data },
-      {
-        onSuccess: () => onConfirmado(`Gasto salvo: ${formatBRL(valor)} em ${categoria}${carteiraNome ? ` (${carteiraNome})` : ''}.`),
-        onError: () => setErro('Não foi possível salvar o gasto. Tente de novo.'),
-      },
-    );
+    definirErroGravacao(null);
+    onSalvando?.(true);
+    // mutateAsync, não os callbacks do mutate (o react-query os descarta ao desmontar): fechar o painel no
+    // meio da gravação ainda tira o card; senão ele voltaria ao reabrir e o gasto poderia ser gravado 2x.
+    const resumo = `Gasto salvo: ${formatBRL(valor)} em ${categoria}${carteiraNome ? ` (${carteiraNome})` : ''}.`;
+    gastei
+      .mutateAsync({ valor, categoria, descricao: descricao.trim() || undefined, carteira_id: carteiraId, data })
+      .then(
+        () => {
+          onSalvando?.(false);
+          onConfirmado(resumo);
+        },
+        () => {
+          onSalvando?.(false);
+          definirErroGravacao(ERRO_GRAVACAO);
+        },
+      );
   };
 
   return (
@@ -115,9 +159,9 @@ export function CardGastoIA({ proposta, onConfirmado, onCancelado }: CardGastoIA
           </Link>
         </p>
       )}
-      {erro && (
+      {(erro ?? erroGravacao) && (
         <p role="alert" className="mt-2 text-xs text-red">
-          {erro}
+          {erro ?? erroGravacao}
         </p>
       )}
 
@@ -125,18 +169,18 @@ export function CardGastoIA({ proposta, onConfirmado, onCancelado }: CardGastoIA
         <Button
           type="button"
           onClick={confirmar}
-          isLoading={gastei.isPending}
-          disabled={carteiras.isLoading || semCarteira || gastei.isPending}
+          isLoading={ocupado}
+          disabled={carteiras.isLoading || semCarteira || ocupado}
           className="min-h-[44px] flex-1"
         >
           Confirmar
         </Button>
         {!editando && (
-          <Button type="button" variant="ghost" onClick={() => setEditando(true)} disabled={gastei.isPending} className="min-h-[44px]">
+          <Button type="button" variant="ghost" onClick={() => setEditando(true)} disabled={ocupado} className="min-h-[44px]">
             Editar
           </Button>
         )}
-        <Button type="button" variant="ghost" onClick={onCancelado} disabled={gastei.isPending} className="min-h-[44px]">
+        <Button type="button" variant="ghost" onClick={onCancelado} disabled={ocupado} className="min-h-[44px]">
           Cancelar
         </Button>
       </div>

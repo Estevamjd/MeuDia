@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
 import { X, Bot, Bell, LayoutDashboard, CheckCheck } from 'lucide-react';
@@ -52,39 +53,89 @@ interface AgentPanelProps {
   onClose: () => void;
 }
 
+/**
+ * O layout monta o painel em toda página: fechado, ele só cuida do portal e da trava de scroll.
+ * Queries e mutations vivem no `AgentPanelContent`, que só monta aberto (nada de requisição em segundo plano).
+ */
 export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
+  // Portal só no cliente (após montar): sem `document` no SSR.
+  const [montado, setMontado] = useState(false);
+  useEffect(() => setMontado(true), []);
+  useTravaScroll(isOpen);
+
+  // Estado React puro (sem consulta) que sobrevive a fechar/reabrir: o card do gasto pendente e o
+  // "consultando a IA". Uma resposta da IA que chega com o painel fechado aparece ao reabrir.
+  const [proposta, setProposta] = useState<PropostaPendente | null>(null);
+  const [consultandoIA, setConsultandoIA] = useState(false);
+  const idProposta = useRef(0);
+  const estado = useMemo<EstadoPainel>(
+    () => ({
+      proposta,
+      consultandoIA,
+      setConsultandoIA,
+      mostrarProposta: (dados) => setProposta({ id: ++idProposta.current, dados, salvando: false, erroGravacao: null }),
+      marcarSalvando: (salvando) => setProposta((p) => (p ? { ...p, salvando } : p)),
+      marcarErroGravacao: (erroGravacao) => setProposta((p) => (p ? { ...p, erroGravacao } : p)),
+      limparProposta: () => setProposta(null),
+    }),
+    [proposta, consultandoIA],
+  );
+
+  if (!isOpen || !montado) return null;
+  return <AgentPanelContent onClose={onClose} estado={estado} />;
+}
+
+interface PropostaPendente {
+  /** Reinicia o card a cada proposta nova. */
+  id: number;
+  dados: PropostaGasto;
+  /** Confirmar em curso (pode ter começado numa abertura anterior). */
+  salvando: boolean;
+  /** Falha da gravação: vive aqui para aparecer no card reaberto, mesmo se a rejeição chegou com o card desmontado. */
+  erroGravacao: string | null;
+}
+
+interface EstadoPainel {
+  proposta: PropostaPendente | null;
+  consultandoIA: boolean;
+  setConsultandoIA: (v: boolean) => void;
+  mostrarProposta: (dados: PropostaGasto) => void;
+  marcarSalvando: (salvando: boolean) => void;
+  marcarErroGravacao: (erro: string | null) => void;
+  limparProposta: () => void;
+}
+
+function AgentPanelContent({ onClose, estado }: { onClose: () => void; estado: EstadoPainel }) {
+  const { proposta, consultandoIA, setConsultandoIA, mostrarProposta, marcarSalvando, marcarErroGravacao, limparProposta } =
+    estado;
+  const queryClient = useQueryClient();
   const router = useRouter();
   const mode = useAppMode();
+  const financas = mode === 'financas';
+  // Monta a cada abertura: começa na aba inicial do modo (Finanças: Chat).
   const [activeTab, setActiveTab] = useState<Tab>(() => abaInicialAgente(mode));
   const { user } = useAuth();
 
-  // Data hooks
+  // Data hooks. Modo Finanças: Hábitos fica oculto (sem consulta); Treinos é visível e o chat responde
+  // "treino de hoje" com `useTreinos` (as sessões da semana já não consultam no modo Finanças por padrão).
   const { data: profile } = useProfile();
   const { data: treinos } = useTreinos();
   const { data: sessoesSemana } = useSessoesSemana();
-  const { data: habitos } = useHabitos();
-  const { data: registrosHoje } = useRegistrosHoje();
+  const { data: habitos } = useHabitos({ enabled: !financas });
+  const { data: registrosHoje } = useRegistrosHoje({ enabled: !financas });
   const now = new Date();
   const { data: resumoMensal } = useResumoMensal(now.getFullYear(), now.getMonth() + 1);
 
   // Agent hooks
   const { data: notificacoes, isLoading: loadingNotif } = useNotificacoes();
-  const { data: mensagens, isLoading: loadingChat, refetch: refetchChat } = useMensagensChat();
-  const { data: countNaoLidas } = useContarNaoLidas();
+  const { data: mensagens, isLoading: loadingChat } = useMensagensChat();
+  // Painel aberto: sem polling. Modo Finanças conta pelas notificações filtradas (abaixo), sem consultar.
+  const { data: countNaoLidas } = useContarNaoLidas({ enabled: !financas, poll: false });
   const enviarMensagem = useEnviarMensagem();
   const marcarLida = useMarcarNotificacaoLida();
   const marcarTodasLidas = useMarcarTodasLidas();
   const dispensar = useDispensarNotificacao();
   const criarCompromisso = useCriarCompromisso();
-
-  // Card do gasto que o assistente (IA) entendeu: só local até o Confirmar; `id` reinicia o card a cada proposta.
-  const [proposta, setProposta] = useState<{ id: number; dados: PropostaGasto } | null>(null);
-  const [consultandoIA, setConsultandoIA] = useState(false);
-
-  // Cada abertura começa na aba inicial do modo (Finanças: Chat).
-  useEffect(() => {
-    if (isOpen) setActiveTab(abaInicialAgente(mode));
-  }, [isOpen, mode]);
 
   // `onClose` chega inline do layout: em ref, para o efeito abaixo não re-rodar a cada render.
   const onCloseRef = useRef(onClose);
@@ -92,17 +143,11 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
     onCloseRef.current = onClose;
   }, [onClose]);
 
-  // Portal só no cliente (após montar): sem `document` no SSR.
-  const [montado, setMontado] = useState(false);
-  useEffect(() => setMontado(true), []);
-
   const painelRef = useRef<HTMLDivElement>(null);
-  useTravaScroll(isOpen);
 
   // Esc fecha; foco vai para o painel ao abrir e volta para o gatilho (ex.: "Chat" da BottomNav) ao fechar.
-  // Só depende de `isOpen`: não re-roda a cada render (não rouba o foco de quem está digitando no chat).
+  // Roda só ao montar/desmontar (abrir/fechar): não rouba o foco de quem está digitando no chat.
   useEffect(() => {
-    if (!isOpen) return;
     const gatilho = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onCloseRef.current();
@@ -116,7 +161,7 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
       clearTimeout(timer);
       if (gatilho?.isConnected) gatilho.focus();
     };
-  }, [isOpen]);
+  }, []);
 
   // Arrastar para baixo pelo topo do sheet (alça + cabeçalho). Só toque/caneta e fora de botões;
   // o conteúdo rolável não tem esses handlers, então o scroll interno segue normal.
@@ -227,9 +272,11 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
           // Num timeout, o servidor pode ainda estar gravando: uma duplicata é preferível a perder a mensagem.
           await enviarMensagem.mutateAsync({ role: 'user', conteudo: texto });
         }
-        await refetchChat();
+        // Invalida em vez de `refetch()`: o painel pode ter fechado durante a espera e um refetch explícito
+        // consultaria sem observador. Com `active`, aberto recarrega já; fechado fica stale até reabrir.
+        await queryClient.invalidateQueries({ queryKey: ['chat-agente'], refetchType: 'active' });
         if (dados?.proposta) {
-          setProposta({ id: Date.now(), dados: dados.proposta });
+          mostrarProposta(dados.proposta);
           return;
         }
       }
@@ -244,7 +291,7 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
         acoes: resposta.acoes,
       });
     },
-    [enviarMensagem, contexto, mensagens, refetchChat, mode],
+    [enviarMensagem, contexto, mensagens, queryClient, mode, setConsultandoIA, mostrarProposta],
   );
 
   // Handler de ações (NAVEGAR + COMANDO + CRIAR_COMPROMISSO)
@@ -291,8 +338,6 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
   const mensagensModo = useMemo(() => filtrarMensagens(mensagens ?? [], mode), [mensagens, mode]);
   // Modo Finanças: o contador do servidor inclui módulos ocultos; conta só as visíveis.
   const naoLidas = mode === 'padrao' ? (countNaoLidas ?? 0) : notificacoesModo.filter((n) => !n.lida).length;
-
-  if (!isOpen || !montado) return null;
 
   const todasTabs: { id: Tab; label: string; icon: typeof LayoutDashboard; badge?: number }[] = [
     { id: 'resumo', label: 'Resumo', icon: LayoutDashboard },
@@ -408,12 +453,16 @@ export function AgentPanel({ isOpen, onClose }: AgentPanelProps) {
                   <CardGastoIA
                     key={proposta.id}
                     proposta={proposta.dados}
+                    salvando={proposta.salvando}
+                    onSalvando={marcarSalvando}
+                    erroGravacao={proposta.erroGravacao}
+                    onErroGravacao={marcarErroGravacao}
                     onConfirmado={(resumoGasto) => {
-                      setProposta(null);
+                      limparProposta();
                       void enviarMensagem.mutateAsync({ role: 'agent', conteudo: resumoGasto }).catch(() => {});
                     }}
                     onCancelado={() => {
-                      setProposta(null);
+                      limparProposta();
                       void enviarMensagem.mutateAsync({ role: 'agent', conteudo: 'Tudo bem, não salvei esse gasto.' }).catch(() => {});
                     }}
                   />

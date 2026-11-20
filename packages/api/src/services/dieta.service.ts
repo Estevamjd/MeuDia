@@ -1,3 +1,4 @@
+import { usuarioAtualId } from './usuario-atual';
 import { AGUA, AppError } from '@meudia/shared';
 import { format } from 'date-fns';
 import { dietaRepository } from '../repositories';
@@ -18,11 +19,11 @@ export async function criarRefeicao(userId: string, data: unknown) {
 
 export async function atualizarRefeicao(refeicaoId: string, data: unknown) {
   const parsed = refeicaoInsertSchema.partial().parse(data);
-  return dietaRepository.updateRefeicao(refeicaoId, parsed);
+  return dietaRepository.updateRefeicao(refeicaoId, parsed, await usuarioAtualId());
 }
 
 export async function excluirRefeicao(refeicaoId: string) {
-  return dietaRepository.removeRefeicao(refeicaoId);
+  return dietaRepository.removeRefeicao(refeicaoId, await usuarioAtualId());
 }
 
 // ── Água ──

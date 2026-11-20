@@ -6,13 +6,14 @@ import type { HabitoInsert } from '@meudia/shared';
 import { useAuth } from './useAuth';
 import { withOfflineSupport } from '../lib/offline-mutation';
 
-export function useHabitos() {
+/** `enabled: false` não consulta (ex.: AgentPanel no modo Finanças, onde Hábitos fica oculto). */
+export function useHabitos({ enabled = true }: { enabled?: boolean } = {}) {
   const { user } = useAuth();
 
   return useQuery({
     queryKey: ['habitos', user?.id],
     queryFn: () => habitoService.listarHabitos(user!.id),
-    enabled: !!user?.id,
+    enabled: enabled && !!user?.id,
   });
 }
 
@@ -76,13 +77,13 @@ export function useExcluirHabito() {
   });
 }
 
-export function useRegistrosHoje() {
+export function useRegistrosHoje({ enabled = true }: { enabled?: boolean } = {}) {
   const { user } = useAuth();
 
   return useQuery({
     queryKey: ['registros-hoje', user?.id],
     queryFn: () => habitoService.obterRegistrosHoje(user!.id),
-    enabled: !!user?.id,
+    enabled: enabled && !!user?.id,
     staleTime: 1000 * 60,
   });
 }

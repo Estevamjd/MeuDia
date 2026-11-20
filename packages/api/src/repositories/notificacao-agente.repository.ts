@@ -58,11 +58,12 @@ export async function create(
   return created as unknown as NotificacaoAgente;
 }
 
-export async function marcarLida(notificacaoId: string): Promise<void> {
+export async function marcarLida(notificacaoId: string, userId: string): Promise<void> {
   const { error } = await getSupabase()
     .from(TABLE)
     .update({ lida: true })
-    .eq('id', notificacaoId);
+    .eq('id', notificacaoId)
+    .eq('user_id', userId);
 
   if (error) throw new AppError(error.message, 'DB_ERROR');
 }
@@ -77,11 +78,12 @@ export async function marcarTodasLidas(userId: string): Promise<void> {
   if (error) throw new AppError(error.message, 'DB_ERROR');
 }
 
-export async function dispensar(notificacaoId: string): Promise<void> {
+export async function dispensar(notificacaoId: string, userId: string): Promise<void> {
   const { error } = await getSupabase()
     .from(TABLE)
     .update({ dispensada: true })
-    .eq('id', notificacaoId);
+    .eq('id', notificacaoId)
+    .eq('user_id', userId);
 
   if (error) throw new AppError(error.message, 'DB_ERROR');
 }

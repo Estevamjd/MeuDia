@@ -17,11 +17,12 @@ export async function findByUserId(userId: string): Promise<Medicamento[]> {
   return data as Medicamento[];
 }
 
-export async function findById(medicamentoId: string): Promise<Medicamento> {
+export async function findById(medicamentoId: string, userId: string): Promise<Medicamento> {
   const { data, error } = await getSupabase()
     .from('medicamentos')
     .select(MEDICAMENTO_COLUMNS)
     .eq('id', medicamentoId)
+    .eq('user_id', userId)
     .single();
 
   if (error) throw new AppError(error.message, 'DB_ERROR');
@@ -39,11 +40,12 @@ export async function create(userId: string, data: MedicamentoInsert): Promise<M
   return created as Medicamento;
 }
 
-export async function update(medicamentoId: string, data: Partial<MedicamentoInsert>): Promise<Medicamento> {
+export async function update(medicamentoId: string, data: Partial<MedicamentoInsert>, userId: string): Promise<Medicamento> {
   const { data: updated, error } = await getSupabase()
     .from('medicamentos')
     .update(data)
     .eq('id', medicamentoId)
+    .eq('user_id', userId)
     .select(MEDICAMENTO_COLUMNS)
     .single();
 
@@ -51,11 +53,12 @@ export async function update(medicamentoId: string, data: Partial<MedicamentoIns
   return updated as Medicamento;
 }
 
-export async function remove(medicamentoId: string): Promise<void> {
+export async function remove(medicamentoId: string, userId: string): Promise<void> {
   const { error } = await getSupabase()
     .from('medicamentos')
     .update({ ativo: false })
-    .eq('id', medicamentoId);
+    .eq('id', medicamentoId)
+    .eq('user_id', userId);
 
   if (error) throw new AppError(error.message, 'DB_ERROR');
 }

@@ -1,3 +1,4 @@
+import { usuarioAtualId } from './usuario-atual';
 import { AppError } from '@meudia/shared';
 import { veiculoRepository } from '../repositories';
 import { veiculoInsertSchema, manutencaoInsertSchema } from '../validators';
@@ -14,11 +15,11 @@ export async function criarVeiculo(userId: string, data: unknown) {
 
 export async function atualizarVeiculo(veiculoId: string, data: unknown) {
   const parsed = veiculoInsertSchema.partial().parse(data);
-  return veiculoRepository.update(veiculoId, parsed);
+  return veiculoRepository.update(veiculoId, parsed, await usuarioAtualId());
 }
 
 export async function excluirVeiculo(veiculoId: string) {
-  return veiculoRepository.remove(veiculoId);
+  return veiculoRepository.remove(veiculoId, await usuarioAtualId());
 }
 
 export async function listarManutencoes(veiculoId: string) {

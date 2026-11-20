@@ -52,11 +52,12 @@ export async function findByUserAndDateRange(
   return (data as SessaoRow[]).map(paraSessao);
 }
 
-export async function findById(sessaoId: string): Promise<SessaoTreino> {
+export async function findById(sessaoId: string, userId: string): Promise<SessaoTreino> {
   const { data, error } = await getSupabase()
     .from('sessoes_treino')
     .select(COLUNAS_SESSAO)
     .eq('id', sessaoId)
+    .eq('user_id', userId)
     .single();
 
   if (error) throw new AppError(error.message, 'DB_ERROR');
@@ -74,11 +75,12 @@ export async function create(userId: string, data: SessaoTreinoInsert): Promise<
   return paraSessao(created as SessaoRow);
 }
 
-export async function update(sessaoId: string, data: Partial<SessaoTreinoInsert>): Promise<SessaoTreino> {
+export async function update(sessaoId: string, data: Partial<SessaoTreinoInsert>, userId: string): Promise<SessaoTreino> {
   const { data: updated, error } = await getSupabase()
     .from('sessoes_treino')
     .update(paraRow(data))
     .eq('id', sessaoId)
+    .eq('user_id', userId)
     .select(COLUNAS_SESSAO)
     .single();
 
@@ -88,6 +90,7 @@ export async function update(sessaoId: string, data: Partial<SessaoTreinoInsert>
 
 // C4 (PLANO-F1): banco real tem `serie_numero`, `carga`, `repeticoes` e `concluida` em `series_realizadas`;
 // o app usa `numero_serie`, `carga_usada`, `reps_feitas` e `concluido`. Pedir os nomes do app dava 400.
+// series_realizadas: RLS confere o dono da sessão e do exercício (008).
 const COLUNAS_SERIE = 'id, sessao_id, exercicio_id, serie_numero, carga, repeticoes, concluida';
 
 export interface SerieRow {

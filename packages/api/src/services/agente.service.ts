@@ -1,3 +1,4 @@
+import { usuarioAtualId } from './usuario-atual';
 import { AppError } from '@meudia/shared';
 import type {
   NotificacaoAgente,
@@ -41,7 +42,7 @@ export async function criarNotificacao(
 }
 
 export async function marcarNotificacaoLida(notificacaoId: string): Promise<void> {
-  return notificacaoAgenteRepository.marcarLida(notificacaoId);
+  return notificacaoAgenteRepository.marcarLida(notificacaoId, await usuarioAtualId());
 }
 
 export async function marcarTodasNotificacoesLidas(userId: string): Promise<void> {
@@ -49,7 +50,7 @@ export async function marcarTodasNotificacoesLidas(userId: string): Promise<void
 }
 
 export async function dispensarNotificacao(notificacaoId: string): Promise<void> {
-  return notificacaoAgenteRepository.dispensar(notificacaoId);
+  return notificacaoAgenteRepository.dispensar(notificacaoId, await usuarioAtualId());
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { hojeSP } from '@meudia/shared';
 import { CardGastoIA } from '../CardGastoIA';
 import type { PropostaGasto } from '../../../lib/ia/proposta';
@@ -19,12 +19,15 @@ vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.Re
 vi.mock('../../../hooks', () => ({
   useCarteiras: () => ({ data: estado.carregando ? undefined : estado.carteiras, isLoading: estado.carregando }),
   usePainelSaldo: () => ({ data: { carteiraPadraoId: estado.padrao } }),
-  useGastei: () => ({ mutate: gasteiMutate, isPending: false }),
+  useGastei: () => ({ mutateAsync: gasteiMutate, isPending: false }),
 }));
 
+beforeEach(() => {
+  gasteiMutate.mockResolvedValue(undefined);
+});
 afterEach(() => {
   cleanup();
-  vi.clearAllMocks();
+  vi.resetAllMocks();
   estado.carregando = false;
   estado.padrao = 'c2';
 });
@@ -56,13 +59,36 @@ describe('CardGastoIA', () => {
     expect(gasteiMutate).not.toHaveBeenCalled();
   });
 
-  it('Confirmar grava pelo "Gastei" existente, com a carteira padrão ativa', () => {
+  it('Confirmar grava pelo "Gastei" existente, com a carteira padrão ativa', async () => {
     const { onConfirmado } = renderCard();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
     expect(gasteiMutate).toHaveBeenCalledTimes(1);
     expect(gasteiMutate.mock.calls[0]![0]).toEqual({ valor: 45, categoria: 'Mercado', descricao: 'Mercado', carteira_id: 'c2', data: hoje });
-    gasteiMutate.mock.calls[0]![1].onSuccess();
+    await waitFor(() => expect(onConfirmado).toHaveBeenCalledTimes(1));
     expect(onConfirmado.mock.calls[0]![0]).toMatch(/Gasto salvo: R\$\s*45,00 em Mercado \(Carteira\)/);
+  });
+
+  it('desmontado no meio da gravação (painel fechado): ainda avisa o pai do sucesso', async () => {
+    let concluir!: () => void;
+    gasteiMutate.mockImplementation(() => new Promise<void>((r) => (concluir = r)));
+    const onConfirmado = vi.fn();
+    const onSalvando = vi.fn();
+    const { unmount } = render(
+      <CardGastoIA proposta={proposta} onConfirmado={onConfirmado} onCancelado={vi.fn()} onSalvando={onSalvando} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
+    expect(onSalvando.mock.calls).toEqual([[true]]);
+    unmount();
+    await act(async () => concluir());
+    expect(onSalvando.mock.calls).toEqual([[true], [false]]);
+    expect(onConfirmado).toHaveBeenCalledTimes(1);
+  });
+
+  it('salvando (gravação de uma abertura anterior): botões travados', () => {
+    render(<CardGastoIA proposta={proposta} onConfirmado={vi.fn()} onCancelado={vi.fn()} salvando />);
+    for (const nome of [/Confirmar/, 'Editar', 'Cancelar']) {
+      expect((screen.getByRole('button', { name: nome }) as HTMLButtonElement).disabled).toBe(true);
+    }
   });
 
   it('usa a carteira proposta quando é ativa; padrão arquivado cai na primeira ativa', () => {
@@ -95,12 +121,12 @@ describe('CardGastoIA', () => {
     expect(screen.getByRole('alert').textContent).toMatch(/maior que zero/);
   });
 
-  it('erro ao salvar mantém o card com aviso', () => {
+  it('erro ao salvar mantém o card com aviso', async () => {
+    gasteiMutate.mockRejectedValue(new Error('falhou'));
     const { onConfirmado } = renderCard();
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }));
-    act(() => gasteiMutate.mock.calls[0]![1].onError());
+    expect((await screen.findByRole('alert')).textContent).toMatch(/Não foi possível salvar/);
     expect(onConfirmado).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert').textContent).toMatch(/Não foi possível salvar/);
     expect(screen.getByTestId('card-gasto-ia')).toBeTruthy();
   });
 

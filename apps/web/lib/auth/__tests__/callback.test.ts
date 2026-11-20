@@ -13,7 +13,7 @@ describe('getAuthCallbackUrl', () => {
   });
 
   it('usa o fallback de produção fora do navegador', () => {
-    expect(getAuthCallbackUrl()).toBe('https://meudia.vercel.app/auth/callback');
+    expect(getAuthCallbackUrl()).toBe('https://meudia.srv2176785.hstgr.cloud/auth/callback');
   });
 });
 

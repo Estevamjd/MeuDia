@@ -29,6 +29,8 @@ docker compose up -d
 
 `APP_MODE` é lido em runtime. `NEXT_PUBLIC_*` entra no bundle no build: mudar URL ou chaves públicas do Supabase exige rebuild.
 
+Para habilitar o Sentry, `NEXT_PUBLIC_SENTRY_DSN` precisa ser passado como build-arg no build da imagem (o `docker-compose.yml` já o passa em `build.args`). Alterar esse DSN exige rebuild. Definir apenas `SENTRY_DSN` em runtime não liga o Sentry: as configurações usam `NEXT_PUBLIC_SENTRY_DSN`.
+
 ## Auth
 
 O login com e-mail e senha fala direto com o Supabase. Para magic link / confirmação de e-mail no host da VPS, acrescente `https://meudia.srv2176785.hstgr.cloud/**` em Additional Redirect URLs no painel do Supabase, sem remover a URL da Vercel.

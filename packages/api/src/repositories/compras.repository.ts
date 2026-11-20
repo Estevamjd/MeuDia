@@ -22,11 +22,12 @@ export async function findListasByUserId(userId: string): Promise<(ListaCompras 
   }));
 }
 
-export async function findListaById(listaId: string): Promise<ListaCompras> {
+export async function findListaById(listaId: string, userId: string): Promise<ListaCompras> {
   const { data, error } = await getSupabase()
     .from('listas_compras')
     .select('id, user_id, nome, created_at, itens_compras(id, lista_id, nome, quantidade, unidade, categoria, comprado, preco_estimado)')
     .eq('id', listaId)
+    .eq('user_id', userId)
     .single();
 
   if (error) throw new AppError(error.message, 'DB_ERROR');
@@ -52,11 +53,12 @@ export async function createLista(userId: string, data: ListaComprasInsert): Pro
   return created as ListaCompras;
 }
 
-export async function updateLista(listaId: string, data: Partial<ListaComprasInsert>): Promise<ListaCompras> {
+export async function updateLista(listaId: string, data: Partial<ListaComprasInsert>, userId: string): Promise<ListaCompras> {
   const { data: updated, error } = await getSupabase()
     .from('listas_compras')
     .update(data)
     .eq('id', listaId)
+    .eq('user_id', userId)
     .select('id, user_id, nome, created_at')
     .single();
 
@@ -64,15 +66,17 @@ export async function updateLista(listaId: string, data: Partial<ListaComprasIns
   return updated as ListaCompras;
 }
 
-export async function removeLista(listaId: string): Promise<void> {
+export async function removeLista(listaId: string, userId: string): Promise<void> {
   const { error } = await getSupabase()
     .from('listas_compras')
     .delete()
-    .eq('id', listaId);
+    .eq('id', listaId)
+    .eq('user_id', userId);
 
   if (error) throw new AppError(error.message, 'DB_ERROR');
 }
 
+// itens_compras: RLS confere listas_compras.user_id; não existe user_id na filha.
 /* ── Itens ── */
 
 export async function findItensByListaId(listaId: string): Promise<ItemCompra[]> {

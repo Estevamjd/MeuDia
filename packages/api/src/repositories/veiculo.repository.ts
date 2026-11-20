@@ -16,11 +16,12 @@ export async function findByUserId(userId: string): Promise<Veiculo[]> {
   return data as unknown as Veiculo[];
 }
 
-export async function findById(veiculoId: string): Promise<Veiculo> {
+export async function findById(veiculoId: string, userId: string): Promise<Veiculo> {
   const { data, error } = await getSupabase()
     .from('veiculos')
     .select(VEICULO_COLUMNS)
     .eq('id', veiculoId)
+    .eq('user_id', userId)
     .single();
 
   if (error) throw new AppError(error.message, 'DB_ERROR');
@@ -38,11 +39,12 @@ export async function create(userId: string, data: VeiculoInsert): Promise<Veicu
   return created as unknown as Veiculo;
 }
 
-export async function update(veiculoId: string, data: Partial<VeiculoInsert>): Promise<Veiculo> {
+export async function update(veiculoId: string, data: Partial<VeiculoInsert>, userId: string): Promise<Veiculo> {
   const { data: updated, error } = await getSupabase()
     .from('veiculos')
     .update(data)
     .eq('id', veiculoId)
+    .eq('user_id', userId)
     .select(VEICULO_COLUMNS)
     .single();
 
@@ -50,15 +52,17 @@ export async function update(veiculoId: string, data: Partial<VeiculoInsert>): P
   return updated as unknown as Veiculo;
 }
 
-export async function remove(veiculoId: string): Promise<void> {
+export async function remove(veiculoId: string, userId: string): Promise<void> {
   const { error } = await getSupabase()
     .from('veiculos')
     .delete()
-    .eq('id', veiculoId);
+    .eq('id', veiculoId)
+    .eq('user_id', userId);
 
   if (error) throw new AppError(error.message, 'DB_ERROR');
 }
 
+// manutencoes: RLS confere veiculos.user_id; não existe user_id na filha.
 export async function findManutencoesByVeiculoId(veiculoId: string): Promise<Manutencao[]> {
   const { data, error } = await getSupabase()
     .from('manutencoes')
