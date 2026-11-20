@@ -38,10 +38,11 @@ export function GraficoPeso({ pontos, metaKg }: { pontos: readonly PontoGraficoP
               />
             )}
             <Scatter dataKey="peso" fill="#5a5a70" isAnimationActive={false} shape={<Ponto />} />
+            {/* Média 7 dias no par claro do accent2 (a menta no ciano): segue a cor do app. */}
             <Line
               type="monotone"
               dataKey="media7"
-              stroke="#6affda"
+              stroke="rgb(var(--c-par-vivo))"
               strokeWidth={2.6}
               dot={false}
               connectNulls

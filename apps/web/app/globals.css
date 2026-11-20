@@ -28,6 +28,9 @@
   --c-brilho: 0 229 255;
   /* Tom "elétrico" da cor do app (o do escuro): brilhos fixos e o bloco principal nos dois temas. Ciano = o de sempre. */
   --c-accent-vivo: 0 229 255;
+  /* accent2 do escuro (a estrela verde do céu) e o par claro dele (a menta): seguem a cor do app. */
+  --c-accent2-vivo: 0 255 163;
+  --c-par-vivo: 106 255 218;
   --barra-fundo: rgb(4 8 19 / 0.88);
   --topo-fundo: rgba(5, 10, 22, 0.82);
   --grafico-tooltip: #16161f;
@@ -58,16 +61,27 @@
   --red:      #f87171;
   --orange:   #fab219;
 
-  /* Material do bloco principal (ciano profundo) */
+  /* Material do bloco principal (ciano profundo). Cada cor do app troca estas linhas (heroi em lib/cores-app.ts). */
   --lap-m-fundo: oklch(0.2 0.05 232);
   --lap-m-vizinho: oklch(0.13 0.03 262);
   --lap-m-meio: oklch(0.42 0.1 222);
   --lap-m-luz: oklch(0.62 0.13 210);
   --lap-m-brilho: oklch(0.9 0.15 200);
+  --lap-m-base: #0b2233;
+  --lap-m-halo: oklch(0.6 0.13 210 / 0.45);
   --lap-m-brilho-foco: color-mix(in oklch, var(--lap-m-brilho) 30%, transparent);
   --lap-h-texto-2: oklch(0.95 0.03 205 / 0.84);
   --lap-h-texto-3: oklch(0.9 0.04 205 / 0.62);
   --lap-h-positivo: oklch(0.9 0.15 200);
+  /* Números positivos dentro do herói no tema claro (html[data-mode='light'] .lap-heroi). */
+  --lap-h-positivo-claro: oklch(0.9 0.105 203);
+  --lap-vidro-fundo: oklch(0.15 0.04 240 / 0.66);
+  --lap-pilula-fundo: #062a33;
+  --lap-pilula-borda: #1f5f6b;
+  --lap-pilula-texto: #ccf7ff;
+  /* Matiz das sombras e arestas tingidas do claro (cartões e herói). */
+  --lap-matiz-sombra: 230;
+  --lap-matiz-sombra-2: 235;
   /* Saída e alerta em números do bloco principal e dos cartões ao lado (rosa no escuro, vermelho no claro). */
   --lap-h-negativo: #f8b4b4;
   --lap-h-alerta: #fca5a5;
@@ -82,7 +96,7 @@
     radial-gradient(1.5px 1.5px at 58% 29%, rgb(var(--c-accent-vivo) / 0.55) 50%, transparent 51%),
     radial-gradient(1px 1px at 79% 84%, rgba(245, 247, 250, 0.42) 50%, transparent 51%),
     radial-gradient(1px 1px at 91% 43%, rgba(245, 247, 250, 0.3) 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 24% 92%, rgba(0, 255, 163, 0.35) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 24% 92%, rgb(var(--c-accent2-vivo) / 0.35) 50%, transparent 51%),
     radial-gradient(1px 1px at 66% 58%, rgb(var(--c-accent-vivo) / 0.35) 50%, transparent 51%);
 }
 
@@ -126,7 +140,7 @@
   .glow-accent  { box-shadow: 0 0 20px rgb(var(--c-accent-vivo) / 0.3); }
   .glow-orange  { box-shadow: 0 0 20px rgba(255,159,74,0.3); }
   .glow-green   { box-shadow: 0 0 20px rgba(74,222,128,0.3); }
-  .glow-accent2 { box-shadow: 0 0 20px rgba(0,255,163,0.3); }
+  .glow-accent2 { box-shadow: 0 0 20px rgb(var(--c-accent2-vivo) / 0.3); }
 
   /* Brilho ciano do topo (lapidacao.css do CRM); fica atrás do conteúdo. */
   .bg-glow-orbs::before {
@@ -150,7 +164,7 @@
   display: flex; align-items: center; gap: 14px;
 }
 .ai-bar.purple {
-  background: linear-gradient(135deg,rgb(var(--c-accent-vivo) / 0.13),rgba(106,255,218,0.06));
+  background: linear-gradient(135deg,rgb(var(--c-accent-vivo) / 0.13),rgb(var(--c-par-vivo) / 0.06));
   border: 1px solid rgb(var(--c-accent-vivo) / 0.28);
 }
 .ai-bar.green {
@@ -204,7 +218,7 @@
 .tag.r { background: rgba(248,113,113,0.14); color: var(--red); }
 .tag.y { background: rgba(251,191,36,0.14);  color: var(--yellow); }
 .tag.p { background: rgb(var(--c-accent-vivo) / 0.14); color: var(--accent); }
-.tag.t { background: rgba(106,255,218,0.14); color: var(--accent3); }
+.tag.t { background: rgb(var(--c-par-vivo) / 0.14); color: var(--accent3); }
 .tag.o { background: rgba(255,159,74,0.14);  color: var(--orange); }
 
 /* Progress bar */
@@ -291,7 +305,7 @@
   box-shadow: var(--lap-sombra-cartao), inset 0 0 0 1px rgba(250, 178, 25, 0.35);
 }
 
-/* Bloco principal: material ciano profundo com foco de luz, anéis e grão. */
+/* Bloco principal: material profundo na cor do app (ciano por padrão) com foco de luz, anéis e grão. */
 .lap-heroi {
   --lap-foco: 78% 48%;
   position: relative;
@@ -306,11 +320,11 @@
     radial-gradient(55% 95% at -8% 115%, color-mix(in oklch, var(--lap-m-vizinho) 90%, transparent), transparent 70%),
     radial-gradient(50% 80% at 6% -24%, color-mix(in oklch, var(--lap-m-meio) 55%, transparent), transparent 72%),
     linear-gradient(135deg, var(--lap-m-fundo), var(--lap-m-vizinho));
-  background-color: #0b2233;
+  background-color: var(--lap-m-base);
   box-shadow:
     inset 0 1px 0 oklch(1 0 0 / 0.22),
     inset 0 0 0 1px oklch(1 0 0 / 0.07),
-    0 40px 80px -40px oklch(0.6 0.13 210 / 0.45),
+    0 40px 80px -40px var(--lap-m-halo),
     0 2px 4px oklch(0 0 0 / 0.5);
 }
 .lap-heroi::before {
@@ -339,7 +353,7 @@
 .lap-heroi .lap-texto-3 { color: var(--lap-h-texto-3); }
 .lap-heroi .lap-positivo { color: var(--lap-h-positivo); }
 .lap-vidro {
-  background: oklch(0.15 0.04 240 / 0.66);
+  background: var(--lap-vidro-fundo);
   border: 1px solid oklch(1 0 0 / 0.08);
   border-radius: 12px;
 }
@@ -396,7 +410,7 @@
 
 /* ══════════════════════════════════════════════════════════════
    Tema claro (Configurações › Aparência), na mesma linguagem do Astro G claro do Mestres CRM:
-   - o bloco principal (.lap-heroi) continua o MESMO material azul-noite com luz ciano, anéis e grão;
+   - o bloco principal (.lap-heroi) continua o MESMO material do escuro (azul-noite com luz ciano, ou o da cor do app), anéis e grão;
    - a página fica num branco frio com o brilho ciano do topo; os cartões ficam brancos com aresta de luz
      no topo e sombra suave puxada para o azul (nada de cartão chapado);
    - o ciano vira azul-petróleo (#0e7490) onde é texto ou botão sobre branco (contraste ≥ 4,5:1).
@@ -455,8 +469,8 @@ html[data-mode='light'] {
   /* Superfícies: aresta de luz branca no topo + sombra física suave, tingida de azul (Mestres CRM claro). */
   --lap-luz-aresta: oklch(1 0 0 / 0.9);
   --lap-luz-topo: oklch(1 0 0 / 0);
-  --lap-borda-fina: oklch(0.25 0.03 235 / 0.1);
-  --lap-sombra-cartao: inset 0 1px 0 var(--lap-luz-aresta), 0 1px 2px oklch(0.3 0.04 235 / 0.07), 0 16px 32px -20px oklch(0.3 0.06 230 / 0.18);
+  --lap-borda-fina: oklch(0.25 0.03 var(--lap-matiz-sombra-2) / 0.1);
+  --lap-sombra-cartao: inset 0 1px 0 var(--lap-luz-aresta), 0 1px 2px oklch(0.3 0.04 var(--lap-matiz-sombra-2) / 0.07), 0 16px 32px -20px oklch(0.3 0.06 var(--lap-matiz-sombra) / 0.18);
   --lap-h-positivo: #0e7490;
   --lap-h-negativo: #c43232;
   --lap-h-alerta: #c43232;
@@ -497,8 +511,8 @@ html[data-mode='light'] .lap-heroi {
   --c-yellow: 250 178 25;
   --c-orange: 250 178 25;
   --c-brilho: var(--c-accent-vivo);
-  /* Sobre a página branca o ciano elétrico do número "estoura": mesma luz, um pouco menos de croma (o material fica igual). */
-  --lap-h-positivo: oklch(0.9 0.105 203);
+  /* Sobre a página branca o tom elétrico do número "estoura": mesma luz, um pouco menos de croma (o material fica igual). */
+  --lap-h-positivo: var(--lap-h-positivo-claro);
   --lap-h-negativo: #f8b4b4;
   --lap-h-alerta: #fca5a5;
   --text: #f5f6f8;
@@ -511,8 +525,8 @@ html[data-mode='light'] .lap-heroi {
   box-shadow:
     inset 0 1px 0 oklch(1 0 0 / 0.2),
     inset 0 0 0 1px oklch(1 0 0 / 0.07),
-    0 18px 34px -22px oklch(0.25 0.05 230 / 0.34),
-    0 2px 6px -1px oklch(0.25 0.04 235 / 0.12);
+    0 18px 34px -22px oklch(0.25 0.05 var(--lap-matiz-sombra) / 0.34),
+    0 2px 6px -1px oklch(0.25 0.04 var(--lap-matiz-sombra-2) / 0.12);
 }
 html[data-mode='light'] ::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.15); }
 html[data-trocando-tema] *, html[data-trocando-tema] *::before, html[data-trocando-tema] *::after { transition: none !important; }
@@ -534,6 +548,25 @@ html[data-accent='laranja'] {
   --accent-soft-2: rgba(251, 146, 60, 0.2);
   --accent2: #fbbf24;
   --accent3: #fdba74;
+  --c-accent2-vivo: 251 191 36;
+  --c-par-vivo: 255 207 118;
+  --lap-m-fundo: oklch(0.21 0.06 33);
+  --lap-m-vizinho: oklch(0.14 0.04 8);
+  --lap-m-meio: oklch(0.44 0.13 40);
+  --lap-m-luz: oklch(0.66 0.16 52);
+  --lap-m-brilho: oklch(0.88 0.14 68);
+  --lap-m-base: #321812;
+  --lap-m-halo: oklch(0.62 0.16 48 / 0.45);
+  --lap-h-texto-2: oklch(0.95 0.03 60 / 0.84);
+  --lap-h-texto-3: oklch(0.9 0.04 60 / 0.62);
+  --lap-h-positivo: oklch(0.88 0.14 68);
+  --lap-h-positivo-claro: oklch(0.88 0.11 66);
+  --lap-vidro-fundo: oklch(0.15 0.04 25 / 0.66);
+  --lap-pilula-fundo: #371e15;
+  --lap-pilula-borda: #754939;
+  --lap-pilula-texto: #ffe5d8;
+  --lap-matiz-sombra: 40;
+  --lap-matiz-sombra-2: 45;
 }
 html[data-mode='light'][data-accent='laranja'] {
   --c-accent: 194 65 12;
@@ -547,6 +580,7 @@ html[data-mode='light'][data-accent='laranja'] {
   --accent-soft-2: rgba(234, 88, 12, 0.18);
   --accent2: #b45309;
   --accent3: #9a3412;
+  --lap-h-positivo: #c2410c;
 }
 html[data-accent='verde'] {
   --c-accent-vivo: 74 222 128;
@@ -561,6 +595,25 @@ html[data-accent='verde'] {
   --accent-soft-2: rgba(74, 222, 128, 0.2);
   --accent2: #2dd4bf;
   --accent3: #86efac;
+  --c-accent2-vivo: 45 212 191;
+  --c-par-vivo: 154 251 176;
+  --lap-m-fundo: oklch(0.2 0.05 165);
+  --lap-m-vizinho: oklch(0.13 0.03 195);
+  --lap-m-meio: oklch(0.42 0.11 158);
+  --lap-m-luz: oklch(0.64 0.15 152);
+  --lap-m-brilho: oklch(0.9 0.17 150);
+  --lap-m-base: #06261b;
+  --lap-m-halo: oklch(0.6 0.14 152 / 0.45);
+  --lap-h-texto-2: oklch(0.95 0.03 155 / 0.84);
+  --lap-h-texto-3: oklch(0.9 0.04 155 / 0.64);
+  --lap-h-positivo: oklch(0.9 0.17 150);
+  --lap-h-positivo-claro: oklch(0.9 0.13 152);
+  --lap-vidro-fundo: oklch(0.15 0.04 175 / 0.66);
+  --lap-pilula-fundo: #112c1d;
+  --lap-pilula-borda: #336147;
+  --lap-pilula-texto: #d6f8e2;
+  --lap-matiz-sombra: 165;
+  --lap-matiz-sombra-2: 170;
 }
 html[data-mode='light'][data-accent='verde'] {
   --c-accent: 21 128 61;
@@ -574,6 +627,7 @@ html[data-mode='light'][data-accent='verde'] {
   --accent-soft-2: rgba(22, 163, 74, 0.18);
   --accent2: #0f766e;
   --accent3: #166534;
+  --lap-h-positivo: #15803d;
 }
 html[data-accent='amarelo'] {
   --c-accent-vivo: 250 204 21;
@@ -588,6 +642,25 @@ html[data-accent='amarelo'] {
   --accent-soft-2: rgba(250, 204, 21, 0.2);
   --accent2: #fb923c;
   --accent3: #fde047;
+  --c-accent2-vivo: 251 146 60;
+  --c-par-vivo: 249 226 110;
+  --lap-m-fundo: oklch(0.2 0.035 52);
+  --lap-m-vizinho: oklch(0.13 0.03 30);
+  --lap-m-meio: oklch(0.44 0.1 62);
+  --lap-m-luz: oklch(0.67 0.14 80);
+  --lap-m-brilho: oklch(0.92 0.16 98);
+  --lap-m-base: #2f1a0d;
+  --lap-m-halo: oklch(0.66 0.14 80 / 0.45);
+  --lap-h-texto-2: oklch(0.95 0.03 90 / 0.84);
+  --lap-h-texto-3: oklch(0.9 0.04 90 / 0.64);
+  --lap-h-positivo: oklch(0.92 0.16 98);
+  --lap-h-positivo-claro: oklch(0.92 0.12 96);
+  --lap-vidro-fundo: oklch(0.15 0.03 52 / 0.66);
+  --lap-pilula-fundo: #34200e;
+  --lap-pilula-borda: #704d2d;
+  --lap-pilula-texto: #ffe8d0;
+  --lap-matiz-sombra: 55;
+  --lap-matiz-sombra-2: 60;
 }
 html[data-mode='light'][data-accent='amarelo'] {
   --c-accent: 143 91 5;
@@ -601,6 +674,7 @@ html[data-mode='light'][data-accent='amarelo'] {
   --accent-soft-2: rgba(202, 138, 4, 0.18);
   --accent2: #c2410c;
   --accent3: #713f12;
+  --lap-h-positivo: #8f5b05;
 }
 html[data-accent='roxo'] {
   --c-accent-vivo: 167 139 250;
@@ -615,6 +689,25 @@ html[data-accent='roxo'] {
   --accent-soft-2: rgba(167, 139, 250, 0.2);
   --accent2: #e879f9;
   --accent3: #c4b5fd;
+  --c-accent2-vivo: 232 121 249;
+  --c-par-vivo: 227 208 255;
+  --lap-m-fundo: oklch(0.2 0.07 302);
+  --lap-m-vizinho: oklch(0.13 0.04 330);
+  --lap-m-meio: oklch(0.4 0.14 300);
+  --lap-m-luz: oklch(0.6 0.17 296);
+  --lap-m-brilho: oklch(0.86 0.12 292);
+  --lap-m-base: #241b31;
+  --lap-m-halo: oklch(0.58 0.17 296 / 0.45);
+  --lap-h-texto-2: oklch(0.95 0.03 298 / 0.84);
+  --lap-h-texto-3: oklch(0.9 0.04 298 / 0.62);
+  --lap-h-positivo: oklch(0.86 0.12 292);
+  --lap-h-positivo-claro: oklch(0.86 0.1 292);
+  --lap-vidro-fundo: oklch(0.15 0.05 305 / 0.66);
+  --lap-pilula-fundo: #282037;
+  --lap-pilula-borda: #5b4d75;
+  --lap-pilula-texto: #f2e8ff;
+  --lap-matiz-sombra: 302;
+  --lap-matiz-sombra-2: 307;
 }
 html[data-mode='light'][data-accent='roxo'] {
   --c-accent: 109 40 217;
@@ -628,6 +721,7 @@ html[data-mode='light'][data-accent='roxo'] {
   --accent-soft-2: rgba(124, 58, 237, 0.18);
   --accent2: #a21caf;
   --accent3: #5b21b6;
+  --lap-h-positivo: #6d28d9;
 }
 html[data-accent='rosa'] {
   --c-accent-vivo: 244 114 182;
@@ -642,6 +736,25 @@ html[data-accent='rosa'] {
   --accent-soft-2: rgba(244, 114, 182, 0.2);
   --accent2: #c084fc;
   --accent3: #f9a8d4;
+  --c-accent2-vivo: 192 132 252;
+  --c-par-vivo: 255 186 230;
+  --lap-m-fundo: oklch(0.2 0.06 346);
+  --lap-m-vizinho: oklch(0.13 0.04 315);
+  --lap-m-meio: oklch(0.42 0.13 350);
+  --lap-m-luz: oklch(0.63 0.17 354);
+  --lap-m-brilho: oklch(0.88 0.12 355);
+  --lap-m-base: #2f1724;
+  --lap-m-halo: oklch(0.6 0.17 354 / 0.45);
+  --lap-h-texto-2: oklch(0.95 0.03 350 / 0.84);
+  --lap-h-texto-3: oklch(0.9 0.04 350 / 0.62);
+  --lap-h-positivo: oklch(0.88 0.12 355);
+  --lap-h-positivo-claro: oklch(0.88 0.1 355);
+  --lap-vidro-fundo: oklch(0.15 0.04 340 / 0.66);
+  --lap-pilula-fundo: #351c28;
+  --lap-pilula-borda: #71465b;
+  --lap-pilula-texto: #ffe2f2;
+  --lap-matiz-sombra: 346;
+  --lap-matiz-sombra-2: 351;
 }
 html[data-mode='light'][data-accent='rosa'] {
   --c-accent: 190 24 93;
@@ -655,6 +768,7 @@ html[data-mode='light'][data-accent='rosa'] {
   --accent-soft-2: rgba(219, 39, 119, 0.18);
   --accent2: #7e22ce;
   --accent3: #9d174d;
+  --lap-h-positivo: #be185d;
 }
 /* fim: cor do app */
 
@@ -674,7 +788,7 @@ html[data-mode='light'][data-accent='rosa'] {
 /* Sombra parada (nunca animada nem escrita no arrasto): o desfoque é pintado uma vez com a camada do cartão. */
 .lap-heroi.cartao-cc { box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.25), inset 0 0 0 1px oklch(1 0 0 / 0.08), 0 18px 36px -18px oklch(0 0 0 / 0.85), 0 2px 4px oklch(0 0 0 / 0.5); }
 /* No claro, sombra curta e neutra: o halo azul de 40px virava uma mancha escura em volta do cartão no branco. */
-html[data-mode='light'] .lap-heroi.cartao-cc { box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.22), inset 0 0 0 1px oklch(1 0 0 / 0.08), 0 14px 26px -18px oklch(0.25 0.05 230 / 0.32), 0 2px 5px -1px oklch(0.25 0.04 235 / 0.12); }
+html[data-mode='light'] .lap-heroi.cartao-cc { box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.22), inset 0 0 0 1px oklch(1 0 0 / 0.08), 0 14px 26px -18px oklch(0.25 0.05 var(--lap-matiz-sombra) / 0.32), 0 2px 5px -1px oklch(0.25 0.04 var(--lap-matiz-sombra-2) / 0.12); }
 
 /* Caminho "reserva" (base): iOS < 26, Firefox e "reduzir movimento", ou palco com data-maco="reserva". Carrossel com
    scroll-snap nativo: o dedo, a inércia e o encaixe rodam no compositor, sem JS por quadro (nada de listener de
@@ -754,6 +868,36 @@ html[data-mode='light'] .lap-heroi.cartao-cc { box-shadow: inset 0 1px 0 oklch(1
   background-color: #082420;
   --lap-h-positivo: oklch(0.88 0.14 155);
 }
+/* As peles Conta e Meta têm material próprio e NÃO seguem a cor do app: ficam como em 42aea22 (ciano) em qualquer cor e
+   tema. Fixa aqui, com os valores ciano de :root, todo token da Wave 3D que elas usam (texto, vidro, pílula, halo,
+   positivo do claro, matiz das sombras). Conferido em lib/__tests__/ciano-42aea22.test.ts. */
+.lap-heroi:is(.cartao-pele-conta, .cartao-pele-meta) {
+  --lap-m-fundo: oklch(0.2 0.05 232);
+  --lap-m-vizinho: oklch(0.13 0.03 262);
+  --lap-m-meio: oklch(0.42 0.1 222);
+  --lap-m-luz: oklch(0.62 0.13 210);
+  --lap-m-brilho: oklch(0.9 0.15 200);
+  --lap-m-base: #0b2233;
+  --lap-m-halo: oklch(0.6 0.13 210 / 0.45);
+  --lap-m-brilho-foco: color-mix(in oklch, var(--lap-m-brilho) 30%, transparent);
+  --lap-h-texto-2: oklch(0.95 0.03 205 / 0.84);
+  --lap-h-texto-3: oklch(0.9 0.04 205 / 0.62);
+  /* No claro, html[data-mode='light'] .lap-heroi (mais específico) põe --lap-h-positivo = este: em 42aea22 era este ciano. */
+  --lap-h-positivo-claro: oklch(0.9 0.105 203);
+  --lap-vidro-fundo: oklch(0.15 0.04 240 / 0.66);
+  --lap-pilula-fundo: #062a33;
+  --lap-pilula-borda: #1f5f6b;
+  --lap-pilula-texto: #ccf7ff;
+  --lap-matiz-sombra: 230;
+  --lap-matiz-sombra-2: 235;
+  --c-accent2-vivo: 0 255 163;
+  --c-par-vivo: 106 255 218;
+}
+/* Borda e sombra dos .lap-cartao dentro das peles no claro: são calculadas no html com a matiz da cor; aqui, as de 42aea22. */
+html[data-mode='light'] .lap-heroi:is(.cartao-pele-conta, .cartao-pele-meta) {
+  --lap-borda-fina: oklch(0.25 0.03 235 / 0.1);
+  --lap-sombra-cartao: inset 0 1px 0 var(--lap-luz-aresta), 0 1px 2px oklch(0.3 0.04 235 / 0.07), 0 16px 32px -20px oklch(0.3 0.06 230 / 0.18);
+}
 /* Segurando o cartão da frente: ele sobe um pouco, como o cartão do funil do CRM. */
 /* Só o translate anima (compositor); a sombra não muda, para não repintar o desfoque a cada quadro. */
 .maco-segurando .cartao-frente > .cartao-cc { translate: 0 -3px; }
@@ -763,6 +907,6 @@ html[data-mode='light'] .lap-heroi.cartao-cc { box-shadow: inset 0 1px 0 oklch(1
 
 /* Pílula de situação (No controle / Atenção / Passou da renda) no material escuro, no claro e no escuro: fundo opaco
    escuro e texto claro, contraste ≥ 7:1 (AAA) não importa onde caia a luz do cartão. Conferido em CardResumoDeslizante.test.tsx. */
-.lap-heroi .pilula-situacao { background: #062a33; border-color: #1f5f6b; color: #ccf7ff; }
+.lap-heroi .pilula-situacao { background: var(--lap-pilula-fundo); border-color: var(--lap-pilula-borda); color: var(--lap-pilula-texto); }
 .lap-heroi .pilula-situacao[data-situacao='atencao'] { background: #2e2205; border-color: #6b5110; color: #fde68a; }
 .lap-heroi .pilula-situacao[data-situacao='passou'] { background: #330d10; border-color: #7a2a30; color: #fecaca; }

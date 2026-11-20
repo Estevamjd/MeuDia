@@ -1,0 +1,381 @@
+/* Valores LITERAIS de 42aea22 (git show 42aea22:apps/web/app/globals.css), só as regras que a Wave 3D tocou ou
+   que pintam o herói, as peles Conta/Meta e o fundo (inclui os blocos de cor da Wave 3C, para comparar as peles em
+   qualquer cor). Referência independente para ciano-42aea22.test.ts: NÃO edite para acompanhar o globals.css atual. */
+:root {
+  --c-bg: 5 10 22;
+  --c-bg-deep: 4 8 19;
+  --c-surface: 6 11 23;
+  --c-card: 11 18 32;
+  --c-card2: 16 24 39;
+  --c-border: 28 38 56;
+  --c-campo: 18 26 43;
+  --c-accent: 0 229 255;
+  --c-accent-fg: 6 16 28;
+  --c-accent2: 0 255 163;
+  --c-accent3: 92 239 255;
+  --c-orange: 250 178 25;
+  --c-green: 52 211 153;
+  --c-green-dark: 12 163 12;
+  --c-yellow: 250 178 25;
+  --c-red: 248 113 113;
+  --c-text: 245 246 248;
+  --c-muted: 148 163 184;
+  --c-muted-text: 168 180 199;
+  --c-trilho: 21 31 49;
+  --c-brilho: 0 229 255;
+  --c-accent-vivo: 0 229 255;
+  --barra-fundo: rgb(4 8 19 / 0.88);
+  --topo-fundo: rgba(5, 10, 22, 0.82);
+  --grafico-tooltip: #16161f;
+  --grafico-borda: rgba(255, 255, 255, 0.07);
+  --grafico-texto: #eeeef8;
+  color-scheme: dark;
+  --bg: #050a16;
+  --bg-deep: #040813;
+  --surface: #060b17;
+  --card: #0b1220;
+  --card2: #101827;
+  --border: #1c2638;
+  --accent: #00e5ff;
+  --accent-fg: #06101c;
+  --accent-soft: rgb(var(--c-accent-vivo) / 0.12);
+  --accent-soft-2: rgb(var(--c-accent-vivo) / 0.2);
+  --accent2: #00ffa3;
+  --accent3: #5cefff;
+  --text: #f5f6f8;
+  --muted: #94a3b8;
+  --muted-text: #a8b4c7;
+  --trilho: #151f31;
+  --green: #34d399;
+  --green-dark: #0ca30c;
+  --yellow: #fab219;
+  --red: #f87171;
+  --orange: #fab219;
+  --lap-m-fundo: oklch(0.2 0.05 232);
+  --lap-m-vizinho: oklch(0.13 0.03 262);
+  --lap-m-meio: oklch(0.42 0.1 222);
+  --lap-m-luz: oklch(0.62 0.13 210);
+  --lap-m-brilho: oklch(0.9 0.15 200);
+  --lap-m-brilho-foco: color-mix(in oklch, var(--lap-m-brilho) 30%, transparent);
+  --lap-h-texto-2: oklch(0.95 0.03 205 / 0.84);
+  --lap-h-texto-3: oklch(0.9 0.04 205 / 0.62);
+  --lap-h-positivo: oklch(0.9 0.15 200);
+  --lap-h-negativo: #f8b4b4;
+  --lap-h-alerta: #fca5a5;
+  --lap-luz-aresta: oklch(1 0 0 / 0.06);
+  --lap-luz-topo: oklch(1 0 0 / 0.025);
+  --lap-borda-fina: oklch(1 0 0 / 0.07);
+  --lap-sombra-cartao: inset 0 1px 0 var(--lap-luz-aresta), 0 1px 2px oklch(0 0 0 / 0.5), 0 16px 32px -20px oklch(0 0 0 / 0.7);
+  --lap-grao: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  --astrog-ceu: radial-gradient(1px 1px at 12% 18%, rgba(245, 247, 250, 0.5) 50%, transparent 51%), radial-gradient(1px 1px at 37% 71%, rgba(245, 247, 250, 0.38) 50%, transparent 51%), radial-gradient(1.5px 1.5px at 58% 29%, rgb(var(--c-accent-vivo) / 0.55) 50%, transparent 51%), radial-gradient(1px 1px at 79% 84%, rgba(245, 247, 250, 0.42) 50%, transparent 51%), radial-gradient(1px 1px at 91% 43%, rgba(245, 247, 250, 0.3) 50%, transparent 51%), radial-gradient(1.5px 1.5px at 24% 92%, rgba(0, 255, 163, 0.35) 50%, transparent 51%), radial-gradient(1px 1px at 66% 58%, rgb(var(--c-accent-vivo) / 0.35) 50%, transparent 51%);
+}
+.glow-accent2 {
+  box-shadow: 0 0 20px rgba(0,255,163,0.3);
+}
+.bg-glow-orbs::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 520px;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(80% 60% at 50% -12%, rgb(var(--c-accent-vivo) / 0.09), transparent 62%);
+}
+.ai-bar.purple {
+  background: linear-gradient(135deg,rgb(var(--c-accent-vivo) / 0.13),rgba(106,255,218,0.06));
+  border: 1px solid rgb(var(--c-accent-vivo) / 0.28);
+}
+.tag.t {
+  background: rgba(106,255,218,0.14);
+  color: var(--accent3);
+}
+.astrog-ceu {
+  background-color: var(--bg);
+  background-image: radial-gradient(80% 45% at 50% -8%, rgb(var(--c-accent-vivo) / 0.07), transparent 62%), var(--astrog-ceu);
+  background-size: auto, 420px 420px;
+  background-repeat: no-repeat, repeat;
+  background-attachment: fixed, fixed;
+}
+.lap-cartao {
+  background: linear-gradient(180deg, var(--lap-luz-topo), transparent 96px), var(--card);
+  border: 1px solid var(--lap-borda-fina);
+  border-radius: 0.75rem;
+  box-shadow: var(--lap-sombra-cartao);
+}
+.lap-heroi {
+  --lap-foco: 78% 48%;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 20px;
+  color: #fff;
+  background: radial-gradient(34% 62% at var(--lap-foco), var(--lap-m-brilho-foco), transparent 72%), radial-gradient(55% 85% at 104% -6%, color-mix(in oklch, var(--lap-m-luz) 70%, transparent), transparent 62%), radial-gradient(60% 90% at 62% 124%, color-mix(in oklch, var(--lap-m-meio) 72%, transparent), transparent 66%), radial-gradient(55% 95% at -8% 115%, color-mix(in oklch, var(--lap-m-vizinho) 90%, transparent), transparent 70%), radial-gradient(50% 80% at 6% -24%, color-mix(in oklch, var(--lap-m-meio) 55%, transparent), transparent 72%), linear-gradient(135deg, var(--lap-m-fundo), var(--lap-m-vizinho));
+  background-color: #0b2233;
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.22), inset 0 0 0 1px oklch(1 0 0 / 0.07), 0 40px 80px -40px oklch(0.6 0.13 210 / 0.45), 0 2px 4px oklch(0 0 0 / 0.5);
+}
+.lap-heroi .lap-texto-2 {
+  color: var(--lap-h-texto-2);
+}
+.lap-heroi .lap-texto-3 {
+  color: var(--lap-h-texto-3);
+}
+.lap-heroi .lap-positivo {
+  color: var(--lap-h-positivo);
+}
+.lap-vidro {
+  background: oklch(0.15 0.04 240 / 0.66);
+  border: 1px solid oklch(1 0 0 / 0.08);
+  border-radius: 12px;
+}
+html[data-mode='light'] {
+  --c-bg: 246 248 251;
+  --c-bg-deep: 255 255 255;
+  --c-surface: 255 255 255;
+  --c-card: 255 255 255;
+  --c-card2: 241 245 249;
+  --c-border: 226 232 240;
+  --c-campo: 248 250 252;
+  --c-accent: 14 116 144;
+  --c-accent-fg: 255 255 255;
+  --c-accent2: 4 120 87;
+  --c-accent3: 21 94 117;
+  --c-orange: 180 83 9;
+  --c-green: 4 120 87;
+  --c-green-dark: 21 128 61;
+  --c-yellow: 161 98 7;
+  --c-red: 220 38 38;
+  --c-text: 11 18 32;
+  --c-muted: 91 103 122;
+  --c-muted-text: 71 85 105;
+  --c-trilho: 232 237 243;
+  --c-brilho: 8 145 178;
+  --barra-fundo: rgb(255 255 255 / 0.9);
+  --topo-fundo: rgba(246, 248, 251, 0.86);
+  --grafico-tooltip: #ffffff;
+  --grafico-borda: rgba(15, 23, 42, 0.12);
+  --grafico-texto: #0b1220;
+  color-scheme: light;
+  --bg: #f6f8fb;
+  --bg-deep: #ffffff;
+  --surface: #ffffff;
+  --card: #ffffff;
+  --card2: #f1f5f9;
+  --border: #e2e8f0;
+  --accent: #0e7490;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(8, 145, 178, 0.1);
+  --accent-soft-2: rgba(8, 145, 178, 0.18);
+  --accent2: #047857;
+  --accent3: #155e75;
+  --text: #0b1220;
+  --muted: #5b677a;
+  --muted-text: #475569;
+  --trilho: #e8edf3;
+  --green: #047857;
+  --yellow: #a16207;
+  --red: #dc2626;
+  --orange: #b45309;
+  --lap-luz-aresta: oklch(1 0 0 / 0.9);
+  --lap-luz-topo: oklch(1 0 0 / 0);
+  --lap-borda-fina: oklch(0.25 0.03 235 / 0.1);
+  --lap-sombra-cartao: inset 0 1px 0 var(--lap-luz-aresta), 0 1px 2px oklch(0.3 0.04 235 / 0.07), 0 16px 32px -20px oklch(0.3 0.06 230 / 0.18);
+  --lap-h-positivo: #0e7490;
+  --lap-h-negativo: #c43232;
+  --lap-h-alerta: #c43232;
+  --astrog-ceu: none;
+}
+html[data-mode='light'] .astrog-ceu {
+  background-image: radial-gradient(90% 50% at 50% -10%, rgb(var(--c-brilho) / 0.12), transparent 64%), radial-gradient(60% 40% at 100% 0%, rgb(var(--c-accent-vivo) / 0.08), transparent 70%);
+}
+html[data-mode='light'] .bg-glow-orbs::before {
+  background: radial-gradient(80% 60% at 50% -12%, rgb(var(--c-brilho) / 0.1), transparent 62%);
+}
+html[data-mode='light'] .lap-heroi {
+  --c-text: 245 246 248;
+  --c-muted: 148 163 184;
+  --c-muted-text: 168 180 199;
+  --c-accent: var(--c-accent-vivo);
+  --c-accent-fg: 6 16 28;
+  --c-border: 28 38 56;
+  --c-card: 11 18 32;
+  --c-card2: 16 24 39;
+  --c-trilho: 21 31 49;
+  --c-red: 248 113 113;
+  --c-green: 52 211 153;
+  --c-yellow: 250 178 25;
+  --c-orange: 250 178 25;
+  --c-brilho: var(--c-accent-vivo);
+  --lap-h-positivo: oklch(0.9 0.105 203);
+  --lap-h-negativo: #f8b4b4;
+  --lap-h-alerta: #fca5a5;
+  --text: #f5f6f8;
+  --muted: #94a3b8;
+  --accent: rgb(var(--c-accent-vivo));
+  --border: #1c2638;
+  --card: #0b1220;
+  --trilho: #151f31;
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.2), inset 0 0 0 1px oklch(1 0 0 / 0.07), 0 18px 34px -22px oklch(0.25 0.05 230 / 0.34), 0 2px 6px -1px oklch(0.25 0.04 235 / 0.12);
+}
+html[data-accent='laranja'] {
+  --c-accent-vivo: 251 146 60;
+  --c-accent: 251 146 60;
+  --c-accent-fg: 6 16 28;
+  --c-accent2: 251 191 36;
+  --c-accent3: 253 186 116;
+  --c-brilho: 251 146 60;
+  --accent: #fb923c;
+  --accent-fg: #06101c;
+  --accent-soft: rgba(251, 146, 60, 0.12);
+  --accent-soft-2: rgba(251, 146, 60, 0.2);
+  --accent2: #fbbf24;
+  --accent3: #fdba74;
+}
+html[data-mode='light'][data-accent='laranja'] {
+  --c-accent: 194 65 12;
+  --c-accent-fg: 255 255 255;
+  --c-accent2: 180 83 9;
+  --c-accent3: 154 52 18;
+  --c-brilho: 234 88 12;
+  --accent: #c2410c;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(234, 88, 12, 0.1);
+  --accent-soft-2: rgba(234, 88, 12, 0.18);
+  --accent2: #b45309;
+  --accent3: #9a3412;
+}
+html[data-accent='verde'] {
+  --c-accent-vivo: 74 222 128;
+  --c-accent: 74 222 128;
+  --c-accent-fg: 6 16 28;
+  --c-accent2: 45 212 191;
+  --c-accent3: 134 239 172;
+  --c-brilho: 74 222 128;
+  --accent: #4ade80;
+  --accent-fg: #06101c;
+  --accent-soft: rgba(74, 222, 128, 0.12);
+  --accent-soft-2: rgba(74, 222, 128, 0.2);
+  --accent2: #2dd4bf;
+  --accent3: #86efac;
+}
+html[data-mode='light'][data-accent='verde'] {
+  --c-accent: 21 128 61;
+  --c-accent-fg: 255 255 255;
+  --c-accent2: 15 118 110;
+  --c-accent3: 22 101 52;
+  --c-brilho: 22 163 74;
+  --accent: #15803d;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(22, 163, 74, 0.1);
+  --accent-soft-2: rgba(22, 163, 74, 0.18);
+  --accent2: #0f766e;
+  --accent3: #166534;
+}
+html[data-accent='amarelo'] {
+  --c-accent-vivo: 250 204 21;
+  --c-accent: 250 204 21;
+  --c-accent-fg: 6 16 28;
+  --c-accent2: 251 146 60;
+  --c-accent3: 253 224 71;
+  --c-brilho: 250 204 21;
+  --accent: #facc15;
+  --accent-fg: #06101c;
+  --accent-soft: rgba(250, 204, 21, 0.12);
+  --accent-soft-2: rgba(250, 204, 21, 0.2);
+  --accent2: #fb923c;
+  --accent3: #fde047;
+}
+html[data-mode='light'][data-accent='amarelo'] {
+  --c-accent: 143 91 5;
+  --c-accent-fg: 255 255 255;
+  --c-accent2: 194 65 12;
+  --c-accent3: 113 63 18;
+  --c-brilho: 202 138 4;
+  --accent: #8f5b05;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(202, 138, 4, 0.1);
+  --accent-soft-2: rgba(202, 138, 4, 0.18);
+  --accent2: #c2410c;
+  --accent3: #713f12;
+}
+html[data-accent='roxo'] {
+  --c-accent-vivo: 167 139 250;
+  --c-accent: 167 139 250;
+  --c-accent-fg: 6 16 28;
+  --c-accent2: 232 121 249;
+  --c-accent3: 196 181 253;
+  --c-brilho: 167 139 250;
+  --accent: #a78bfa;
+  --accent-fg: #06101c;
+  --accent-soft: rgba(167, 139, 250, 0.12);
+  --accent-soft-2: rgba(167, 139, 250, 0.2);
+  --accent2: #e879f9;
+  --accent3: #c4b5fd;
+}
+html[data-mode='light'][data-accent='roxo'] {
+  --c-accent: 109 40 217;
+  --c-accent-fg: 255 255 255;
+  --c-accent2: 162 28 175;
+  --c-accent3: 91 33 182;
+  --c-brilho: 124 58 237;
+  --accent: #6d28d9;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(124, 58, 237, 0.1);
+  --accent-soft-2: rgba(124, 58, 237, 0.18);
+  --accent2: #a21caf;
+  --accent3: #5b21b6;
+}
+html[data-accent='rosa'] {
+  --c-accent-vivo: 244 114 182;
+  --c-accent: 244 114 182;
+  --c-accent-fg: 6 16 28;
+  --c-accent2: 192 132 252;
+  --c-accent3: 249 168 212;
+  --c-brilho: 244 114 182;
+  --accent: #f472b6;
+  --accent-fg: #06101c;
+  --accent-soft: rgba(244, 114, 182, 0.12);
+  --accent-soft-2: rgba(244, 114, 182, 0.2);
+  --accent2: #c084fc;
+  --accent3: #f9a8d4;
+}
+html[data-mode='light'][data-accent='rosa'] {
+  --c-accent: 190 24 93;
+  --c-accent-fg: 255 255 255;
+  --c-accent2: 126 34 206;
+  --c-accent3: 157 23 77;
+  --c-brilho: 219 39 119;
+  --accent: #be185d;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(219, 39, 119, 0.1);
+  --accent-soft-2: rgba(219, 39, 119, 0.18);
+  --accent2: #7e22ce;
+  --accent3: #9d174d;
+}
+.lap-heroi.cartao-cc {
+  border-radius: 18px;
+  transition: translate 0.2s ease;
+}
+.lap-heroi.cartao-cc {
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.25), inset 0 0 0 1px oklch(1 0 0 / 0.08), 0 18px 36px -18px oklch(0 0 0 / 0.85), 0 2px 4px oklch(0 0 0 / 0.5);
+}
+html[data-mode='light'] .lap-heroi.cartao-cc {
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.22), inset 0 0 0 1px oklch(1 0 0 / 0.08), 0 14px 26px -18px oklch(0.25 0.05 230 / 0.32), 0 2px 5px -1px oklch(0.25 0.04 235 / 0.12);
+}
+.lap-heroi.cartao-pele-conta {
+  background: radial-gradient(50% 80% at 90% 10%, oklch(0.68 0.15 275 / 0.35), transparent 65%), radial-gradient(70% 90% at 10% 120%, oklch(0.38 0.14 265 / 0.8), transparent 66%), linear-gradient(135deg, #141a3a, #0b0f24);
+  background-color: #0f1430;
+  --lap-h-positivo: oklch(0.82 0.1 280);
+}
+.lap-heroi.cartao-pele-meta {
+  background: radial-gradient(45% 75% at 88% 20%, oklch(0.78 0.15 165 / 0.35), transparent 68%), radial-gradient(70% 90% at 20% 125%, oklch(0.42 0.09 170 / 0.8), transparent 66%), linear-gradient(135deg, #0a2f2a, #071a18);
+  background-color: #082420;
+  --lap-h-positivo: oklch(0.88 0.14 155);
+}
+.lap-heroi.cartao-cc {
+  transition: none;
+}
+.lap-heroi .pilula-situacao {
+  background: #062a33;
+  border-color: #1f5f6b;
+  color: #ccf7ff;
+}

@@ -5,6 +5,7 @@ import type { SobraDoMes } from '@meudia/shared';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { renderToString } from 'react-dom/server';
+import { CORES_APP, PALETA_CORES } from '../../../../lib/cores-app';
 import { CardResumoDeslizante, paginasDoCartao, type MetaDoCartao } from '../CardResumoDeslizante';
 
 afterEach(cleanup);
@@ -562,8 +563,14 @@ describe('material do maço e pílula de situação (globals.css)', () => {
       const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m);
       return (x! + 0.05) / (y! + 0.05);
     };
-    const regras = [...css.matchAll(/\.lap-heroi \.pilula-situacao(?:\[data-situacao='(\w+)'\])? \{ background: (#[0-9a-f]{6}); border-color: #[0-9a-f]{6}; color: (#[0-9a-f]{6}); \}/g)];
-    expect(regras.map((r) => r[1] ?? 'no-controle')).toEqual(['no-controle', 'atencao', 'passou']);
+    // "No controle" segue a cor do app (variáveis geradas de PALETA_CORES); atenção e passou são fixas.
+    expect(css).toContain('.lap-heroi .pilula-situacao { background: var(--lap-pilula-fundo); border-color: var(--lap-pilula-borda); color: var(--lap-pilula-texto); }');
+    for (const cor of CORES_APP) {
+      const { fundo, texto } = PALETA_CORES[cor].heroi.pilula;
+      expect(contraste(fundo, texto), cor).toBeGreaterThanOrEqual(7);
+    }
+    const regras = [...css.matchAll(/\.lap-heroi \.pilula-situacao\[data-situacao='(\w+)'\] \{ background: (#[0-9a-f]{6}); border-color: #[0-9a-f]{6}; color: (#[0-9a-f]{6}); \}/g)];
+    expect(regras.map((r) => r[1])).toEqual(['atencao', 'passou']);
     for (const [, , fundo, texto] of regras) expect(contraste(fundo!, texto!)).toBeGreaterThanOrEqual(7);
   });
 
