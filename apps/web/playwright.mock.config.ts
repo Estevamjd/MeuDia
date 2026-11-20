@@ -22,7 +22,7 @@ const CHAVE_SINTETICA_BUILD = 'anthropic-chave-sintetica-bundle-e2e';
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: /(modo-runtime|novo-usuario|onboarding-loop|onboarding-pular|contas-saldo|excluir-metas|assistente|abas|config|treinos|saude|registros|whatsapp-link|recuperar-senha|cofrinho|tema|cor-app|cartao-painel|ritmo-busca-parcelas|treino-plano-semana|perfil-saude-conta|rotas-legadas)\.spec\.ts$/,
+  testMatch: /(modo-runtime|novo-usuario|onboarding-loop|onboarding-pular|contas-saldo|excluir-metas|assistente|abas|config|treinos|saude|registros|whatsapp-link|recuperar-senha|cofrinho|tema|cor-app|cartao-painel|ritmo-busca-parcelas|treino-plano-semana|perfil-saude-conta|rotas-legadas|info-dica)\.spec\.ts$/,
   fullyParallel: false,
   workers: 1,
   retries: 0,

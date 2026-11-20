@@ -2,14 +2,19 @@ import { PieChart } from 'lucide-react';
 import { formatBRL } from '../../../lib/financas-ui';
 import { VALOR_OCULTO } from '../../../lib/carteiras-ui';
 import type { CategoriaResumo } from './montarResumoMes';
+import { InfoDica } from '../../ui/InfoDica';
+import { EXPLICACOES } from '../home/explicacoes';
 
 /** Gastos do mês por categoria (top 5 + Outros), barra ciano proporcional ao total. */
 export function ParaOndeFoi({ categorias, escondido = false }: { categorias: CategoriaResumo[]; escondido?: boolean }) {
   return (
     <section aria-labelledby="para-onde-foi" className="lap-cartao px-4 pb-3.5 pt-4">
-      <h2 id="para-onde-foi" className="mb-3.5 text-base font-medium tracking-[-0.02em] text-text">
-        Para onde foi
-      </h2>
+      <div className="mb-3.5 flex items-center gap-2">
+        <h2 id="para-onde-foi" className="text-base font-medium tracking-[-0.02em] text-text">
+          Para onde foi
+        </h2>
+        <InfoDica {...EXPLICACOES.paraOndeFoi} />
+      </div>
       {categorias.length === 0 ? (
         <div className="flex items-center gap-3 py-1">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-trilho text-accent">

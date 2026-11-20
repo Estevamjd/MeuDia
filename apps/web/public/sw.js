@@ -1,4 +1,4 @@
-const CACHE_NAME = 'meudia-v10';
+const CACHE_NAME = 'meudia-v11';
 const STATIC_ASSETS = [
   '/icons/icon-192.png?v=3c', '/icons/icon-512.png?v=3c',
   '/apple-touch-icon.png?v=3c', '/favicon.png',

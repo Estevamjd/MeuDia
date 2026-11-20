@@ -111,7 +111,8 @@ test('(a) Início: cartão "Ritmo" com o disponível por dia e "+ Guardei" no ca
       await page.getByRole('button', { name: 'Próximo cartão: Ritmo' }).click();
       await naFrente(page, 'cartao-pagina-conta');
       const conta = page.getByTestId('cartao-pagina-conta');
-      await expect(conta.getByText('Disponível por dia')).toBeVisible();
+      await expect(conta.getByText('Pode gastar por dia')).toBeVisible();
+      await expect(page.getByTestId('cartao-ritmo-conta')).toHaveText(/R\$\s139,10 que sobram ÷ 14 dias/);
       await expect(page.getByTestId('cartao-ritmo-dia')).toHaveText(brl('9,93'));
       await expect(page.getByTestId('cartao-ritmo-dias')).toHaveText('14 dias restantes');
       await expect(page.getByTestId('previsao-fim-mes-valor')).toHaveText(brl('139,10'));
@@ -121,9 +122,9 @@ test('(a) Início: cartão "Ritmo" com o disponível por dia e "+ Guardei" no ca
       expect(fim.y + fim.height, `${modo} ${largura}: conta dentro do cartão`).toBeLessThanOrEqual(cc.y + cc.height);
       for (const id of ['cartao-ritmo-dia', 'cartao-ritmo-dias', 'resumo-mes-conta']) await semReticencias(page.getByTestId(id), `${modo} ${largura} ${id}`);
       // Contas fixas continuam abrindo a lista abaixo do maço.
-      await conta.getByRole('button', { name: /Contas fixas/ }).click();
+      await conta.getByRole('button', { name: /^Contas fixas/ }).click();
       await expect(page.getByRole('list', { name: 'Contas fixas de outubro' })).toContainText('Curso');
-      await conta.getByRole('button', { name: /Contas fixas/ }).click();
+      await conta.getByRole('button', { name: /^Contas fixas/ }).click();
 
       await page.getByRole('button', { name: 'Próximo cartão: Meta' }).click();
       await naFrente(page, 'cartao-pagina-meta');

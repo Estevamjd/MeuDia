@@ -5,6 +5,8 @@ import type { Competencia, SituacaoOcorrencia } from '@meudia/shared';
 import { Button } from '../../ui';
 import { formatBRL, textoVencimento } from '../../../lib/financas-ui';
 import { CategoriaIcone } from '../CategoriaIcone';
+import { InfoDica } from '../../ui/InfoDica';
+import { EXPLICACOES } from './explicacoes';
 import { LinhaRendaAReceber, type RendaAReceberItem } from './CardRendaAReceber';
 
 export interface ContaProxima {
@@ -37,9 +39,12 @@ export function ProximasContas({ contas, totalMes, hojeISO, contaOcupada, pagame
   return (
     <section id="proximas-contas" aria-labelledby="proximas-contas-titulo" className="lap-cartao scroll-mt-20 space-y-2 px-4 py-3">
       <div className="flex items-center justify-between gap-3">
-        <h2 id="proximas-contas-titulo" className="text-[13px] font-medium text-muted">
-          Contas a vencer
-        </h2>
+        <div className="flex items-center gap-2">
+          <h2 id="proximas-contas-titulo" className="text-[13px] font-medium text-muted">
+            Contas a vencer
+          </h2>
+          <InfoDica {...EXPLICACOES.contasAVencer} />
+        </div>
         <Link
           href="/financas/contas"
           aria-label={`Ver todas as contas (${totalMes})`}
@@ -96,8 +101,9 @@ export function ProximasContas({ contas, totalMes, hojeISO, contaOcupada, pagame
 
       {onRecebi && rendasAReceber.length > 0 && (
         <ul className="space-y-1 border-t border-border pt-2">
-          {rendasAReceber.map((r) => (
-            <LinhaRendaAReceber key={r.rendaId} renda={r} hojeISO={hojeISO} onRecebi={onRecebi} />
+          {rendasAReceber.map((r, i) => (
+            // Um ⓘ só, na primeira linha "A receber" (não repete por renda).
+            <LinhaRendaAReceber key={r.rendaId} renda={r} hojeISO={hojeISO} onRecebi={onRecebi} dica={i === 0} />
           ))}
         </ul>
       )}

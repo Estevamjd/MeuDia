@@ -54,6 +54,20 @@ describe('CardResumoDeslizante (Início v5, maço)', () => {
     expect(within(conta).getByRole('heading', { level: 2 }).textContent).toBe('Ritmo de novembro');
   });
 
+  it('ⓘ do Cofrinho: com a 014 explica o dinheiro guardado; sem a 014 (cofrinhoLegado) explica a soma dos bancos', () => {
+    const abrir = () => {
+      fireEvent.click(within(screen.getByTestId('cartao-pagina-resumo')).getByRole('button', { name: 'O que é Cofrinho?' }));
+      return t(screen.getByRole('dialog', { name: 'Cofrinho' }));
+    };
+    render(<CardResumoDeslizante {...base} />);
+    expect(abrir()).toContain('Dinheiro que você já guardou.');
+    cleanup();
+    render(<CardResumoDeslizante {...base} cofrinhoLegado />);
+    const legado = abrir();
+    expect(legado).toContain('saldo de hoje dos seus bancos que entram no total');
+    expect(legado).not.toContain('já guardou');
+  });
+
   it('com meta: 3 páginas, linha da meta na página 1 e a página Meta com %, valores, falta, hoje, ritmo e por mês', () => {
     render(<CardResumoDeslizante {...base} metas={[meta]} />);
     expect((screen.getByTestId('cartao-resumo')).getAttribute('data-paginas')).toBe('3');
@@ -121,7 +135,7 @@ describe('CardResumoDeslizante (Início v5, maço)', () => {
 
   it('"Contas fixas" no cartão abre a lista abaixo do maço, com pago / a pagar', () => {
     render(<CardResumoDeslizante {...base} />);
-    const botao = screen.getByRole('button', { name: /Contas fixas/ });
+    const botao = screen.getByRole('button', { name: /^Contas fixas/ });
     expect(botao.getAttribute('aria-expanded')).toBe('false');
     fireEvent.click(botao);
     expect(botao.getAttribute('aria-expanded')).toBe('true');

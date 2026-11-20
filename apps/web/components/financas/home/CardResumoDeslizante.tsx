@@ -9,11 +9,13 @@ import { metaDoCartao, progressoMeta, ritmoDiarioDoMes, sugestaoMeta, type MetaP
 import { formatBRL, formatBRLSinal, formatDiaMes, nomeMes } from '../../../lib/financas-ui';
 import { VALOR_OCULTO } from '../../../lib/carteiras-ui';
 import { NumeroAnimado } from '../../ui/NumeroAnimado';
+import { InfoDica, type AlvoInfoDica } from '../../ui/InfoDica';
 import { IconeMeta } from '../metas/IconeMeta';
 import { SITUACAO, pctComprometida } from '../resumo/ResumoMesConta';
 import { situacaoDo } from '../resumo/montarResumoMes';
 import { BANCOS_PATH } from './CardSaldoHoje';
 import { cssDoMaco, modoDoMaco, type ModoMaco } from './poseDoMaco';
+import { EXPLICACOES, contaDoRitmo } from './explicacoes';
 
 export const METAS_PATH = '/financas/metas';
 
@@ -25,6 +27,8 @@ export interface CardResumoDeslizanteProps {
   sobra: SobraDoMes;
   /** Dinheiro guardado (Cofrinho). */
   cofrinho: number;
+  /** Banco sem a 014: `cofrinho` é o total dos bancos (legado) e o ⓘ explica isso. */
+  cofrinhoLegado?: boolean;
   /** Metas da pessoa; sem metas, o maço fica com 2 cartões. */
   metas?: readonly MetaDoCartao[];
   hojeISO: string;
@@ -54,14 +58,14 @@ const PILULA = 'inline-flex h-[22px] shrink-0 items-center whitespace-nowrap rou
 
 /**
  * Início v5 (aprovado em 19/11/2026): cartõezinhos no formato de cartão de crédito, em maço, que a pessoa segura e
- * passa para o lado. 1 "Resumo" (deve sobrar, Cofrinho, meta), 2 "Ritmo" (disponível por dia + a conta curta: recebe −
+ * passa para o lado. 1 "Resumo" (deve sobrar, Cofrinho, meta), 2 "Ritmo" (pode gastar por dia + a conta curta: recebe −
  * contas fixas − gastos), 3 "Meta" (só com meta; "+ Guardei"). Uma árvore só: o trilho com scroll-snap nativo cuida do dedo, da inércia e do teclado, e o caminho
  * fica no palco (`data-maco`, ver `modoDoMaco`):
  * - "rolagem" (Chrome 116+, iOS 26+): os cartões saem do fluxo e animam pela rolagem do trilho, no compositor;
  * - "reserva" (iOS < 26, Firefox, "reduzir movimento"): carrossel nativo, cartão ativo por IntersectionObserver.
  * Em nenhum dos dois o JS escreve pose por quadro. Botões ‹ ›, pontos e anúncio (WCAG 2.5.1).
  */
-export function CardResumoDeslizante({ sobra, cofrinho, metas = [], hojeISO, escondido = false, onGuardei }: CardResumoDeslizanteProps) {
+export function CardResumoDeslizante({ sobra, cofrinho, cofrinhoLegado = false, metas = [], hojeISO, escondido = false, onGuardei }: CardResumoDeslizanteProps) {
   const meta = useMemo(() => metaDoCartao(metas), [metas]);
   const temMeta = !!meta;
   const paginas = useMemo(() => paginasDoCartao(temMeta), [temMeta]);
@@ -292,7 +296,7 @@ export function CardResumoDeslizante({ sobra, cofrinho, metas = [], hojeISO, esc
           className="maco-trilho sem-barra rounded-[20px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <Cartao i={0} atual={atual} refSlide={refSlide(0)} refEl={refCartao(0)} rotulo={rotulo(0)} testid="cartao-pagina-resumo">
-            <CartaoResumo sobra={sobra} cofrinho={cofrinho} meta={meta} hojeISO={hojeISO} escondido={escondido} />
+            <CartaoResumo sobra={sobra} cofrinho={cofrinho} cofrinhoLegado={cofrinhoLegado} meta={meta} hojeISO={hojeISO} escondido={escondido} />
           </Cartao>
           <Cartao i={1} atual={atual} refSlide={refSlide(1)} refEl={refCartao(1)} rotulo={rotulo(1)} testid="cartao-pagina-conta" pele="cartao-pele-conta">
             <CartaoRitmo sobra={sobra} hojeISO={hojeISO} escondido={escondido} contasAbertas={contasAbertas} onContas={alternarContas} idLista={idListaContas} />
@@ -396,7 +400,7 @@ const ROTULO = 'lap-rotulo lap-texto-3 flex min-w-0 items-center gap-2 text-[10.
 const ROTULO_PEQ = 'lap-rotulo lap-texto-3 text-[9.5px] tracking-[0.09em]';
 const MARCA = <span className="lap-texto-3 font-mono text-[11px] tracking-[0.16em]" aria-hidden="true">MEUDIA</span>;
 
-const CartaoResumo = memo(function CartaoResumo({ sobra, cofrinho, meta, hojeISO, escondido }: { sobra: SobraDoMes; cofrinho: number; meta: MetaDoCartao | null; hojeISO: string; escondido: boolean }) {
+const CartaoResumo = memo(function CartaoResumo({ sobra, cofrinho, cofrinhoLegado, meta, hojeISO, escondido }: { sobra: SobraDoMes; cofrinho: number; cofrinhoLegado: boolean; meta: MetaDoCartao | null; hojeISO: string; escondido: boolean }) {
   const pct = pctComprometida(sobra);
   const pctBarra = pct === null ? 0 : Math.min(Math.max(pct, 0), 100);
   const chaveSituacao = situacaoDo(pct, sobra.valor) ?? 'no-controle';
@@ -407,10 +411,13 @@ const CartaoResumo = memo(function CartaoResumo({ sobra, cofrinho, meta, hojeISO
   return (
     <>
       <Cabeca direita={pct !== null && <span data-testid="pilula-situacao" data-situacao={chaveSituacao} className={clsx(PILULA, situacao.classe, 'pilula-situacao')}>{situacao.texto}</span>}>
-        <h2 className={ROTULO}>
-          <i className="cartao-chip" aria-hidden="true" />
-          <span className="truncate"><span className="capitalize">{nomeMes(sobra.competencia)}</span> · deve sobrar</span>
-        </h2>
+        <div className="flex min-w-0 items-center gap-2">
+          <h2 className={ROTULO}>
+            <i className="cartao-chip" aria-hidden="true" />
+            <span className="truncate"><span className="capitalize">{nomeMes(sobra.competencia)}</span> · deve sobrar</span>
+          </h2>
+          <Dica {...EXPLICACOES.deveSobrar} />
+        </div>
       </Cabeca>
       <p
         data-testid="cartao-sobra-valor"
@@ -436,6 +443,7 @@ const CartaoResumo = memo(function CartaoResumo({ sobra, cofrinho, meta, hojeISO
         <span className="lap-barra-luz block h-full rounded-full" style={{ width: `${pctBarra}%` }} />
       </div>
       <div className="mt-auto flex items-end justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-1.5">
         <Link
           href={BANCOS_PATH}
           data-testid="linha-cofrinho"
@@ -447,6 +455,11 @@ const CartaoResumo = memo(function CartaoResumo({ sobra, cofrinho, meta, hojeISO
           </span>
           <span data-testid="linha-cofrinho-valor" className="text-[14px] font-medium tabular-nums text-text">{valorCofrinho}</span>
         </Link>
+          {/* Fora do Link (botão dentro de link não vale); na altura do rótulo "Cofrinho ›". */}
+          <span className="mt-[3px] flex">
+            <Dica {...(cofrinhoLegado ? EXPLICACOES.cofrinhoLegado : EXPLICACOES.cofrinho)} />
+          </span>
+        </div>
         {meta && progresso ? (
           <div className="min-w-0 text-right" data-testid="cartao-meta-mini">
             <p className={clsx(ROTULO_PEQ, 'truncate')}>Meta · {meta.nome}</p>
@@ -473,13 +486,13 @@ const CartaoRitmo = memo(function CartaoRitmo({ sobra, hojeISO, escondido, conta
   const mes = nomeMes(sobra.competencia);
   const ritmo = ritmoDiarioDoMes(sobra.competencia, sobra.valor, hojeISO);
   const semRenda = sobra.renda.total === 0;
-  const linha = 'flex min-h-[22px] items-center justify-between gap-2 text-[13px]';
+  // Linhas de 24px: o ⓘ de cada uma tem toque de 44 × a altura da linha, sem cobrir o vizinho (o cartão tem altura fixa,
+  // ID-1; a 360px sobram ~8px, não dá para 32px por linha sem mudar o desenho).
+  const linha = 'flex min-h-[24px] items-center justify-between gap-2 text-[13px]';
   const dias =
     ritmo.estado === 'encerrado' ? 'mês encerrado' : ritmo.diasRestantes === 1 ? 'último dia do mês' : `${ritmo.diasRestantes} dias restantes`;
-  let nota: string | null = null;
-  if (!semRenda && ritmo.estado === 'sem_folga') {
-    nota = ritmo.excedente > 0 ? (escondido ? 'Passou do que entra' : `Passou ${formatBRL(ritmo.excedente)} do que entra`) : 'Sem folga este mês';
-  }
+  // A conta de verdade sob o valor ("R$ 2.090,00 que sobram ÷ 11 dias"); sem folga, a nota de sempre.
+  const conta = contaDoRitmo(ritmo, sobra.valor, escondido);
   return (
     <section aria-labelledby="resumo-mes" data-testid="resumo-mes-conta" className="flex h-full flex-col">
       <Cabeca
@@ -504,20 +517,21 @@ const CartaoRitmo = memo(function CartaoRitmo({ sobra, hojeISO, escondido, conta
           <ChevronRight size={16} aria-hidden="true" className="shrink-0" />
         </Link>
       ) : (
-        <div className="mt-1.5">
-          <p className="lap-texto-2 text-[11px] leading-[14px]">Disponível por dia</p>
-          <div className="flex flex-wrap items-baseline gap-x-2">
-            <p
-              data-testid="cartao-ritmo-dia"
-              className={clsx(
-                'whitespace-nowrap text-[28px] font-light leading-[1.1] tracking-[-0.03em] tabular-nums',
-                ritmo.estado === 'folga' || escondido ? 'text-[var(--lap-h-positivo)]' : 'text-[var(--lap-h-alerta)]',
-              )}
-            >
-              {escondido ? VALOR_OCULTO : formatBRL(ritmo.disponivelPorDia)}
-            </p>
-            {nota && <p data-testid="cartao-ritmo-nota" className="lap-texto-2 text-[12px]">{nota}</p>}
+        <div className="mt-1">
+          <div className="flex items-center gap-2">
+            <p className="lap-texto-2 text-[11px] leading-[14px]">Pode gastar por dia</p>
+            <Dica {...EXPLICACOES.porDia} />
           </div>
+          <p
+            data-testid="cartao-ritmo-dia"
+            className={clsx(
+              'whitespace-nowrap text-[28px] font-light leading-[1.1] tracking-[-0.03em] tabular-nums',
+              ritmo.estado === 'folga' || escondido ? 'text-[var(--lap-h-positivo)]' : 'text-[var(--lap-h-alerta)]',
+            )}
+          >
+            {escondido ? VALOR_OCULTO : formatBRL(ritmo.disponivelPorDia)}
+          </p>
+          <p data-testid={conta.testid} className="lap-texto-2 text-[11.5px] leading-[14px] tabular-nums">{conta.texto}</p>
         </div>
       )}
       <dl className="mt-auto">
@@ -528,16 +542,17 @@ const CartaoRitmo = memo(function CartaoRitmo({ sobra, hojeISO, escondido, conta
               <span data-testid="renda-previsao" title="Renda ainda não recebida" className="lap-texto-3 rounded-full border border-text/20 px-1.5 text-[10.5px] leading-[16px]">previsão</span>
             )}
           </dt>
-          <dd data-testid="resumo-renda" className="whitespace-nowrap font-medium tabular-nums text-text">{v(sobra.renda.total)}</dd>
+          <dd className="flex items-center gap-2"><span data-testid="resumo-renda" className="whitespace-nowrap font-medium tabular-nums text-text">{v(sobra.renda.total)}</span><Dica {...EXPLICACOES.voceRecebe} alvo="linha-topo" /></dd>
         </div>
         <div>
-          <dt>
+          {/* O ⓘ fica fora do botão da lista (botão dentro de botão não vale), na mesma coluna dos outros. */}
+          <dt className="flex items-center gap-2">
             <button
               type="button"
               onClick={onContas}
               aria-expanded={contasAbertas}
               aria-controls={contasAbertas ? idLista : undefined}
-              className={clsx(linha, 'lap-texto-2 pointer-events-auto -mx-1 w-[calc(100%+0.5rem)] rounded-md px-1 text-left')}
+              className={clsx(linha, 'lap-texto-2 pointer-events-auto -ml-1 min-w-0 flex-1 rounded-md pl-1 text-left')}
             >
               <span className="flex items-center gap-0.5">
                 Contas fixas
@@ -548,22 +563,19 @@ const CartaoRitmo = memo(function CartaoRitmo({ sobra, hojeISO, escondido, conta
                 {escondido ? VALOR_OCULTO : `− ${formatBRL(sobra.totalContasFixas)}`}
               </span>
             </button>
+            <Dica {...EXPLICACOES.contasFixas} alvo="linha" />
           </dt>
         </div>
         <div className={linha}>
           <dt className="lap-texto-2">Gastos do mês</dt>
-          <dd data-testid="resumo-gastos" className="whitespace-nowrap font-medium tabular-nums text-text">
-            {escondido ? VALOR_OCULTO : `− ${formatBRL(sobra.gastosExtras)}`}
-          </dd>
+          <dd className="flex items-center gap-2"><span data-testid="resumo-gastos" className="whitespace-nowrap font-medium tabular-nums text-text">{escondido ? VALOR_OCULTO : `− ${formatBRL(sobra.gastosExtras)}`}</span><Dica {...EXPLICACOES.gastosDoMes} alvo="linha" /></dd>
         </div>
-        <div className={clsx(linha, 'mt-0.5 border-t border-text/15 pt-1')}>
+        <div className={clsx(linha, 'border-t border-text/15 pt-0.5')}>
           <dt className="lap-texto-2">Deve sobrar</dt>
-          <dd
-            data-testid="previsao-fim-mes-valor"
-            className={clsx('whitespace-nowrap font-medium tabular-nums', sobra.valor < 0 && !escondido ? 'text-[var(--lap-h-alerta)]' : 'text-[var(--lap-h-positivo)]')}
-          >
-            {escondido ? VALOR_OCULTO : <NumeroAnimado valor={sobra.valor} formatar={formatBRLSinal} />}
-          </dd>
+          <dd className="flex items-center gap-2"><span
+              data-testid="previsao-fim-mes-valor"
+              className={clsx('whitespace-nowrap font-medium tabular-nums', sobra.valor < 0 && !escondido ? 'text-[var(--lap-h-alerta)]' : 'text-[var(--lap-h-positivo)]')}
+            >{escondido ? VALOR_OCULTO : <NumeroAnimado valor={sobra.valor} formatar={formatBRLSinal} />}</span><Dica {...EXPLICACOES.contaDeveSobrar} alvo="linha-base" /></dd>
         </div>
       </dl>
     </section>
@@ -632,10 +644,13 @@ const CartaoMeta = memo(function CartaoMeta({ meta, sobraMensal, hojeISO, escond
           ) : null
         }
       >
-        <h2 className={ROTULO}>
-          <IconeMeta icone={meta.icone} className="h-[22px] w-[22px] shrink-0 rounded-md [&>svg]:h-3 [&>svg]:w-3" />
-          <span className="truncate">Meta · {meta.nome}</span>
-        </h2>
+        <div className="flex min-w-0 items-center gap-2">
+          <h2 className={ROTULO}>
+            <IconeMeta icone={meta.icone} className="h-[22px] w-[22px] shrink-0 rounded-md [&>svg]:h-3 [&>svg]:w-3" />
+            <span className="truncate">Meta · {meta.nome}</span>
+          </h2>
+          <Dica {...EXPLICACOES.meta} />
+        </div>
       </Cabeca>
       <div className="mt-2.5 flex items-center justify-between gap-2.5">
         <p data-testid="cartao-meta-pct" className="text-[40px] font-light leading-none tracking-[-0.04em] tabular-nums text-[var(--lap-h-positivo)]">
@@ -665,7 +680,7 @@ const CartaoMeta = memo(function CartaoMeta({ meta, sobraMensal, hojeISO, escond
       </div>
       <div className="mt-auto grid grid-cols-3 gap-1.5">
         <Celula rotulo="Faltam" testid="cartao-meta-falta" valor={p.alcancada ? 'nada' : vCurto(p.falta)} />
-        <Celula rotulo="Por mês" testid="cartao-meta-guardar" valor={guardar.valor} nota={guardar.nota} />
+        <Celula rotulo="Por mês" testid="cartao-meta-guardar" valor={guardar.valor} nota={guardar.nota} dica={EXPLICACOES.metaPorMes} />
         <Celula rotulo="Até" valor={meta.data_limite ? mesCurto(meta.data_limite) : 'sem prazo'} />
       </div>
     </>
@@ -707,14 +722,29 @@ function BotaoGuardei({ nome, onClick }: { nome: string; onClick: () => void }) 
   );
 }
 
-function Celula({ rotulo, valor, nota, testid }: { rotulo: string; valor: string; nota?: string; testid?: string }) {
+function Celula({ rotulo, valor, nota, testid, dica }: { rotulo: string; valor: string; nota?: string; testid?: string; dica?: Explicacao }) {
   return (
     <div className="lap-vidro min-w-0 px-2 py-1.5" data-testid={testid}>
-      <p className={ROTULO_PEQ}>{rotulo}</p>
+      {dica ? (
+        <div className="flex items-center justify-between gap-1">
+          <p className={ROTULO_PEQ}>{rotulo}</p>
+          {/* Sem ⓘ vizinho na célula: 44×44 (passa sobre a barra e a célula ao lado, que não têm ação). */}
+          <Dica {...dica} />
+        </div>
+      ) : (
+        <p className={ROTULO_PEQ}>{rotulo}</p>
+      )}
       <p className="truncate text-[13px] font-medium tabular-nums text-text">{valor}</p>
       {nota && <p className="lap-texto-3 truncate text-[10px] leading-tight">{nota}</p>}
     </div>
   );
+}
+
+type Explicacao = { rotulo: string; texto: string };
+
+/** ⓘ no material do herói: cor do texto secundário do cartão (segue a Cor do app e o tema). */
+function Dica({ rotulo, texto, alvo }: Explicacao & { alvo?: AlvoInfoDica }) {
+  return <InfoDica rotulo={rotulo} texto={texto} alvo={alvo} className="lap-texto-2" />;
 }
 
 function fimDoMes(competencia: string): string {

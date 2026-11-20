@@ -13,6 +13,8 @@ export interface DadosDashboard {
   sobraMes: SobraDoMes | null;
   /** Dinheiro guardado (014); banco sem a 014: o total dos bancos, como antes. */
   cofrinho: number;
+  /** `true` = banco sem a 014 (`painel.cofrinho` ausente): `cofrinho` é o total dos bancos (`painel.saldoHoje`). */
+  cofrinhoLegado: boolean;
   /** "Sobrou R$ X em <mês>. Quer guardar no Cofrinho?" (uma vez por mês); `null` = nada a perguntar. */
   fechamento: PerguntaFechamento | null;
   rendasAReceber: RendaAReceberItem[];
@@ -58,6 +60,7 @@ export function montarDashboard(
     },
     sobraMes: sobra,
     cofrinho: painel.cofrinho?.saldo ?? painel.saldoHoje,
+    cofrinhoLegado: !painel.cofrinho,
     fechamento,
     rendasAReceber: mesCorrente
       ? painel.rendasAReceber.map((r) => ({ rendaId: r.renda.id, descricao: r.renda.descricao, valor: Number(r.renda.valor), data: r.data, competencia: r.competencia }))

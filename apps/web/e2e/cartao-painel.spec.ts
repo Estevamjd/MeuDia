@@ -163,9 +163,9 @@ test('maço de cartões: 2 sem meta, 3 com meta; formato de cartão (230–250px
   await expect(page.getByTestId('cartao-posicao')).toHaveText('2 de 2 · Ritmo');
   await expect(page.getByRole('button', { name: 'Próximo cartão' })).toBeDisabled();
   // Contas fixas do cartão abrem a lista abaixo do maço.
-  await page.getByRole('button', { name: /Contas fixas/ }).click();
+  await page.getByRole('button', { name: /^Contas fixas/ }).click();
   await expect(page.getByRole('list', { name: 'Contas fixas de outubro' })).toContainText('Curso');
-  await page.getByRole('button', { name: /Contas fixas/ }).click();
+  await page.getByRole('button', { name: /^Contas fixas/ }).click();
   await page.screenshot({ path: path.join(pasta, '01-sem-meta-p2-escuro.png') });
 
   // ── Com meta: 3 páginas; linha da meta na página 1 e página Meta com os números ──

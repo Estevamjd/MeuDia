@@ -211,7 +211,7 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   // Contas fixas (no cartão "Ritmo" do maço): a lista mostra cada conta com "a pagar" (pagas ou não, já contam na sobra).
   await tocar(page.getByRole('button', { name: 'Próximo cartão: Ritmo' }));
   await expect(page.getByTestId('cartao-pagina-conta')).toHaveClass(/cartao-frente/);
-  await tocar(page.getByRole('button', { name: /Contas fixas/ }));
+  await tocar(page.getByRole('button', { name: /^Contas fixas/ }));
   const listaContas = page.getByRole('list', { name: 'Contas fixas de outubro' });
   await expect(listaContas.getByRole('listitem')).toHaveCount(2);
   await expect(listaContas.getByRole('listitem').first()).toContainText(/Luz.*vence 20\/10.*a pagar/);
@@ -454,7 +454,7 @@ test('previsão B/C: fim do mês 2.090 continua igual depois de Recebi e de Pagu
   // O status das contas fixas fica na lista, aberta pelo cartão "Ritmo" do maço.
   await tocar(page.getByRole('button', { name: 'Próximo cartão: Ritmo' }));
   await expect(page.getByTestId('cartao-pagina-conta')).toHaveClass(/cartao-frente/);
-  await tocar(page.getByRole('button', { name: /Contas fixas/ }));
+  await tocar(page.getByRole('button', { name: /^Contas fixas/ }));
   await expect(page.getByText('1 paga · 0 a pagar', { exact: false })).toBeVisible();
   expect(erros, 'erros na página ou respostas HTTP ≥ 400').toEqual([]);
 });

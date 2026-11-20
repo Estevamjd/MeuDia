@@ -226,6 +226,15 @@ describe('montarDashboard', () => {
     expect(d.evolucao).toHaveLength(17);
     expect(d.evolucao.at(-1)).toMatchObject({ dia: 17, gasto: 25 });
   });
+  it('Cofrinho: sem a 014 (painel sem cofrinho) é o total dos bancos e marca cofrinhoLegado; com a 014, o saldo guardado', () => {
+    const legado = montarDashboard('2026-10', '2026-10-17', painel, [gasto]);
+    expect(legado.cofrinho).toBe(775);
+    expect(legado.cofrinhoLegado).toBe(true);
+    const com014 = { ...painel, mesAnterior: { competencia: '2026-09', sobra: null }, cofrinho: { saldo: 40, inicioEm: '2026-10-01', respondidas: [] } } as unknown as PainelSaldo;
+    const d = montarDashboard('2026-10', '2026-10-17', com014, [gasto]);
+    expect(d.cofrinho).toBe(40);
+    expect(d.cofrinhoLegado).toBe(false);
+  });
   it('outro mês: sem previsões nem Recebi', () => {
     const d = montarDashboard('2026-09', '2026-10-17', painel, []);
     expect(d.sobraMes).toBeNull();

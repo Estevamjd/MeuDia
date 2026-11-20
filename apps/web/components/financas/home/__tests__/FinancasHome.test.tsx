@@ -58,7 +58,7 @@ const dashboard = (over: Partial<DashboardHome> = {}): DashboardHome => ({
   rendasAReceber: [{ rendaId: 'r1', descricao: 'Salário', valor: 2000, data: '2026-10-20', competencia: '2026-10' }],
   fatias: [], evolucao: [], escondido: false, onAlternarOlho: vi.fn(), onRecebi: vi.fn(),
   recebiSheet: { renda: null, carteiras: [], carteiraPadrao: null, salvando: false, onClose: vi.fn(), onConfirmar: vi.fn() },
-  cofrinho: 150, fechamento: null,
+  cofrinho: 150, cofrinhoLegado: false, fechamento: null,
   fechamentoSheet: { pergunta: null, aberto: false, salvando: false, onGuardar: vi.fn(), onAgoraNao: vi.fn(), onClose: vi.fn() },
   ...over,
 });
@@ -265,7 +265,7 @@ describe('FinancasHomeView (Início, design v2)', () => {
 
   it('Contas fixas: resumo pagas/a pagar e lista com "pago" / "a pagar" ao tocar', () => {
     render(<FinancasHomeView {...viewProps()} />);
-    const botao = screen.getByRole('button', { name: /Contas fixas/ });
+    const botao = screen.getByRole('button', { name: /^Contas fixas/ });
     expect(botao.getAttribute('aria-expanded')).toBe('false');
     fireEvent.click(botao);
     expect(botao.getAttribute('aria-expanded')).toBe('true');

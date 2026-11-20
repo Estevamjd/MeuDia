@@ -18,11 +18,14 @@ const sobra: SobraDoMes = {
 const com = (o: Partial<SobraDoMes>): SobraDoMes => ({ ...sobra, ...o });
 const conta = () => screen.getByTestId('cartao-pagina-conta');
 
-describe('Cartão 2 "Ritmo": disponível por dia', () => {
+describe('Cartão 2 "Ritmo": pode gastar por dia', () => {
   it('com folga: Deve sobrar ÷ dias que faltam contando hoje, para baixo em centavos (139,10 ÷ 12 = 11,59)', () => {
     render(<CardResumoDeslizante sobra={sobra} cofrinho={0} hojeISO="2026-11-19" />);
-    expect(within(conta()).getByText('Disponível por dia')).toBeTruthy();
+    expect(within(conta()).getByText('Pode gastar por dia')).toBeTruthy();
+    expect(within(conta()).queryByText('Disponível por dia')).toBeNull();
     expect(t(within(conta()).getByTestId('cartao-ritmo-dia'))).toBe('R$ 11,59');
+    // A conta de verdade, com as mesmas entradas (Deve sobrar e dias contando hoje).
+    expect(t(within(conta()).getByTestId('cartao-ritmo-conta'))).toBe('R$ 139,10 que sobram ÷ 12 dias');
     expect(t(within(conta()).getByTestId('cartao-ritmo-dias'))).toBe('12 dias restantes');
     expect(within(conta()).queryByTestId('cartao-ritmo-nota')).toBeNull();
     // A conta curta continua embaixo, com os mesmos testids.
@@ -33,12 +36,16 @@ describe('Cartão 2 "Ritmo": disponível por dia', () => {
     render(<CardResumoDeslizante sobra={sobra} cofrinho={0} hojeISO="2026-11-30" />);
     expect(t(within(conta()).getByTestId('cartao-ritmo-dia'))).toBe('R$ 139,10');
     expect(t(within(conta()).getByTestId('cartao-ritmo-dias'))).toBe('último dia do mês');
+    expect(t(within(conta()).getByTestId('cartao-ritmo-conta'))).toBe('R$ 139,10 que sobram, só para hoje');
   });
 
   it('sem folga com excedente: R$ 0,00 por dia e quanto passou do que entra', () => {
     render(<CardResumoDeslizante sobra={com({ valor: -80.5 })} cofrinho={0} hojeISO="2026-11-19" />);
     expect(t(within(conta()).getByTestId('cartao-ritmo-dia'))).toBe('R$ 0,00');
     expect(t(within(conta()).getByTestId('cartao-ritmo-nota'))).toBe('Passou R$ 80,50 do que entra');
+    // Sem folga não há divisão: a linha é a nota, nunca "÷".
+    expect(within(conta()).queryByTestId('cartao-ritmo-conta')).toBeNull();
+    expect(t(conta())).not.toContain('÷');
   });
 
   it('sobra exatamente zero: R$ 0,00 e "Sem folga este mês"', () => {
