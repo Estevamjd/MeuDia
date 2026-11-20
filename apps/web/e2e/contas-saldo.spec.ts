@@ -170,7 +170,9 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await folha.getByRole('button', { name: 'Transferir' }).click();
   await confirmarToast('Transferência feita');
   await expect(cofrinho).toHaveText(brl('700,00'));
-  await expect(page.getByText('Nenhum gasto neste mês ainda.', { exact: false })).toBeVisible();
+  // Transferência não é gasto: sem gasto no mês, a Início nem mostra "Para onde foi".
+  await expect(page.getByRole('region', { name: 'Últimos lançamentos' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Para onde foi' })).toHaveCount(0);
 
   // 5. Gastei R$ 25 em Comida no Nubank → o Cofrinho NÃO cai (700); deve sobrar −145.
   folha = await abrirAcao(/Gastei/);

@@ -214,3 +214,57 @@ test('maço de cartões: 2 sem meta, 3 com meta; formato de cartão (230–250px
 
   expect(erros, 'erros na página ou respostas HTTP ≥ 400').toEqual([]);
 });
+
+test('maço na reserva (CSS.supports sem "timeline", como iOS < 26): ida e volta pelos botões e destino interrompido', async ({ page }) => {
+  const erros: string[] = [];
+  page.on('pageerror', (err) => erros.push(`${err.name}: ${err.message}`));
+  // Força o caminho de reserva antes de qualquer script da página (o mesmo truque do benchmark).
+  await page.addInitScript(() => {
+    const original = CSS.supports.bind(CSS) as (...a: string[]) => boolean;
+    CSS.supports = ((...args: string[]) => (args.join(' ').includes('timeline') ? false : original(...args))) as typeof CSS.supports;
+  });
+  const email = await cadastrar(page, 'Rui Reserva');
+  await semear(email, {
+    rendas: [{ descricao: 'Salário', valor: 943, dia_recebimento: 5 }],
+    metas: [{ nome: 'Celular novo', icone: 'smartphone', valor_alvo: 2000, valor_guardado: 840, data_limite: '2027-03-31', criado_em: '2026-09-01T12:00:00.000Z' }],
+  });
+  await page.reload();
+  await fecharBanner(page);
+
+  const cartao = page.getByTestId('cartao-resumo');
+  const anuncio = cartao.locator('[aria-live="polite"]');
+  const inert = (testid: string) => page.getByTestId(testid).evaluate((el) => (el as HTMLElement & { inert: boolean }).inert);
+  await expect(page.getByTestId('cartao-maco')).toHaveAttribute('data-maco', 'reserva');
+  await expect(cartao).toHaveAttribute('data-paginas', '3');
+  expect(await page.getByTestId('cartao-pagina-resumo').evaluate((el) => el.getAnimations().length)).toBe(0);
+  await naFrente(page, 'cartao-pagina-resumo');
+
+  // Ida: 1 → 2 → 3; volta: 3 → 2 → 1.
+  await page.getByRole('button', { name: 'Próximo cartão: A conta' }).click();
+  await naFrente(page, 'cartao-pagina-conta');
+  await page.getByRole('button', { name: 'Próximo cartão: Meta' }).click();
+  await naFrente(page, 'cartao-pagina-meta');
+  await expect(anuncio).toHaveText('Cartão 3 de 3: Meta');
+  await page.getByRole('button', { name: 'Cartão anterior: A conta' }).click();
+  await naFrente(page, 'cartao-pagina-conta');
+  await page.getByRole('button', { name: 'Cartão anterior: Resumo' }).click();
+  await naFrente(page, 'cartao-pagina-resumo');
+  await expect(anuncio).toHaveText('Cartão 1 de 3: Resumo');
+
+  // Interrompido: "Próximo" e, antes de a rolagem suave chegar, a pessoa assume e volta ao 1º.
+  await page.getByRole('button', { name: 'Próximo cartão: A conta' }).click();
+  await page.getByLabel('Cartões do resumo do mês. Deslize para o lado ou use as setas.').evaluate((el) => {
+    el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    el.scrollTo({ left: 0, behavior: 'auto' });
+  });
+  await naFrente(page, 'cartao-pagina-resumo');
+  await expect(page.getByTestId('cartao-posicao')).toHaveText('1 de 3 · Resumo');
+  await expect(anuncio).toHaveText('Cartão 1 de 3: Resumo');
+  // E continua certo depois do tempo do destino (900 ms).
+  await page.waitForTimeout(1000);
+  await expect(page.getByTestId('cartao-posicao')).toHaveText('1 de 3 · Resumo');
+  expect([await inert('cartao-pagina-resumo'), await inert('cartao-pagina-conta'), await inert('cartao-pagina-meta')]).toEqual([false, true, true]);
+  await semRolagemLateral(page);
+
+  expect(erros, 'erros na página').toEqual([]);
+});

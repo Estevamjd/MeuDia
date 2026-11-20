@@ -45,6 +45,20 @@ async function cadastrarCenario(page: Page, nome: string, diaSalario: number) {
   await expect(banner).toBeVisible();
   await banner.getByRole('button', { name: 'Fechar' }).click();
 
+  // Início da usuária nova (passo 1, com banco) no iPhone 13: faixa do onboarding de 1 linha (≤ 56px) e o "Gastei"
+  // acima da dobra, sem ficar atrás da barra inferior.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForLoadState('networkidle');
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const faixa = page.getByRole('region', { name: 'Vamos montar seu mês' });
+  await expect(faixa).toBeVisible();
+  expect((await faixa.boundingBox())!.height, 'faixa do onboarding com mais de 56px').toBeLessThanOrEqual(56);
+  const gastei = page.getByRole('region', { name: 'Últimos lançamentos' }).getByRole('button', { name: 'Gastei' });
+  await expect(gastei).toBeVisible();
+  const caixaGastei = (await gastei.boundingBox())!;
+  expect(caixaGastei.y + caixaGastei.height, '"Gastei" abaixo da dobra em 390×844').toBeLessThanOrEqual(844);
+  expect(caixaGastei.y + caixaGastei.height, '"Gastei" atrás da barra inferior').toBeLessThanOrEqual((await bottomNav.boundingBox())!.y);
+
   await tocar(page.getByRole('button', { name: 'Cadastrar minha renda' }));
   const modalRenda = page.getByRole('dialog', { name: 'Sua renda do mês' });
   await modalRenda.getByLabel('Valor').fill('220000');

@@ -51,7 +51,7 @@ export function PainelView({ nomeMes, numeros: n, resumo, acumulado, meses, esco
             <span className="capitalize">{nomeMes}</span> · {n ? 'deve sobrar' : 'sobrou'}
           </h2>
           {situacao && (
-            <span className={clsx('inline-flex h-[22px] shrink-0 items-center whitespace-nowrap rounded-full border px-2 text-[11px] font-medium', situacao.classe)}>{situacao.texto}</span>
+            <span data-testid="pilula-situacao" data-situacao={resumo.situacao ?? undefined} className={clsx('pilula-situacao inline-flex h-[22px] shrink-0 items-center whitespace-nowrap rounded-full border px-2 text-[11px] font-medium', situacao.classe)}>{situacao.texto}</span>
           )}
         </div>
         <p
@@ -65,7 +65,7 @@ export function PainelView({ nomeMes, numeros: n, resumo, acumulado, meses, esco
         </p>
         <p className="lap-texto-2 mt-1.5 text-[14px]">{n ? 'se nada mais sair até o fim do mês' : 'o que entrou menos o que saiu no mês'}</p>
         <div className="mt-4 grid grid-cols-3 gap-2">
-          <Celula rotulo="Recebeu" valor={v(n ? n.recebeu : resumo.entrou)} nota={n ? (n.previsao ? 'previsão' : 'renda do mês') : 'entradas'} testid="painel-recebeu" />
+          <Celula {...celulaRenda(n, resumo.entrou, v)} testid="painel-recebeu" />
           <Celula rotulo="Já gastou" valor={v(n ? n.jaGastou : resumo.saiu)} nota={n ? 'pagas + extras' : 'saídas'} testid="painel-ja-gastou" />
           {n ? (
             <Celula rotulo="A pagar" valor={v(n.faltaPagar)} nota={n.contasAPagar === 1 ? '1 conta' : `${n.contasAPagar} contas`} testid="painel-falta-pagar" />
@@ -118,6 +118,17 @@ export function PainelView({ nomeMes, numeros: n, resumo, acumulado, meses, esco
       )}
     </div>
   );
+}
+
+/**
+ * Renda nunca aparece como "Recebeu" se ainda não entrou: sem nenhum "Recebi" é "Renda do mês" (previsão); com parte
+ * recebida, "Recebeu" mostra só o que entrou e a nota diz quanto falta.
+ */
+export function celulaRenda(n: NumerosPainel | null, entrou: number, v: (x: number) => string): { rotulo: string; valor: string; nota: string } {
+  if (!n) return { rotulo: 'Recebeu', valor: v(entrou), nota: 'entradas' };
+  if (!n.previsao) return { rotulo: 'Recebeu', valor: v(n.recebeu), nota: 'renda do mês' };
+  if (n.recebido > 0) return { rotulo: 'Recebeu', valor: v(n.recebido), nota: `falta ${v(n.faltaReceber)}` };
+  return { rotulo: 'Renda do mês', valor: v(n.recebeu), nota: 'previsão' };
 }
 
 function Celula({ rotulo, valor, nota, testid }: { rotulo: string; valor: string; nota: string; testid: string }) {

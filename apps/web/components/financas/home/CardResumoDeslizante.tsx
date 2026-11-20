@@ -13,7 +13,7 @@ import { IconeMeta } from '../metas/IconeMeta';
 import { SITUACAO, pctComprometida } from '../resumo/ResumoMesConta';
 import { situacaoDo } from '../resumo/montarResumoMes';
 import { BANCOS_PATH } from './CardSaldoHoje';
-import { cssDoMaco, macoNaRolagem, poseDoCartao, transformDaPose } from './poseDoMaco';
+import { cssDoMaco, modoDoMaco, type ModoMaco } from './poseDoMaco';
 
 export const METAS_PATH = '/financas/metas';
 
@@ -53,9 +53,11 @@ const PILULA = 'inline-flex h-[22px] shrink-0 items-center whitespace-nowrap rou
 /**
  * Início v5 (aprovado em 19/11/2026): cartõezinhos no formato de cartão de crédito, em maço, que a pessoa segura e
  * passa para o lado. 1 "Resumo" (deve sobrar, Cofrinho, meta), 2 "A conta" (recebe − contas fixas − gastos), 3 "Meta"
- * (só com meta). Por baixo, um trilho invisível com scroll-snap nativo cuida do dedo, da inércia e do teclado; por cima,
- * os cartões ganham a pose do maço a cada quadro (poseDoMaco). Botões ‹ ›, pontos e anúncio (WCAG 2.5.1); com
- * "reduzir movimento" vira um carrossel simples, sem giro.
+ * (só com meta). Uma árvore só: o trilho com scroll-snap nativo cuida do dedo, da inércia e do teclado, e o caminho
+ * fica no palco (`data-maco`, ver `modoDoMaco`):
+ * - "rolagem" (Chrome 116+, iOS 26+): os cartões saem do fluxo e animam pela rolagem do trilho, no compositor;
+ * - "reserva" (iOS < 26, Firefox, "reduzir movimento"): carrossel nativo, cartão ativo por IntersectionObserver.
+ * Em nenhum dos dois o JS escreve pose por quadro. Botões ‹ ›, pontos e anúncio (WCAG 2.5.1).
  */
 export function CardResumoDeslizante({ sobra, cofrinho, metas = [], hojeISO, escondido = false }: CardResumoDeslizanteProps) {
   const meta = useMemo(() => metaDoCartao(metas), [metas]);
@@ -65,153 +67,166 @@ export function CardResumoDeslizante({ sobra, cofrinho, metas = [], hojeISO, esc
   const [atual, setAtual] = useState(0);
   const [anuncio, setAnuncio] = useState('');
   const [contasAbertas, setContasAbertas] = useState(false);
+  /** `null` até o JS rodar (SSR/primeira pintura): aí quem escolhe o caminho é o @supports do CSS. */
+  const [modo, setModo] = useState<ModoMaco | null>(null);
   const secaoRef = useRef<HTMLElement>(null);
   const trilhoRef = useRef<HTMLDivElement>(null);
-  /** Última pose escrita em cada cartão (só escreve no DOM o que mudou). */
-  const escritoRef = useRef<{ t: string; z: string; v: string }[]>([]);
-  /** O navegador anima o maço pela rolagem (compositor); aí o JS não escreve pose por quadro. */
-  const naRolagemRef = useRef(false);
-  /**
-   * Caminho em JS: largura do trilho e "reduzir movimento" ficam guardados (ResizeObserver / matchMedia), para o
-   * quadro só LER scrollLeft — nada de clientWidth (layout) nem matchMedia a cada quadro.
-   */
-  const larguraRef = useRef(0);
-  const reduzirRef = useRef(false);
-  /** Posição (em páginas) da última pose escrita: rolagem sem mudança não recalcula nada. */
-  const pEscritoRef = useRef(Number.NaN);
   /** Dedo no trilho: sem `scrollend`, não dá por assentado no meio do gesto (evita re-render com o dedo parado). */
   const tocandoRef = useRef(false);
   const cartoesRef = useRef<(HTMLDivElement | null)[]>([]);
+  const slidesRef = useRef<(HTMLDivElement | null)[]>([]);
   const atualRef = useRef(0);
+  /** Destino dos botões/setas na reserva: a rolagem suave passa por cartões no meio e eles não contam. */
+  const alvoRef = useRef<number | null>(null);
+  const esperaAlvoRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  /** Na reserva: acerta o cartão ativo pelo que o trilho mostra agora (uma leitura, sem nada por quadro). */
+  const reconciliarRef = useRef<(() => void) | null>(null);
   const idTrilho = useId();
   const idListaContas = useId();
   const mes = nomeMes(sobra.competencia);
 
-  // Página em que o trilho assentou (só re-renderiza ao trocar de cartão, nunca por quadro).
-  const assentar = useCallback(() => {
-    const el = trilhoRef.current;
-    if (!el) return;
-    const novo = Math.max(0, Math.min(total - 1, Math.round(el.scrollLeft / (el.clientWidth || 1))));
-    if (novo !== atualRef.current) {
+  const ativar = useCallback(
+    (i: number) => {
+      const novo = Math.max(0, Math.min(total - 1, i));
+      if (novo === atualRef.current) return;
       atualRef.current = novo;
       setAtual(novo);
       setAnuncio(`Cartão ${novo + 1} de ${total}: ${paginas[novo]!.titulo}`);
-    }
-  }, [paginas, total]);
+    },
+    [paginas, total],
+  );
 
-  // Caminho em JS (iOS < 26 sem scroll-driven animations, ou "reduzir movimento"): pose a cada quadro, escrevendo
-  // direto no DOM só transform/z-index/visibility que mudaram. O quadro lê UMA coisa (scrollLeft) e escreve depois:
-  // nenhuma leitura que force layout, nada de matchMedia, nada de re-render. z-index e visibility só mudam nas viradas
-  // (meio do arco), então na prática só o transform é escrito por quadro, e o cartão (camada própria) não repinta.
-  const aplicarPoses = useCallback((forcar = false) => {
-    const el = trilhoRef.current;
-    if (!el || naRolagemRef.current) return;
-    // Sem medida ainda (ResizeObserver não chegou ou não existe): mede uma vez só.
-    if (!larguraRef.current) larguraRef.current = el.clientWidth;
-    const largura = larguraRef.current || 1;
-    const p = el.scrollLeft / largura;
-    if (!forcar && p === pEscritoRef.current) return;
-    pEscritoRef.current = p;
-    const reduzir = reduzirRef.current;
-    const cartoes = cartoesRef.current;
-    const escrito = escritoRef.current;
-    for (let i = 0; i < cartoes.length; i++) {
-      const c = cartoes[i];
-      if (!c) continue;
-      const pose = poseDoCartao(i - p, largura, reduzir);
-      const ant = (escrito[i] ??= { t: '', z: '', v: '' });
-      const t = transformDaPose(pose);
-      const z = String(pose.z);
-      const v = pose.visivel ? 'visible' : 'hidden';
-      if (t !== ant.t) { c.style.transform = t; ant.t = t; }
-      if (z !== ant.z) { c.style.zIndex = z; ant.z = z; }
-      if (v !== ant.v) { c.style.visibility = v; ant.v = v; }
-    }
+  // Caminho do maço: CSS.supports + "reduzir movimento", de novo se a preferência mudar com a página aberta.
+  useEffect(() => {
+    const escolher = () => setModo(modoDoMaco());
+    escolher();
+    const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    mq?.addEventListener?.('change', escolher);
+    return () => mq?.removeEventListener?.('change', escolher);
   }, []);
 
-  // Mede e posiciona (montagem, meta nova).
-  useEffect(() => {
-    reduzirRef.current = reduzMovimento();
-    naRolagemRef.current = macoNaRolagem();
-    escritoRef.current = [];
-    aplicarPoses(true);
-  }, [aplicarPoses, total]);
+  /** Posição do trilho que centraliza o cartão `i` (nos dois caminhos a página tem a largura do passo do snap). */
+  const posicaoDe = useCallback((i: number) => {
+    const el = trilhoRef.current;
+    const slide = slidesRef.current[i];
+    if (!el) return 0;
+    if (!slide?.offsetWidth) return i * el.clientWidth;
+    return Math.max(0, slide.offsetLeft - (el.clientWidth - slide.offsetWidth) / 2);
+  }, []);
 
-  // Largura do trilho fora do quadro: ResizeObserver (ou resize da janela onde não houver).
+  // Trocou de caminho (1ª escolha, "reduzir movimento"): o passo do snap muda, então realinha no cartão atual.
   useEffect(() => {
     const el = trilhoRef.current;
-    if (!el) return;
-    const medir = (largura: number) => {
-      if (largura === larguraRef.current) return;
-      larguraRef.current = largura;
-      escritoRef.current = [];
-      aplicarPoses(true);
-    };
-    if (typeof ResizeObserver !== 'undefined') {
-      const ro = new ResizeObserver((entradas) => {
-        const caixa = entradas[entradas.length - 1]?.contentRect;
-        if (caixa) medir(caixa.width);
-      });
-      ro.observe(el);
-      return () => ro.disconnect();
-    }
-    const aoRedimensionar = () => medir(el.clientWidth);
-    window.addEventListener('resize', aoRedimensionar, { passive: true });
-    return () => window.removeEventListener('resize', aoRedimensionar);
-  }, [aplicarPoses]);
+    if (!modo || !el || !atualRef.current) return;
+    el.scrollTo?.({ left: posicaoDe(atualRef.current), behavior: 'auto' });
+  }, [modo, posicaoDe]);
 
-  // "Reduzir movimento" ligado/desligado com a página aberta: troca de caminho (CSS ↔ JS) sem recarregar.
-  useEffect(() => {
-    const mq = typeof window !== 'undefined' ? window.matchMedia?.('(prefers-reduced-motion: reduce)') : undefined;
-    if (!mq?.addEventListener) return;
-    const aoMudar = () => {
-      reduzirRef.current = mq.matches;
-      naRolagemRef.current = macoNaRolagem();
-      escritoRef.current = [];
-      aplicarPoses(true);
-    };
-    mq.addEventListener('change', aoMudar);
-    return () => mq.removeEventListener('change', aoMudar);
-  }, [aplicarPoses]);
-
+  // Rolagem: o compositor anima o maço; o JS só descobre onde o trilho assentou (timer, sem rAF) e marca o "segurar".
   useEffect(() => {
     const el = trilhoRef.current;
     const secao = secaoRef.current;
-    if (!el || !secao) return;
-    let quadro = 0;
+    if (modo !== 'rolagem' || !el || !secao) return;
     let espera: ReturnType<typeof setTimeout> | undefined;
     const temScrollend = 'onscrollend' in window;
-    // Sem `scrollend` (iOS < 26): considera assentado depois de um instante sem rolagem E sem dedo no trilho. Com o
-    // dedo parado no meio do gesto, nada de re-render (era um tranco no meio da troca de cartão).
+    const assentar = () => ativar(Math.round(el.scrollLeft / (el.clientWidth || 1)));
+    // Sem `scrollend`: considera assentado depois de um instante sem rolagem E sem dedo no trilho.
     const agendarAssentar = () => {
       clearTimeout(espera);
       if (!temScrollend && tocandoRef.current) return;
       espera = setTimeout(assentar, temScrollend ? 600 : 120);
     };
-    const quadroDaPose = () => { quadro = 0; aplicarPoses(); };
-    const aoRolar = () => {
-      if (!naRolagemRef.current && !quadro) quadro = requestAnimationFrame(quadroDaPose);
-      agendarAssentar();
-    };
     const aoAssentar = () => { clearTimeout(espera); assentar(); };
     // "Segurar" o cartão é só uma classe (sem re-render no começo do gesto).
     const pegar = () => { tocandoRef.current = true; secao.classList.add('maco-segurando'); };
     const soltar = () => { tocandoRef.current = false; secao.classList.remove('maco-segurando'); agendarAssentar(); };
-    el.addEventListener('scroll', aoRolar, { passive: true });
+    el.addEventListener('scroll', agendarAssentar, { passive: true });
     el.addEventListener('scrollend', aoAssentar, { passive: true });
     el.addEventListener('touchstart', pegar, { passive: true });
     el.addEventListener('touchend', soltar, { passive: true });
     el.addEventListener('touchcancel', soltar, { passive: true });
     return () => {
-      el.removeEventListener('scroll', aoRolar);
+      el.removeEventListener('scroll', agendarAssentar);
       el.removeEventListener('scrollend', aoAssentar);
       el.removeEventListener('touchstart', pegar);
       el.removeEventListener('touchend', soltar);
       el.removeEventListener('touchcancel', soltar);
-      cancelAnimationFrame(quadro);
+      secao.classList.remove('maco-segurando');
+      tocandoRef.current = false;
       clearTimeout(espera);
     };
-  }, [aplicarPoses, assentar]);
+  }, [modo, ativar]);
+
+  /** Larga o destino dos botões e acerta o ativo pelo trilho (destino expirou ou a pessoa assumiu a rolagem). */
+  const soltarAlvo = useCallback(() => {
+    clearTimeout(esperaAlvoRef.current);
+    if (alvoRef.current === null) return;
+    alvoRef.current = null;
+    reconciliarRef.current?.();
+  }, []);
+
+  // Reserva: nenhum listener de rolagem. O IntersectionObserver avisa quando outro cartão passa de 60% do trilho
+  // (uma vez por troca, não por quadro) e só aí o React re-renderiza. A última fração de cada cartão fica guardada
+  // para reconciliar o ativo quando o destino de um botão é largado no meio do caminho.
+  useEffect(() => {
+    const el = trilhoRef.current;
+    if (modo !== 'reserva' || !el || typeof IntersectionObserver === 'undefined') return;
+    const fracoes: number[] = [];
+    const maisVisivel = () => {
+      let melhor = -1;
+      let maior = 0;
+      fracoes.forEach((f, i) => { if (f > maior) { maior = f; melhor = i; } });
+      return maior >= LIMIAR_ATIVO ? melhor : -1;
+    };
+    const io = new IntersectionObserver(
+      (entradas) => {
+        for (const e of entradas) {
+          const i = Number((e.target as HTMLElement).dataset.slide);
+          if (!Number.isNaN(i)) fracoes[i] = e.isIntersecting ? e.intersectionRatio : 0;
+        }
+        const melhor = maisVisivel();
+        if (melhor < 0) return;
+        if (alvoRef.current !== null) {
+          if (melhor !== alvoRef.current) return;
+          alvoRef.current = null;
+          clearTimeout(esperaAlvoRef.current);
+        }
+        ativar(melhor);
+      },
+      { root: el, threshold: [LIMIAR_ATIVO] },
+    );
+    for (const s of slidesRef.current) if (s) io.observe(s);
+    // Reconciliar: pela última interseção; sem nenhuma acima do limiar, pelo scrollLeft (uma leitura só).
+    reconciliarRef.current = () => {
+      let i = maisVisivel();
+      if (i < 0) {
+        const x = el.scrollLeft;
+        let menor = Infinity;
+        for (let j = 0; j < slidesRef.current.length; j++) {
+          const dist = Math.abs(posicaoDe(j) - x);
+          if (dist < menor) { menor = dist; i = j; }
+        }
+      }
+      if (i >= 0) ativar(i);
+    };
+    // A pessoa assumiu (dedo, mouse, roda, teclas que rolam): o destino do botão deixa de valer. As setas ← → não
+    // contam, porque elas mesmas escolhem um destino novo (irPara). Sem destino pendente, não fazem nada.
+    const assumir = () => soltarAlvo();
+    const tecla = (e: globalThis.KeyboardEvent) => { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') soltarAlvo(); };
+    el.addEventListener('pointerdown', assumir, { passive: true });
+    el.addEventListener('wheel', assumir, { passive: true });
+    el.addEventListener('keydown', tecla);
+    return () => {
+      io.disconnect();
+      el.removeEventListener('pointerdown', assumir);
+      el.removeEventListener('wheel', assumir);
+      el.removeEventListener('keydown', tecla);
+      reconciliarRef.current = null;
+      alvoRef.current = null;
+      clearTimeout(esperaAlvoRef.current);
+    };
+  }, [modo, ativar, total, posicaoDe, soltarAlvo]);
+
+  useEffect(() => () => clearTimeout(esperaAlvoRef.current), []);
 
   // Cartões de trás não recebem foco nem toque (o da frente é o que vale); `inert` via DOM por compatibilidade.
   useEffect(() => {
@@ -233,12 +248,14 @@ export function CardResumoDeslizante({ sobra, cofrinho, metas = [], hojeISO, esc
       const el = trilhoRef.current;
       const alvo = Math.max(0, Math.min(total - 1, i));
       if (!el) return;
-      el.scrollTo?.({ left: alvo * (el.clientWidth || 1), behavior: reduzMovimento() ? 'auto' : 'smooth' });
-      atualRef.current = alvo;
-      setAtual(alvo);
-      setAnuncio(`Cartão ${alvo + 1} de ${total}: ${paginas[alvo]!.titulo}`);
+      alvoRef.current = alvo;
+      // Se a rolagem não chegar (já estava lá, ou foi interrompida), o destino expira e o ativo é reconciliado.
+      clearTimeout(esperaAlvoRef.current);
+      esperaAlvoRef.current = setTimeout(soltarAlvo, ESPERA_ALVO_MS);
+      el.scrollTo?.({ left: posicaoDe(alvo), behavior: reduzMovimento() ? 'auto' : 'smooth' });
+      ativar(alvo);
     },
-    [paginas, total],
+    [ativar, posicaoDe, total, soltarAlvo],
   );
 
   const aoTeclar = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -247,15 +264,14 @@ export function CardResumoDeslizante({ sobra, cofrinho, metas = [], hojeISO, esc
   };
 
   const rotulo = (i: number) => `${i + 1} de ${total}: ${paginas[i]!.titulo}`;
-  // Pose inicial (antes do JS medir): o 1º na frente, os outros atrás à direita.
-  const poseInicial = (i: number) => {
-    const pose = poseDoCartao(i, 340);
-    return { transform: transformDaPose(pose), zIndex: pose.z, visibility: pose.visivel ? ('visible' as const) : ('hidden' as const) };
-  };
   const refCartao = (i: number) => (el: HTMLDivElement | null) => {
     cartoesRef.current[i] = el;
   };
+  const refSlide = (i: number) => (el: HTMLDivElement | null) => {
+    slidesRef.current[i] = el;
+  };
   cartoesRef.current.length = total;
+  slidesRef.current.length = total;
   const alternarContas = useCallback(() => setContasAbertas((a) => !a), []);
   const css = useMemo(() => cssDoMaco(total), [total]);
 
@@ -263,29 +279,24 @@ export function CardResumoDeslizante({ sobra, cofrinho, metas = [], hojeISO, esc
     <section ref={secaoRef} aria-roledescription="carrossel" aria-label="Resumo do mês" data-testid="cartao-resumo" data-paginas={total} className="maco-secao">
       {/* eslint-disable-next-line react/no-danger -- CSS gerado aqui mesmo (keyframes do maço), sem dado do usuário */}
       <style dangerouslySetInnerHTML={{ __html: css }} />
-      <div className="maco-palco relative -mx-4 overflow-x-clip md:mx-0" data-total={total} data-testid="cartao-maco">
-        {/* Trilho invisível: é ele que rola (dedo, inércia, teclado); os cartões só desenham a pose. */}
+      <div className="maco-palco -mx-4 overflow-x-clip md:mx-0" data-total={total} data-maco={modo ?? undefined} data-testid="cartao-maco">
+        {/* O trilho é o que rola (dedo, inércia, teclado); cada página leva o seu cartão. */}
         <div
           id={idTrilho}
           ref={trilhoRef}
           tabIndex={0}
           onKeyDown={aoTeclar}
           aria-label="Cartões do resumo do mês. Deslize para o lado ou use as setas."
-          className="maco-trilho sem-barra absolute inset-0 flex snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-[20px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="maco-trilho sem-barra rounded-[20px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
-          {paginas.map((p) => (
-            <div key={p.id} className="h-full w-full shrink-0 snap-center snap-always" aria-hidden="true" />
-          ))}
-        </div>
-        <div className="pointer-events-none absolute inset-0 z-10">
-          <Cartao i={0} total={total} atual={atual} refEl={refCartao(0)} estilo={poseInicial(0)} rotulo={rotulo(0)} testid="cartao-pagina-resumo">
+          <Cartao i={0} atual={atual} refSlide={refSlide(0)} refEl={refCartao(0)} rotulo={rotulo(0)} testid="cartao-pagina-resumo">
             <CartaoResumo sobra={sobra} cofrinho={cofrinho} meta={meta} hojeISO={hojeISO} escondido={escondido} />
           </Cartao>
-          <Cartao i={1} total={total} atual={atual} refEl={refCartao(1)} estilo={poseInicial(1)} rotulo={rotulo(1)} testid="cartao-pagina-conta" pele="cartao-pele-conta">
+          <Cartao i={1} atual={atual} refSlide={refSlide(1)} refEl={refCartao(1)} rotulo={rotulo(1)} testid="cartao-pagina-conta" pele="cartao-pele-conta">
             <CartaoConta sobra={sobra} escondido={escondido} contasAbertas={contasAbertas} onContas={alternarContas} idLista={idListaContas} />
           </Cartao>
           {meta && (
-            <Cartao i={2} total={total} atual={atual} refEl={refCartao(2)} estilo={poseInicial(2)} rotulo={rotulo(2)} testid="cartao-pagina-meta" pele="cartao-pele-meta">
+            <Cartao i={2} atual={atual} refSlide={refSlide(2)} refEl={refCartao(2)} rotulo={rotulo(2)} testid="cartao-pagina-meta" pele="cartao-pele-meta">
               <CartaoMeta meta={meta} sobraMensal={sobra.valor} hojeISO={hojeISO} escondido={escondido} />
             </Cartao>
           )}
@@ -319,6 +330,11 @@ export function CardResumoDeslizante({ sobra, cofrinho, metas = [], hojeISO, esc
   );
 }
 
+/** Fração do trilho que um cartão precisa ocupar para virar o da frente na reserva. */
+const LIMIAR_ATIVO = 0.6;
+/** Tempo máximo da rolagem suave de um botão; depois disso o destino deixa de filtrar o observador. */
+const ESPERA_ALVO_MS = 900;
+
 /** Visual pequeno (30px), área de toque de 44px pelo ::before (WCAG 2.5.8 pede ≥ 24px). */
 const CLASSE_REDONDO =
   "lap-cartao relative inline-flex h-[30px] min-w-[30px] items-center justify-center gap-0.5 rounded-full before:absolute before:-inset-y-[7px] before:-inset-x-[7px] before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
@@ -341,24 +357,26 @@ function Pontos({ total, atual }: { total: number; atual: number }) {
   );
 }
 
-function Cartao({ children, i, atual, refEl, estilo, rotulo, testid, pele }: {
-  children: ReactNode; i: number; total: number; atual: number; refEl: (el: HTMLDivElement | null) => void;
-  estilo: { transform: string; zIndex: number; visibility: 'visible' | 'hidden' }; rotulo: string; testid: string; pele?: string;
+/** Página do trilho (passo do snap) com o cartão; `data-lado` dá a pose leve dos vizinhos na reserva. */
+function Cartao({ children, i, atual, refSlide, refEl, rotulo, testid, pele }: {
+  children: ReactNode; i: number; atual: number; refSlide: (el: HTMLDivElement | null) => void; refEl: (el: HTMLDivElement | null) => void;
+  rotulo: string; testid: string; pele?: string;
 }) {
-  // O estilo inicial é passado uma vez só (useState): depois quem move o cartão é o trilho, direto no DOM.
-  const [inicial] = useState(estilo);
+  const lado = i < atual ? 'esq' : i > atual ? 'dir' : 'atual';
   return (
-    <div
-      ref={refEl}
-      role="group"
-      aria-roledescription="cartão"
-      aria-label={rotulo}
-      data-testid={testid}
-      style={inicial}
-      data-i={i}
-      className={clsx('maco-cartao absolute inset-x-0 top-[17px] mx-auto aspect-[1.586] origin-[50%_120%]', i === atual && 'cartao-frente')}
-    >
-      <div className={clsx('lap-heroi cartao-cc flex h-full flex-col px-4 pb-3.5 pt-[15px]', pele)}>{children}</div>
+    <div ref={refSlide} data-slide={i} className="maco-slide">
+      <div
+        ref={refEl}
+        role="group"
+        aria-roledescription="cartão"
+        aria-label={rotulo}
+        data-testid={testid}
+        data-i={i}
+        data-lado={lado}
+        className={clsx('maco-cartao', i === atual && 'cartao-frente')}
+      >
+        <div className={clsx('lap-heroi cartao-cc flex h-full flex-col px-4 pb-3.5 pt-[15px]', pele)}>{children}</div>
+      </div>
     </div>
   );
 }
@@ -379,13 +397,14 @@ const MARCA = <span className="lap-texto-3 font-mono text-[11px] tracking-[0.16e
 const CartaoResumo = memo(function CartaoResumo({ sobra, cofrinho, meta, hojeISO, escondido }: { sobra: SobraDoMes; cofrinho: number; meta: MetaDoCartao | null; hojeISO: string; escondido: boolean }) {
   const pct = pctComprometida(sobra);
   const pctBarra = pct === null ? 0 : Math.min(Math.max(pct, 0), 100);
-  const situacao = SITUACAO[situacaoDo(pct, sobra.valor) ?? 'no-controle'];
+  const chaveSituacao = situacaoDo(pct, sobra.valor) ?? 'no-controle';
+  const situacao = SITUACAO[chaveSituacao];
   const fimMes = formatDiaMes(fimDoMes(sobra.competencia));
   const valorCofrinho = escondido ? VALOR_OCULTO : formatBRLSinal(cofrinho);
   const progresso = meta ? progressoMeta(meta, hojeISO) : null;
   return (
     <>
-      <Cabeca direita={pct !== null && <span className={clsx(PILULA, situacao.classe)}>{situacao.texto}</span>}>
+      <Cabeca direita={pct !== null && <span data-testid="pilula-situacao" data-situacao={chaveSituacao} className={clsx(PILULA, situacao.classe, 'pilula-situacao')}>{situacao.texto}</span>}>
         <h2 className={ROTULO}>
           <i className="cartao-chip" aria-hidden="true" />
           <span className="truncate"><span className="capitalize">{nomeMes(sobra.competencia)}</span> · deve sobrar</span>

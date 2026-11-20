@@ -17,6 +17,14 @@ describe('numerosPainel (bloco principal e "Para onde vai o salário")', () => {
     expect(n).toMatchObject({ recebeu: 943, jaGastou: 679.9, faltaPagar: 124, contasAPagar: 1, sobra: 139.1 });
     expect(n.partes).toEqual({ fixas: 79, extras: 6, sobra: 15 });
   });
+  it('renda toda recebida: recebido = renda, nada a receber', () => {
+    expect(numerosPainel(sobra({}))).toMatchObject({ recebeu: 943, previsao: false, recebido: 943, faltaReceber: 0 });
+  });
+  it('previsão: separa o que já entrou do que falta receber (em centavos)', () => {
+    const renda = { lancada: 1200.1, aReceber: 799.9, total: 2000 };
+    expect(numerosPainel(sobra({ renda, previsao: true }))).toMatchObject({ recebeu: 2000, recebido: 1200.1, faltaReceber: 799.9 });
+    expect(numerosPainel(sobra({ renda: { lancada: 0, aReceber: 943, total: 943 }, previsao: true }))).toMatchObject({ recebido: 0, faltaReceber: 943 });
+  });
   it('sem renda: sem partes (nada de divisão por zero)', () => {
     expect(numerosPainel(sobra({ renda: { total: 0 } as SobraDoMes['renda'] })).partes).toBeNull();
   });

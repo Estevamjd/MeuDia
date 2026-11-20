@@ -94,37 +94,64 @@ describe('ProximasContas', () => {
     expect(screen.getByRole('link', { name: 'Ver todas as contas (5)' }).getAttribute('href')).toBe('/financas/contas');
   });
 
-  it('tudo pago: mensagem em vez da lista', () => {
-    render(<ProximasContas contas={[]} totalMes={2} hojeISO={HOJE} onPagar={vi.fn()} />);
-    expect(texto()).toContain('Todas as contas do mês estão pagas.');
+  it('tudo pago: "Todas as N contas do mês estão pagas." em vez da lista (singular com 1)', () => {
+    const { rerender } = render(<ProximasContas contas={[]} totalMes={2} hojeISO={HOJE} onPagar={vi.fn()} />);
+    expect(texto(screen.getByTestId('contas-todas-pagas'))).toBe('Todas as 2 contas do mês estão pagas.');
     expect(screen.queryByRole('button', { name: /Paguei/ })).toBeNull();
+    expect(screen.queryByTestId('contas-vazio')).toBeNull();
+    rerender(<ProximasContas contas={[]} totalMes={1} hojeISO={HOJE} onPagar={vi.fn()} />);
+    expect(texto(screen.getByTestId('contas-todas-pagas'))).toBe('A conta do mês está paga.');
+  });
+
+  it('nenhuma conta cadastrada não é "tudo pago": convite para adicionar', () => {
+    const renda = { rendaId: 'r1', descricao: 'Salário', valor: 2000, data: '2026-10-20', competencia: '2026-10' as const };
+    render(<ProximasContas contas={[]} totalMes={0} hojeISO={HOJE} onPagar={vi.fn()} rendasAReceber={[renda]} onRecebi={vi.fn()} />);
+    expect(texto(screen.getByTestId('contas-vazio'))).toBe('Nenhuma conta fixa cadastradaAdicionar');
+    expect(screen.getByRole('link', { name: 'Adicionar' }).getAttribute('href')).toBe('/financas/contas?nova=1');
+    expect(texto()).not.toMatch(/pagas?\./);
+    expect(texto()).toContain('A receber: Salário');
   });
 });
 
 describe('BoasVindasFinancas', () => {
-  const segmentosAtivos = () =>
-    Array.from(screen.getByTestId('progresso-passos').children).filter((s) => s.className.includes('bg-accent')).length;
+  const segmentos = () => Array.from(screen.getByTestId('progresso-passos').children).map((s) => s.getAttribute('data-estado'));
+  const preenchidos = () => Array.from(screen.getByTestId('progresso-passos').children).filter((s) => s.classList.contains('bg-accent')).length;
 
-  it('passo 1 (sem renda): só "Cadastrar minha renda", Passo 1 de 2', () => {
+  it('passo 1 (sem renda): faixa de 1 linha com "Cadastrar minha renda"; barra sem nada preenchido', () => {
     const onCadastrarRenda = vi.fn();
     render(<BoasVindasFinancas rendaCadastrada={false} onCadastrarRenda={onCadastrarRenda} />);
     expect(texto()).toContain('Passo 1 de 2');
-    expect(segmentosAtivos()).toBe(1);
-    expect(texto()).toContain('Vamos montar seu mês');
+    expect(segmentos()).toEqual(['falta', 'falta']);
+    expect(preenchidos()).toBe(0);
+    expect(screen.getByRole('region', { name: 'Vamos montar seu mês' })).toBeTruthy();
     expect(screen.queryByRole('link', { name: 'Adicionar conta' })).toBeNull();
-    expect(texto()).not.toMatch(/iPhone|Tela de Início|lembrete|Ou registre um lançamento/i);
+    expect(texto()).not.toMatch(/iPhone|Tela de Início|lembrete|Ou registre um lançamento|Leva menos de um minuto/i);
     const botao = screen.getByRole('button', { name: 'Cadastrar minha renda' });
-    expect(botao.className).toContain('w-full');
+    // O texto visível é o nome acessível (WCAG 2.5.3), sem botão de largura cheia.
+    expect(botao.textContent).toBe('Cadastrar minha renda');
+    expect(botao.className).not.toContain('w-full');
     fireEvent.click(botao);
     expect(onCadastrarRenda).toHaveBeenCalled();
   });
 
-  it('passo 2 (renda cadastrada): "Adicionar conta", Passo 2 de 2', () => {
+  it('passo 2 (renda cadastrada): "Adicionar conta"; só o passo feito fica preenchido', () => {
     render(<BoasVindasFinancas rendaCadastrada onCadastrarRenda={vi.fn()} />);
     expect(texto()).toContain('Passo 2 de 2');
-    expect(segmentosAtivos()).toBe(2);
+    expect(segmentos()).toEqual(['feito', 'falta']);
+    expect(preenchidos()).toBe(1);
     expect(screen.getByRole('link', { name: 'Adicionar conta' }).getAttribute('href')).toBe('/financas/contas?nova=1');
     expect(screen.queryByRole('button', { name: 'Cadastrar minha renda' })).toBeNull();
+  });
+
+  it('faixa compacta: uma linha (título truncado, ação ao lado), sem parágrafo nem botão grande', () => {
+    render(<BoasVindasFinancas rendaCadastrada={false} onCadastrarRenda={vi.fn()} />);
+    const faixa = screen.getByTestId('boas-vindas');
+    expect(faixa.className).toMatch(/\bflex\b/);
+    expect(faixa.className).toContain('min-h-[52px]');
+    expect(faixa.className).not.toMatch(/\bp-5\b|space-y-4/);
+    expect(faixa.querySelectorAll('p')).toHaveLength(0);
+    expect(screen.getByRole('heading', { level: 2 }).className).toContain('truncate');
+    expect(screen.getByRole('button', { name: 'Cadastrar minha renda' }).className).toContain('h-9');
   });
 });
 
@@ -314,6 +341,15 @@ describe('FinancasHomeView (Início, design v2)', () => {
     render(<FinancasHomeView {...viewProps({ boasVindas: { rendaCadastrada: true, onCadastrarRenda: vi.fn() } })} />);
     expect(texto()).toContain('Passo 2 de 2');
     expect(texto()).toContain('A conta de outubro');
+  });
+
+  it('usuária nova com banco e sem gasto: faixa do passo 1 → maço → Últimos lançamentos com "Gastei" (sem "Para onde foi" vazio)', () => {
+    const onGastei = vi.fn();
+    render(<FinancasHomeView {...viewProps({ onGastei, boasVindas: { rendaCadastrada: false, onCadastrarRenda: vi.fn() }, resumo: montarResumoMes('2026-10', [], sobra) }, { ocorrencias: [], transacoes: [] })} />);
+    expect(regioes()).toEqual(['Vamos montar seu mês', 'Resumo do mês', 'A conta de outubro', 'Contas a vencer', 'Últimos lançamentos']);
+    expect(screen.queryByRole('region', { name: 'Para onde foi' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Gastei' }));
+    expect(onGastei).toHaveBeenCalled();
   });
 
   it('usuária nova (vazio, sem banco): só o convite e as boas-vindas, sem "R$ 0,00"', () => {

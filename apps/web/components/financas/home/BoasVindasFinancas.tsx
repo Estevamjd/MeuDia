@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Button } from '../../ui';
+import { clsx } from 'clsx';
 
 export interface BoasVindasFinancasProps {
   rendaCadastrada: boolean;
@@ -9,47 +9,56 @@ export interface BoasVindasFinancasProps {
 const TOTAL_PASSOS = 2;
 
 const PASSOS = {
-  1: { titulo: 'Vamos montar seu mês', subtitulo: 'Comece pela sua renda. Leva menos de um minuto.' },
-  2: { titulo: 'Agora, suas contas', subtitulo: 'Adicione luz, aluguel e assinaturas para ver quanto sobra.' },
+  1: { titulo: 'Vamos montar seu mês', acao: 'Cadastrar minha renda' },
+  2: { titulo: 'Agora, suas contas', acao: 'Adicionar conta' },
 } as const;
 
-const BOTAO_GRANDE = 'w-full py-3 text-base';
+/** Botão de 36px com área de toque de 44px pelo ::before. */
+const CLASSE_ACAO =
+  "relative inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-lg bg-accent px-3 text-[12.5px] font-medium text-accent-fg transition-opacity hover:opacity-90 before:absolute before:-inset-y-1 before:inset-x-0 before:content-[''] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
-/** Onboarding da home: um passo por vez (renda → contas), com "Passo X de 2". */
+/**
+ * Onboarding da home numa faixa só (≤ 56px), para o "Gastei" caber acima da dobra no iPhone 13: um passo por vez
+ * (renda → contas), "Passo X de 2" e a barra preenchendo só o que já foi feito.
+ */
 export function BoasVindasFinancas({ rendaCadastrada, onCadastrarRenda }: BoasVindasFinancasProps) {
   const passo = rendaCadastrada ? 2 : 1;
-  const { titulo, subtitulo } = PASSOS[passo];
+  const concluidos = passo - 1;
+  const { titulo, acao } = PASSOS[passo];
 
   return (
-    <section aria-labelledby="boas-vindas-financas" className="lap-cartao space-y-4 !border-accent/30 p-5">
-      <div className="space-y-2">
-        <p className="text-[13px] font-medium text-muted">
-          Passo {passo} de {TOTAL_PASSOS}
-        </p>
-        <div className="flex gap-1.5" aria-hidden="true" data-testid="progresso-passos">
-          {Array.from({ length: TOTAL_PASSOS }, (_, i) => (
-            <span key={i} className={`h-1.5 flex-1 rounded-full ${i < passo ? 'bg-accent' : 'bg-card2'}`} />
-          ))}
+    <section
+      aria-labelledby="boas-vindas-financas"
+      data-testid="boas-vindas"
+      className="lap-cartao flex min-h-[52px] items-center justify-between gap-3 !border-accent/30 px-3.5 py-2"
+    >
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex items-center gap-2">
+          <span className="shrink-0 text-[11px] font-medium leading-none text-muted">
+            Passo {passo} de {TOTAL_PASSOS}
+          </span>
+          <span className="flex w-14 gap-1" aria-hidden="true" data-testid="progresso-passos">
+            {Array.from({ length: TOTAL_PASSOS }, (_, i) => (
+              <span
+                key={i}
+                data-estado={i < concluidos ? 'feito' : 'falta'}
+                className={clsx('h-1 flex-1 rounded-full', i < concluidos ? 'bg-accent' : 'bg-trilho')}
+              />
+            ))}
+          </span>
         </div>
-      </div>
-
-      <div className="space-y-1">
-        <h2 id="boas-vindas-financas" className="text-lg font-semibold text-text">
+        <h2 id="boas-vindas-financas" className="truncate text-[13.5px] font-medium leading-tight text-text">
           {titulo}
         </h2>
-        <p className="text-[15px] text-muted">{subtitulo}</p>
       </div>
 
       {passo === 1 ? (
-        <Button className={BOTAO_GRANDE} onClick={onCadastrarRenda}>
-          Cadastrar minha renda
-        </Button>
+        <button type="button" onClick={onCadastrarRenda} className={CLASSE_ACAO}>
+          {acao}
+        </button>
       ) : (
-        <Link
-          href="/financas/contas?nova=1"
-          className={`inline-flex items-center justify-center rounded-lg bg-accent font-medium text-accent-fg transition-all duration-200 hover:opacity-90 ${BOTAO_GRANDE}`}
-        >
-          Adicionar conta
+        <Link href="/financas/contas?nova=1" className={CLASSE_ACAO}>
+          {acao}
         </Link>
       )}
     </section>

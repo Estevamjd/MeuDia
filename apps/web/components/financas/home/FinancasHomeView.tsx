@@ -134,7 +134,8 @@ export function FinancasHomeView({
         />
       )}
 
-      {!soConvite && resumo && <ParaOndeFoi categorias={resumo.categorias} escondido={escondido} />}
+      {/* Sem gasto no mês, "Para onde foi" vazio só empurrava o "Gastei" para baixo da dobra (usuária nova). */}
+      {!soConvite && resumo && resumo.categorias.length > 0 && <ParaOndeFoi categorias={resumo.categorias} escondido={escondido} />}
       {!soConvite && <UltimosLancamentos lancamentos={resumo?.ultimos ?? []} escondido={escondido} onGastei={onGastei} />}
 
       <RendaSheet {...rendaSheet} />

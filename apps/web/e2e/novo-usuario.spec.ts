@@ -205,7 +205,8 @@ test('novo usuário: cadastro → onboarding → finanças → logout → login'
   await shot('home-com-conta');
   await tocar(paguei);
   await confirmarToast('"Luz" marcada como paga.');
-  await expect(page.getByText('Todas as contas do mês estão pagas.')).toBeVisible();
+  // Uma conta só: singular (e "tudo pago" nunca aparece sem conta cadastrada).
+  await expect(page.getByText('A conta do mês está paga.')).toBeVisible();
   await shot('conta-paga');
 
   // ── 6. Orçamento ───────────────────────────────────────────────────────────
@@ -319,7 +320,7 @@ test('novo usuário: cadastro → onboarding → finanças → logout → login'
   await page.getByRole('button', { name: 'Entrar' }).click();
   await page.waitForURL(/\/financas$/);
   await semVoltarParaOnboarding(page);
-  await expect(page.getByText('Todas as contas do mês estão pagas.')).toBeVisible();
+  await expect(page.getByText('A conta do mês está paga.')).toBeVisible();
   await expect(page.getByText('Feira').first()).toBeVisible();
   await shot('login-novamente');
 

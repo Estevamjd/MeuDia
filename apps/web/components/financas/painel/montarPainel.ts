@@ -4,8 +4,14 @@ import { CATEGORICAS, COR_OUTROS } from '../home/paletaGraficos';
 
 /** Números do bloco principal do Painel (mês corrente, pela conta da sobra). Puro. */
 export interface NumerosPainel {
+  /** Renda do mês inteira (recebida + a receber); base das partes e da linha de renda do gráfico. */
   recebeu: number;
+  /** Alguma renda do mês ainda sem "Recebi". */
   previsao: boolean;
+  /** Parte da renda já lançada (com "Recebi"). */
+  recebido: number;
+  /** Parte da renda ainda sem "Recebi" (0 fora da previsão). */
+  faltaReceber: number;
   /** Contas fixas já pagas + gastos extras. */
   jaGastou: number;
   /** Contas fixas ainda sem "Paguei". */
@@ -28,9 +34,12 @@ export function numerosPainel(s: SobraDoMes): NumerosPainel {
     const extras = Math.min(100 - fixas, Math.round((s.gastosExtras / renda) * 100));
     partes = { fixas, extras, sobra: Math.max(0, 100 - fixas - extras) };
   }
+  const faltaReceber = s.previsao ? Math.max(0, centavos(renda) - centavos(s.renda.lancada ?? 0)) / 100 : 0;
   return {
     recebeu: renda,
     previsao: s.previsao,
+    recebido: (centavos(renda) - centavos(faltaReceber)) / 100,
+    faltaReceber,
     jaGastou: (centavos(s.totalContasPagas) + centavos(s.gastosExtras)) / 100,
     faltaPagar,
     contasAPagar: s.contasFixas.filter((c) => !c.paga).length,

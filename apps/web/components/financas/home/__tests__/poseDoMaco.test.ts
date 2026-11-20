@@ -1,5 +1,36 @@
-import { describe, expect, it } from 'vitest';
-import { cssDoMaco, poseDoCartao, transformDaPose } from '../poseDoMaco';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { PALCO_ROLAGEM, SUPORTE_ROLAGEM, cssDoMaco, macoNaRolagem, modoDoMaco, poseDoCartao, transformDaPose } from '../poseDoMaco';
+
+describe('modoDoMaco (caminho gravado em data-maco)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const janela = (reduzir: boolean) => vi.stubGlobal('window', { matchMedia: (q: string) => ({ matches: reduzir && q.includes('reduce') }) });
+
+  it('rolagem só com animation-timeline e timeline-scope em CSS.supports e sem "reduzir movimento"', () => {
+    janela(false);
+    vi.stubGlobal('CSS', { supports: () => true });
+    expect(macoNaRolagem()).toBe(true);
+    expect(modoDoMaco()).toBe('rolagem');
+  });
+
+  it('reserva quando CSS.supports nega "timeline" (iOS < 26; é assim que o benchmark força a reserva)', () => {
+    janela(false);
+    const supports = vi.fn((q: string) => !q.includes('timeline'));
+    vi.stubGlobal('CSS', { supports });
+    expect(modoDoMaco()).toBe('reserva');
+    expect(supports.mock.calls.every(([q]) => q.includes('timeline'))).toBe(true);
+  });
+
+  it('reserva com "reduzir movimento", sem CSS.supports e no servidor', () => {
+    janela(true);
+    vi.stubGlobal('CSS', { supports: () => true });
+    expect(modoDoMaco()).toBe('reserva');
+    janela(false);
+    vi.stubGlobal('CSS', undefined);
+    expect(modoDoMaco()).toBe('reserva');
+    vi.stubGlobal('window', undefined);
+    expect(modoDoMaco()).toBe('reserva');
+  });
+});
 
 describe('poseDoCartao (maço da Início v5)', () => {
   const W = 390;
@@ -35,12 +66,16 @@ describe('poseDoCartao (maço da Início v5)', () => {
 });
 
 describe('cssDoMaco (animação ligada à rolagem, no compositor)', () => {
-  it('só vale com suporte e sem "reduzir movimento"; o trilho publica --maco e cada cartão anima com ela', () => {
+  it('só vale com suporte, sem "reduzir movimento" e no palco em rolagem (ou ainda sem marca); o trilho publica --maco e cada cartão anima com ela', () => {
     const css = cssDoMaco(3);
-    expect(css.startsWith('@supports (animation-timeline: --maco) and (timeline-scope: --maco){@media (prefers-reduced-motion: no-preference){')).toBe(true);
-    expect(css).toContain('.maco-trilho{scroll-timeline:--maco x}');
-    expect(css).toContain('.maco-palco{timeline-scope:--maco}');
-    for (const i of [0, 1, 2]) expect(css).toContain(`.maco-palco[data-total="3"] .maco-cartao[data-i="${i}"]{animation-name:maco-3-${i}-t,maco-3-${i}-z;`);
+    expect(css.startsWith(`@supports ${SUPORTE_ROLAGEM}{@media (prefers-reduced-motion: no-preference){`)).toBe(true);
+    expect(SUPORTE_ROLAGEM).toBe('(animation-timeline: --maco) and (timeline-scope: --maco)');
+    expect(PALCO_ROLAGEM).toBe('.maco-palco:is([data-maco="rolagem"],:not([data-maco]))');
+    expect(css).toContain(`${PALCO_ROLAGEM} .maco-trilho{scroll-timeline:--maco x}`);
+    expect(css).toContain(`${PALCO_ROLAGEM}{timeline-scope:--maco}`);
+    for (const i of [0, 1, 2]) expect(css).toContain(`${PALCO_ROLAGEM}[data-total="3"] .maco-cartao[data-i="${i}"]{animation-name:maco-3-${i}-t,maco-3-${i}-z;`);
+    // Nenhuma regra sem o escopo: com data-maco="reserva" o maço scroll-driven não vale nem onde há suporte.
+    expect(css).not.toMatch(/\}\.maco-(palco|trilho|cartao)[{[ ]/);
     expect(cssDoMaco(1)).toBe('');
   });
 

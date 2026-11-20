@@ -495,7 +495,8 @@ html[data-mode='light'] .lap-heroi {
   --c-yellow: 250 178 25;
   --c-orange: 250 178 25;
   --c-brilho: 0 229 255;
-  --lap-h-positivo: oklch(0.9 0.15 200);
+  /* Sobre a página branca o ciano elétrico do número "estoura": mesma luz, um pouco menos de croma (o material fica igual). */
+  --lap-h-positivo: oklch(0.9 0.105 203);
   --lap-h-negativo: #f8b4b4;
   --lap-h-alerta: #fca5a5;
   --text: #f5f6f8;
@@ -504,12 +505,12 @@ html[data-mode='light'] .lap-heroi {
   --border: #1c2638;
   --card: #0b1220;
   --trilho: #151f31;
-  /* Mesma sombra-halo do escuro, um pouco mais leve sobre o branco. */
+  /* Sombra curta e neutra sobre o branco (o halo azul largo do escuro virava uma mancha no claro). */
   box-shadow:
-    inset 0 1px 0 oklch(1 0 0 / 0.22),
+    inset 0 1px 0 oklch(1 0 0 / 0.2),
     inset 0 0 0 1px oklch(1 0 0 / 0.07),
-    0 36px 64px -36px oklch(0.55 0.13 215 / 0.55),
-    0 2px 6px oklch(0.25 0.05 235 / 0.18);
+    0 18px 34px -22px oklch(0.25 0.05 230 / 0.34),
+    0 2px 6px -1px oklch(0.25 0.04 235 / 0.12);
 }
 html[data-mode='light'] ::-webkit-scrollbar-thumb { background: rgba(15, 23, 42, 0.15); }
 html[data-trocando-tema] *, html[data-trocando-tema] *::before, html[data-trocando-tema] *::after { transition: none !important; }
@@ -526,19 +527,74 @@ html[data-trocando-tema] *, html[data-trocando-tema] *::before, html[data-trocan
    para os cartões de trás. Container query: a largura vem da seção (o palco sangra -mx-4 no celular). */
 .maco-secao { container-type: inline-size; --maco-w: min(400px, calc(100cqw + 8px)); }
 @media (min-width: 768px) { .maco-secao { --maco-w: min(400px, calc(100cqw - 24px)); } }
-.maco-palco { height: calc(var(--maco-w) / 1.586 + 34px); }
-/* Cada cartão é uma camada própria do compositor: mover/girar não repinta nada (só transform, z-index e visibility
-   mudam por quadro). Sem `contain: paint` para não cortar a sombra. */
-.maco-cartao { width: var(--maco-w); will-change: transform; backface-visibility: hidden; -webkit-backface-visibility: hidden; contain: layout style; }
-/* O material (6 gradientes, anéis com mask, grão SVG com mix-blend-mode) é caro de PINTAR, não de mover: numa camada
-   que só recebe transform ele é pintado uma vez e reaproveitado. O que repintava era o "segurar" (translate com
-   transição no .cartao-cc): sem camada própria, o WebKit/Chrome promoviam o .cartao-cc no começo da transição e o
-   devolviam ao fim — repintando o cartão inteiro (grão feTurbulence + 2 transparências) no toque e na soltura, bem na
-   troca de cartão. Com a camada fixa, o "segurar" também só move. O invólucro (.maco-cartao) não pinta nada: vira
-   camada-contêiner, sem backing store, então a memória é a mesma de antes. */
-.lap-heroi.cartao-cc { will-change: transform; }
+.maco-palco { position: relative; isolation: isolate; height: calc(var(--maco-w) / 1.586 + 34px); }
+/* Sombra parada (nunca animada nem escrita no arrasto): o desfoque é pintado uma vez com a camada do cartão. */
 .lap-heroi.cartao-cc { box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.25), inset 0 0 0 1px oklch(1 0 0 / 0.08), 0 18px 36px -18px oklch(0 0 0 / 0.85), 0 2px 4px oklch(0 0 0 / 0.5); }
-html[data-mode='light'] .lap-heroi.cartao-cc { box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.25), inset 0 0 0 1px oklch(1 0 0 / 0.08), 0 22px 40px -22px oklch(0.35 0.08 230 / 0.55), 0 2px 6px oklch(0.25 0.05 235 / 0.18); }
+/* No claro, sombra curta e neutra: o halo azul de 40px virava uma mancha escura em volta do cartão no branco. */
+html[data-mode='light'] .lap-heroi.cartao-cc { box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.22), inset 0 0 0 1px oklch(1 0 0 / 0.08), 0 14px 26px -18px oklch(0.25 0.05 230 / 0.32), 0 2px 5px -1px oklch(0.25 0.04 235 / 0.12); }
+
+/* Caminho "reserva" (base): iOS < 26, Firefox e "reduzir movimento", ou palco com data-maco="reserva". Carrossel com
+   scroll-snap nativo: o dedo, a inércia e o encaixe rodam no compositor, sem JS por quadro (nada de listener de
+   rolagem, rAF, z-index ou sombra escritos no arrasto). O cartão ativo muda por IntersectionObserver, só na troca,
+   e os vizinhos ganham uma pose leve (data-lado) com transição só de transform/opacity. */
+.maco-trilho {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-inline: calc((100% - var(--maco-w)) / 2);
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+}
+.maco-slide { flex: 0 0 var(--maco-w); scroll-snap-align: center; scroll-snap-stop: always; }
+/* Cada cartão é uma camada própria do compositor (sem `contain: paint` para não cortar a sombra). */
+.maco-cartao {
+  position: relative;
+  width: var(--maco-w);
+  aspect-ratio: 1.586;
+  transform-origin: 50% 60%;
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  contain: layout style;
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 240ms ease;
+}
+.maco-cartao[data-lado='esq'] { transform: translateY(2px) rotate(-1.1deg) scale(0.95); opacity: 0.86; }
+.maco-cartao[data-lado='dir'] { transform: translateY(2px) rotate(1.1deg) scale(0.95); opacity: 0.86; }
+/* O grão (feTurbulence + mix-blend-mode) o WebKit < 26 rasteriza na CPU quando a camada muda de escala: fora aqui. */
+.maco-cartao > .lap-heroi.cartao-cc::after { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .maco-cartao { transition: none; }
+  .maco-cartao[data-lado] { transform: none; opacity: 1; }
+}
+
+/* Caminho "rolagem" (Chrome 116+, Safari/iOS 26+): o maço empilhado anda pela animação ligada à rolagem do trilho
+   (keyframes de cssDoMaco), no compositor. Vale com data-maco="rolagem" e, antes do JS (SSR/primeira pintura), pelo
+   próprio @supports, então não há flash: o JS só confirma o que o CSS já mostrou. O trilho e as páginas ficam
+   estáticos para os cartões (absolute) se ancorarem no palco, fora do recorte e da rolagem do trilho. */
+@supports (animation-timeline: --maco) and (timeline-scope: --maco) {
+  @media (prefers-reduced-motion: no-preference) {
+    .maco-palco:is([data-maco='rolagem'], :not([data-maco])) .maco-trilho { position: static; height: 100%; gap: 0; padding-inline: 0; align-items: stretch; }
+    .maco-palco:is([data-maco='rolagem'], :not([data-maco])) .maco-slide { flex: 0 0 100%; }
+    .maco-palco:is([data-maco='rolagem'], :not([data-maco])) .maco-cartao {
+      position: absolute;
+      inset-inline: 0;
+      top: 17px;
+      margin-inline: auto;
+      transform-origin: 50% 120%;
+      pointer-events: none;
+      opacity: 1;
+      transition: none;
+    }
+    .maco-palco:is([data-maco='rolagem'], :not([data-maco])) .maco-cartao > .lap-heroi.cartao-cc::after { display: block; }
+    /* O material (6 gradientes, anéis com mask, grão) é caro de PINTAR, não de mover: com camada fixa no .cartao-cc
+       o "segurar" (translate com transição) só move, sem promover/devolver a camada e repintar no toque e na soltura. */
+    .maco-palco:is([data-maco='rolagem'], :not([data-maco])) .lap-heroi.cartao-cc { will-change: transform; }
+  }
+}
 .lap-heroi.cartao-pele-conta {
   background:
     radial-gradient(50% 80% at 90% 10%, oklch(0.68 0.15 275 / 0.35), transparent 65%),
@@ -561,3 +617,9 @@ html[data-mode='light'] .lap-heroi.cartao-cc { box-shadow: inset 0 1px 0 oklch(1
 .cartao-chip { width: 30px; height: 22px; border-radius: 5px; flex: none; position: relative; background: linear-gradient(135deg, #e9d8a6, #b9975b 55%, #e2c98f); box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.18); }
 .cartao-chip::before { content: ''; position: absolute; inset: 5px 9px; border: 1px solid rgb(0 0 0 / 0.25); border-radius: 3px; }
 @media (prefers-reduced-motion: reduce) { .lap-heroi.cartao-cc { transition: none; } .maco-segurando .cartao-frente > .cartao-cc { translate: none; } }
+
+/* Pílula de situação (No controle / Atenção / Passou da renda) no material escuro, no claro e no escuro: fundo opaco
+   escuro e texto claro, contraste ≥ 7:1 (AAA) não importa onde caia a luz do cartão. Conferido em CardResumoDeslizante.test.tsx. */
+.lap-heroi .pilula-situacao { background: #062a33; border-color: #1f5f6b; color: #ccf7ff; }
+.lap-heroi .pilula-situacao[data-situacao='atencao'] { background: #2e2205; border-color: #6b5110; color: #fde68a; }
+.lap-heroi .pilula-situacao[data-situacao='passou'] { background: #330d10; border-color: #7a2a30; color: #fecaca; }

@@ -49,8 +49,21 @@ export function ProximasContas({ contas, totalMes, hojeISO, contaOcupada, pagame
         </Link>
       </div>
 
-      {contas.length === 0 ? (
-        <p className="text-[15px] text-muted">Todas as contas do mês estão pagas.</p>
+      {contas.length === 0 && totalMes === 0 ? (
+        // Nenhuma conta cadastrada não é "tudo pago" (o card aparece só pela linha "A receber").
+        <div className="flex min-h-[44px] items-center justify-between gap-3" data-testid="contas-vazio">
+          <p className="text-[15px] text-muted">Nenhuma conta fixa cadastrada</p>
+          <Link
+            href="/financas/contas?nova=1"
+            className="-my-2 -mr-1 inline-flex min-h-[44px] shrink-0 items-center px-1 text-sm font-medium text-accent"
+          >
+            Adicionar
+          </Link>
+        </div>
+      ) : contas.length === 0 ? (
+        <p className="text-[15px] text-muted" data-testid="contas-todas-pagas">
+          {totalMes === 1 ? 'A conta do mês está paga.' : `Todas as ${totalMes} contas do mês estão pagas.`}
+        </p>
       ) : (
         <ul className="space-y-1">
           {contas.map((c) => {

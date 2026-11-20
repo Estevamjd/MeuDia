@@ -104,8 +104,14 @@ test('Aparência: Sistema segue o modo do celular, inclusive quando ele muda', a
   await page.getByPlaceholder('seu@email.com').fill(email);
   await page.locator('#senha').fill(SENHA);
   await page.getByRole('button', { name: 'Entrar' }).click();
-  await page.waitForURL(/\/financas/);
-  await page.goto('/configuracoes');
+  // O login faz push('/inicio') + refresh() e o middleware leva a /financas: a URL muda antes
+  // do router terminar e o goto pode ser interrompido. Espera a Início e repete o goto até ele
+  // completar (carga inteira troca o documento, então nada mais o interrompe).
+  await page.waitForURL(/\/financas$/);
+  await page.getByTestId('linha-cofrinho').waitFor();
+  await expect(async () => {
+    await page.goto('/configuracoes');
+  }).toPass();
   const grupo = page.getByRole('radiogroup', { name: 'Aparência' });
   await grupo.getByRole('radio', { name: 'Sistema' }).click();
   expect(await modo(page)).toBe('dark');

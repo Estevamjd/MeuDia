@@ -4,8 +4,8 @@
  * deslocamento e giro pequenos por cartão). O cartão que está sendo passado (−1 < d < 0) sai em arco para a
  * esquerda, girando, e na metade do caminho vai para trás do maço, como quem passa cartões na carteira.
  *
- * O arco é medido em % da largura do próprio cartão (não do palco): assim a mesma pose serve para o caminho em JS
- * e para os @keyframes da animação ligada à rolagem (que rodam no compositor, sem JS por quadro).
+ * O arco é medido em % da largura do próprio cartão (não do palco): assim a pose vira @keyframes da animação ligada à
+ * rolagem (que rodam no compositor, sem JS por quadro). Onde ela não existe, o maço vira o carrossel de reserva.
  */
 export interface PoseCartao {
   /** Deslocamento horizontal em % da largura do cartão. */
@@ -27,7 +27,7 @@ const ARCO = 0.68;
 
 export function poseDoCartao(d: number, larguraPalco: number, reduzirMovimento = false): PoseCartao {
   if (reduzirMovimento) {
-    // Sem giro nem arco: um carrossel simples que acompanha o dedo.
+    // Sem giro nem arco: um carrossel simples que acompanha o dedo (referência; o componente usa o de reserva).
     return { xPct: 0, xPx: d * larguraPalco, rot: 0, escala: 1, z: 20 - Math.round(Math.min(Math.abs(d), 2) * 2), visivel: Math.abs(d) < 1.5 };
   }
   if (d < 0 && d > -1) {
@@ -57,10 +57,20 @@ export function transformDaPose(p: PoseCartao): string {
 /** Amostras por página: o arco (seno) fica liso com interpolação linear entre elas. */
 const AMOSTRAS_POR_PAGINA = 16;
 
+/** Mesma condição do @supports do maço (aqui, no globals.css e no `macoNaRolagem`). */
+export const SUPORTE_ROLAGEM = '(animation-timeline: --maco) and (timeline-scope: --maco)';
+
+/**
+ * Palco no caminho "rolagem": marcado pelo JS (`data-maco="rolagem"`) ou ainda sem marca (SSR/primeira pintura, aí
+ * quem decide é o @supports em volta). Com `data-maco="reserva"` nada do caminho scroll-driven vale, mesmo que o
+ * navegador suporte (é o que o benchmark força ao trocar `CSS.supports`).
+ */
+export const PALCO_ROLAGEM = '.maco-palco:is([data-maco="rolagem"],:not([data-maco]))';
+
 /**
  * CSS da animação ligada à rolagem (scroll-driven animations; Chrome 116+, Safari/iOS 26+): o trilho publica a
- * timeline `--maco` e cada cartão anima transform (compositor) e z-index/visibilidade (degraus) com ela. Onde não
- * houver suporte, ou com "reduzir movimento", nada disso vale e o JS posiciona os cartões.
+ * timeline `--maco` e cada cartão anima transform (compositor) e z-index/visibilidade (degraus) com ela. Sem suporte,
+ * com "reduzir movimento" ou no palco em "reserva", nada disso vale: fica o carrossel com scroll-snap nativo.
  */
 export function cssDoMaco(total: number): string {
   if (total < 2) return '';
@@ -89,15 +99,26 @@ export function cssDoMaco(total: number): string {
     if (!z.some((q) => q.startsWith('100.0000%'))) z.push(`100%{${zAnterior};animation-timing-function:step-end}`);
     quadros.push(`@keyframes maco-${total}-${i}-t{${t.join('')}}@keyframes maco-${total}-${i}-z{${z.join('')}}`);
     regras.push(
-      `.maco-palco[data-total="${total}"] .maco-cartao[data-i="${i}"]{animation-name:maco-${total}-${i}-t,maco-${total}-${i}-z;animation-duration:1ms,1ms;animation-timing-function:linear,linear;animation-fill-mode:both,both;animation-timeline:--maco,--maco}`,
+      `${PALCO_ROLAGEM}[data-total="${total}"] .maco-cartao[data-i="${i}"]{animation-name:maco-${total}-${i}-t,maco-${total}-${i}-z;animation-duration:1ms,1ms;animation-timing-function:linear,linear;animation-fill-mode:both,both;animation-timeline:--maco,--maco}`,
     );
   }
-  return `@supports (animation-timeline: --maco) and (timeline-scope: --maco){@media (prefers-reduced-motion: no-preference){.maco-palco{timeline-scope:--maco}.maco-trilho{scroll-timeline:--maco x}${regras.join('')}${quadros.join('')}}}`;
+  return `@supports ${SUPORTE_ROLAGEM}{@media (prefers-reduced-motion: no-preference){${PALCO_ROLAGEM}{timeline-scope:--maco}${PALCO_ROLAGEM} .maco-trilho{scroll-timeline:--maco x}${regras.join('')}${quadros.join('')}}}`;
 }
 
-/** Mesmo critério do CSS acima, para o JS saber se precisa posicionar os cartões a cada quadro. */
+/** Mesmo critério do CSS acima (lido em `CSS.supports`, que dá para trocar em teste/benchmark; o @supports não). */
 export function macoNaRolagem(): boolean {
   if (typeof window === 'undefined' || typeof CSS === 'undefined' || !CSS.supports) return false;
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
   return CSS.supports('animation-timeline: --maco') && CSS.supports('timeline-scope: --maco');
+}
+
+/**
+ * Caminho do maço, gravado no palco como `data-maco`:
+ * - "rolagem": o navegador anima o maço pela rolagem, no compositor (Chrome 116+, iOS 26+);
+ * - "reserva": carrossel com scroll-snap nativo, sem JS por quadro (iOS < 26, Firefox, "reduzir movimento").
+ */
+export type ModoMaco = 'rolagem' | 'reserva';
+
+export function modoDoMaco(): ModoMaco {
+  return macoNaRolagem() ? 'rolagem' : 'reserva';
 }

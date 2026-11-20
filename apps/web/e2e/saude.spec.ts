@@ -214,14 +214,19 @@ test('modo Finanças: cadastro de saúde, Hoje, Dieta, Peso e o vazio do Caderno
   await pc.getByLabel('Email').fill(EMAIL);
   await pc.getByLabel('Senha', { exact: true }).fill(SENHA);
   await pc.getByRole('button', { name: 'Entrar' }).click();
+  // Login = push('/inicio') + refresh() → /financas: a URL muda antes do router terminar e o
+  // 1º goto pode ser interrompido. Espera a Início e repete o goto até completar.
   await pc.waitForURL(/\/financas$/);
+  await expect(pc.getByRole('heading', { name: /^Olá/, level: 1 })).toBeVisible();
   await fecharBanner(pc);
   for (const [rota, nome, espera] of [
     ['/saude', 'hoje', 'Superior A'],
     ['/saude/dieta', 'dieta', '1.180 / 3.102 kcal'],
     ['/saude/peso', 'peso', 'meta 75 kg'],
   ] as const) {
-    await pc.goto(rota);
+    await expect(async () => {
+      await pc.goto(rota);
+    }).toPass();
     await expect(pc.getByText(espera).first()).toBeVisible();
     await fecharBanner(pc);
     await shot(pc, `${nome}-depois-1440.png`);
