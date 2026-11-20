@@ -2,10 +2,7 @@ import { filtrarPorModo, rotaInicial, type AppMode } from './app-mode';
 
 const ATALHOS = [
   { name: 'Treino', url: '/treinos', description: 'Registrar o treino de hoje' },
-  { name: 'Habitos', url: '/habitos', description: 'Marcar habitos de hoje' },
-  { name: 'Notas', url: '/notas', description: 'Abrir bloco de notas' },
   { name: 'Financas', url: '/financas', description: 'Ver financas do mes' },
-  { name: 'Agenda', url: '/agenda', description: 'Ver compromissos' },
 ];
 
 const ICONES = [192, 512].flatMap((tamanho) =>
@@ -22,13 +19,13 @@ export function buildManifest(mode: AppMode) {
   return {
     name: 'MeuDia - Assistente Pessoal',
     short_name: 'MeuDia',
-    description: 'Seu assistente pessoal de produtividade e saude. Treinos, habitos, notas, financas e mais.',
+    description: 'Seu assistente pessoal de financas e saude. Gastos, contas, metas, treinos e dieta.',
     start_url: rotaInicial(mode),
     display: 'standalone',
     orientation: 'portrait',
     background_color: '#050a16',
     theme_color: '#050a16',
-    categories: mode === 'financas' ? ['finance'] : ['health', 'fitness', 'productivity', 'finance'],
+    categories: mode === 'financas' ? ['finance'] : ['finance', 'health', 'fitness'],
     lang: 'pt-BR',
     icons: ICONES,
     screenshots: [],

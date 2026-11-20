@@ -9,12 +9,6 @@
       "autoPort": true
     },
     {
-      "name": "mobile",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@meudia/mobile", "dev"],
-      "port": 8081
-    },
-    {
       "name": "all",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev"],

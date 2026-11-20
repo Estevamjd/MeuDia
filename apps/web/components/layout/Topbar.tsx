@@ -1,26 +1,19 @@
 'use client';
 
 import { useRef } from 'react';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { clsx } from 'clsx';
 import { Menu, MessageCircle } from 'lucide-react';
-import { useAppMode } from '../AppModeProvider';
-import { tabsTopbar } from '../../lib/topbar';
 import { NavDrawer } from './NavDrawer';
 import { useMenuLateral } from '../../lib/menu-lateral';
 
 const PAGE_TITLES: Record<string, string> = {
-  '/inicio': '✦ MeuDia',
   '/saude': '🩺 Saúde',
   '/saude/dieta': '🩺 Saúde',
   '/saude/peso': '🩺 Saúde',
   '/treinos': '🏋️ Treino',
   '/treinos/plano': '🗓️ Plano de treino',
   '/refeicoes': '🥗 Dieta',
-  '/notas': '📝 Notas',
-  '/agenda': '📅 Agenda',
-  '/habitos': '✅ Hábitos',
   '/financas': '💰 Finanças',
   '/financas/contas': '🧾 Contas',
   '/financas/orcamento': '📊 Orçamento',
@@ -28,8 +21,6 @@ const PAGE_TITLES: Record<string, string> = {
   '/financas/metas': '🎯 Metas',
   '/financas/carteiras': '🏦 Bancos',
   '/financas/relatorio': 'Painel',
-  '/compras': '🛒 Compras',
-  '/veiculo': '🚗 Veículo',
   '/assinaturas': '💳 Assinaturas',
   '/configuracoes': '⚙️ Configurações',
 };
@@ -37,18 +28,17 @@ const PAGE_TITLES: Record<string, string> = {
 const DRAWER_ID = 'menu-lateral';
 
 interface TopbarProps {
-  /** Usado pelo "Sair" do menu lateral (modo Finanças). */
+  /** Usado pelo "Sair" do menu lateral; sem ele o topo mostra só o título da página. */
   onSignOut?: () => void;
-  /** Modo Finanças: ícone do assistente no header (abre o AgentPanel do layout). */
+  /** Ícone do assistente no header no celular (abre o AgentPanel do layout). */
   onOpenChat?: () => void;
   chatAberto?: boolean;
 }
 
 export function Topbar({ onSignOut, onOpenChat, chatAberto = false }: TopbarProps) {
   const pathname = usePathname();
-  const mode = useAppMode();
-  const tabs = tabsTopbar(mode);
-  const comDrawer = mode === 'financas' && !!onSignOut;
+  // Os dois modos usam a mesma navegação (☰ + barra de baixo) desde a faxina dos módulos legados.
+  const comDrawer = !!onSignOut;
   // Compartilhado com a aba "Mais" da BottomNav.
   const drawerAberto = useMenuLateral((m) => m.aberto);
   const abrirDrawer = useMenuLateral((m) => m.abrir);
@@ -70,10 +60,7 @@ export function Topbar({ onSignOut, onOpenChat, chatAberto = false }: TopbarProp
           paddingTop: 'env(safe-area-inset-top)',
         }}
       >
-        {/* Mobile (e desktop sem abas no modo): show page title */}
-        <div
-          className={clsx('flex min-w-0 items-center gap-2', comDrawer ? 'py-1.5' : 'py-3', tabs.length > 0 && 'md:hidden')}
-        >
+        <div className={clsx('flex min-w-0 items-center gap-2', comDrawer ? 'py-1.5' : 'py-3')}>
           {comDrawer && (
             <button
               ref={botaoMenuRef}
@@ -90,7 +77,7 @@ export function Topbar({ onSignOut, onOpenChat, chatAberto = false }: TopbarProp
             </button>
           )}
           {comDrawer ? (
-            // Modo Finanças: cada tela tem o próprio título grande; o topo só leva a marca (design v2).
+            // Cada tela tem o próprio título grande; o topo só leva a marca (design v2).
             <span className="lap-rotulo min-w-0 flex-1 truncate text-center text-muted">MeuDia</span>
           ) : (
             <span className="min-w-0 flex-1 truncate font-syne text-base font-bold text-text">{pageTitle}</span>
@@ -109,33 +96,6 @@ export function Topbar({ onSignOut, onOpenChat, chatAberto = false }: TopbarProp
           )}
         </div>
 
-        {/* Desktop: show tabs */}
-        <div className={clsx('hidden items-center gap-1', tabs.length > 0 && 'md:flex')}>
-          {tabs.map((tab) => {
-            const isActive = pathname === tab.href || pathname.startsWith(tab.href + '/');
-
-            const activeColors = {
-              accent: 'text-accent border-accent',
-              green:  'text-green border-green',
-              orange: 'text-orange border-orange',
-            };
-
-            return (
-              <Link
-                key={tab.href}
-                href={tab.href}
-                className={clsx(
-                  'px-[18px] py-4 text-[13px] font-medium border-b-2 transition-colors whitespace-nowrap',
-                  isActive
-                    ? activeColors[tab.color]
-                    : 'border-transparent text-muted hover:text-text',
-                )}
-              >
-                {tab.label}
-              </Link>
-            );
-          })}
-        </div>
       </nav>
 
       {comDrawer && onSignOut && (

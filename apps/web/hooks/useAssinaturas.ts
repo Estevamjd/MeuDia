@@ -1,6 +1,7 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutacao } from './useMutacao';
 import { assinaturasService } from '@meudia/api';
 import type { AssinaturaInsert } from '@meudia/shared';
 import { useAuth } from './useAuth';
@@ -31,7 +32,7 @@ export function useCriarAssinatura() {
   const { user } = useAuth();
   const invalidar = useInvalidarAssinaturas();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: (data: AssinaturaInsert) => assinaturasService.criarAssinatura(user!.id, data),
     onSettled: invalidar,
   });
@@ -41,7 +42,7 @@ export function useAtualizarAssinatura() {
   const { user } = useAuth();
   const invalidar = useInvalidarAssinaturas();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: ({ id, data }: { id: string; data: Partial<AssinaturaInsert> }) =>
       assinaturasService.atualizarAssinatura(user!.id, id, data),
     onSettled: invalidar,
@@ -52,7 +53,7 @@ export function useExcluirAssinatura() {
   const { user } = useAuth();
   const invalidar = useInvalidarAssinaturas();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: (id: string) => assinaturasService.excluirAssinatura(user!.id, id),
     onSettled: invalidar,
   });

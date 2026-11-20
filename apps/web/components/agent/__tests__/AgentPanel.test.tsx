@@ -48,26 +48,17 @@ const h = vi.hoisted(() => ({
   useProfile: vi.fn(),
   useTreinos: vi.fn(),
   useSessoesSemana: vi.fn(),
-  useHabitos: vi.fn(),
-  useRegistrosHoje: vi.fn(),
   useResumoMensal: vi.fn(),
-  useCriarCompromisso: vi.fn(),
 }));
 h.useNotificacoes.mockImplementation(() => ({ data: NOTIFICACOES, isLoading: false }));
 h.useMensagensChat.mockImplementation(() => ({ data: [], isLoading: false, refetch: refetchChat }));
 h.useContarNaoLidas.mockImplementation(() => ({ data: 2 }));
 h.useEnviarMensagem.mockImplementation(() => mutation);
-h.useCriarCompromisso.mockImplementation(() => mutation);
 h.useProfile.mockImplementation(() => ({ data: { nome: 'Ana', objetivo: null } }));
 h.useTreinos.mockImplementation(() => ({
   data: [0, 1, 2, 3, 4, 5, 6].map((d) => ({ id: `t${d}`, nome: 'Treino A', dia_semana: d, exercicios: [] })),
 }));
 h.useSessoesSemana.mockImplementation(() => ({ data: [] }));
-// Como o hook real: com `enabled: false` não há dados.
-h.useHabitos.mockImplementation((op?: { enabled?: boolean }) => ({
-  data: op?.enabled === false ? undefined : [{ id: 'h1', nome: 'Ler', ativo: true, frequencia: 'diario', dias_semana: [] }],
-}));
-h.useRegistrosHoje.mockImplementation((op?: { enabled?: boolean }) => ({ data: op?.enabled === false ? undefined : [] }));
 h.useResumoMensal.mockImplementation(() => ({ data: { saldo: 0, totalDespesas: 0, totalReceitas: 0 } }));
 
 vi.mock('../../../hooks/useAgente', () => ({
@@ -80,13 +71,10 @@ vi.mock('../../../hooks/useAgente', () => ({
   useContarNaoLidas: h.useContarNaoLidas,
 }));
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'u1', email: 'a@b.c' } }) }));
-vi.mock('../../../hooks/useAgenda', () => ({ useCriarCompromisso: h.useCriarCompromisso }));
 vi.mock('../../../hooks', () => ({
   useProfile: h.useProfile,
   useTreinos: h.useTreinos,
   useSessoesSemana: h.useSessoesSemana,
-  useHabitos: h.useHabitos,
-  useRegistrosHoje: h.useRegistrosHoje,
   useResumoMensal: h.useResumoMensal,
   // Card do gasto (IA): grava só pelo "Gastei".
   useCarteiras: () => ({ data: [{ id: 'c1', nome: 'Banco Teste', tipo: 'banco', arquivada: false }], isLoading: false }),
@@ -129,24 +117,12 @@ describe('AgentPanel: lazy-mount (P0.1, sem consulta nem polling em segundo plan
     for (const [nome, spy] of hooksDeDados) expect({ nome, chamadas: spy.mock.calls.length }).toEqual({ nome, chamadas: 0 });
   });
 
-  it('financas aberto: funciona, sem consultar Hábitos nem o contador (e sem polling)', () => {
-    renderPanel('financas');
+  it.each(['financas', 'padrao'] as const)('%s aberto: sem contador do servidor nem polling; consulta treino, chat e alertas', (mode) => {
+    renderPanel(mode);
     expect(screen.getByRole('dialog', { name: 'Agente MeuDia' })).toBeTruthy();
-    expect(h.useHabitos).toHaveBeenCalled();
-    for (const spy of [h.useHabitos, h.useRegistrosHoje]) {
-      for (const [op] of spy.mock.calls) expect(op).toEqual({ enabled: false });
-    }
-    for (const [op] of h.useContarNaoLidas.mock.calls) expect(op).toEqual({ enabled: false, poll: false });
-    // Treino segue: o módulo aparece para todos e o chat responde o treino de hoje.
-    expect(h.useTreinos).toHaveBeenCalled();
-  });
-
-  it('padrão aberto: Hábitos consultados; contador sem polling (o FAB já faz o de 60s)', () => {
-    renderPanel('padrao');
-    for (const spy of [h.useHabitos, h.useRegistrosHoje]) {
-      for (const [op] of spy.mock.calls) expect(op).toEqual({ enabled: true });
-    }
-    for (const [op] of h.useContarNaoLidas.mock.calls) expect(op).toEqual({ enabled: true, poll: false });
+    expect(h.useContarNaoLidas).not.toHaveBeenCalled();
+    // Treino segue: o chat responde o treino de hoje.
+    for (const spy of [h.useTreinos, h.useNotificacoes, h.useMensagensChat]) expect(spy).toHaveBeenCalled();
   });
 
   it('abre ao trocar isOpen para true e só então consulta', () => {
@@ -205,21 +181,15 @@ describe('AgentPanel por APP_MODE', () => {
     expect(marcarLida.mock.calls).toEqual([['n1']]);
   });
 
-  it('padrão: inalterado (abre no Resumo com treinos/hábitos e todas as notificações)', () => {
+  it('padrão: igual ao Finanças (Chat + Alertas, sem Resumo, sugestões de finanças, alertas só de finanças)', () => {
     renderPanel('padrao');
-    expect(screen.getByRole('button', { name: 'Resumo' }).className).toContain('text-accent');
-    expect(screen.getByText(/Treino A/)).toBeTruthy();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Chat' }));
-    expect(screen.getByText(/treinos, hábitos, agenda ou finanças/)).toBeTruthy();
-    expect(textoBotoes()).toEqual(expect.arrayContaining(['Treino: Treino A', '1 hábitos pendentes']));
-
+    expect(screen.queryByRole('button', { name: 'Resumo' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Chat' }).className).toContain('text-accent');
+    expect(textoBotoes()).toEqual(expect.arrayContaining(['Resumo financeiro', 'Ver contas', 'Ver orçamento']));
     const alertas = screen.getByRole('button', { name: /Alertas/ });
-    expect(alertas.textContent).toBe('Alertas2');
+    expect(alertas.textContent).toBe('Alertas1');
     fireEvent.click(alertas);
-    expect(screen.getByText('Aviso treino')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /Marcar todas como lidas/ }));
-    expect(marcarTodasLidas).toHaveBeenCalledOnce();
+    expect(screen.queryByText('Aviso treino')).toBeNull();
   });
 });
 

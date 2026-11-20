@@ -26,5 +26,5 @@ module.exports = {
     'react/prop-types': 'off',
     'no-console': ['warn', { allow: ['warn', 'error'] }],
   },
-  ignorePatterns: ['node_modules/', 'dist/', '.next/', '.expo/', '*.config.js', '*.config.ts'],
+  ignorePatterns: ['node_modules/', 'dist/', '.next/', '*.config.js', '*.config.ts'],
 };

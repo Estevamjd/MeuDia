@@ -14,7 +14,6 @@ export default defineConfig({
     alias: {
       '@meudia/shared': path.resolve(__dirname, 'packages/shared/src'),
       '@meudia/api': path.resolve(__dirname, 'packages/api/src'),
-      '@meudia/ai': path.resolve(__dirname, 'packages/ai/src'),
     },
   },
 });

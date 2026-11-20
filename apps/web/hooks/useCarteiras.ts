@@ -1,6 +1,7 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutacao } from './useMutacao';
 import { carteirasService } from '@meudia/api';
 import type { CarteiraInsert, Competencia, TipoCarteira } from '@meudia/shared';
 import { useAuth } from './useAuth';
@@ -64,7 +65,7 @@ export function useTransferencias() {
 export function useCriarCarteira() {
   const { user } = useAuth();
   const invalidar = useInvalidarSaldo();
-  return useMutation({
+  return useMutacao({
     mutationFn: (data: CarteiraInsert) => carteirasService.criarCarteira(requireUserId(user?.id), data),
     onSuccess: invalidar,
   });
@@ -80,7 +81,7 @@ export interface CarteiraPatch {
 export function useAtualizarCarteira() {
   const { user } = useAuth();
   const invalidar = useInvalidarSaldo();
-  return useMutation({
+  return useMutacao({
     mutationFn: ({ id, data }: { id: string; data: CarteiraPatch }) =>
       carteirasService.atualizarCarteira(requireUserId(user?.id), id, data),
     onSuccess: invalidar,
@@ -92,7 +93,7 @@ export function useExcluirCarteira() {
   const { user } = useAuth();
   const invalidar = useInvalidarSaldo();
   const queryClient = useQueryClient();
-  return useMutation({
+  return useMutacao({
     mutationFn: (id: string) => carteirasService.excluirCarteira(requireUserId(user?.id), id),
     onSuccess: () => {
       invalidar();
@@ -105,7 +106,7 @@ export function useExcluirCarteira() {
 export function useExcluirTransferencia() {
   const { user } = useAuth();
   const invalidar = useInvalidarSaldo();
-  return useMutation({
+  return useMutacao({
     mutationFn: (id: string) => carteirasService.excluirTransferencia(requireUserId(user?.id), id),
     onSuccess: invalidar,
   });
@@ -122,7 +123,7 @@ export interface GasteiInput {
 export function useGastei(hojeISO: string) {
   const { user } = useAuth();
   const invalidar = useInvalidarSaldo();
-  return useMutation({
+  return useMutacao({
     mutationFn: (data: GasteiInput) => carteirasService.gastei(requireUserId(user?.id), data, hojeISO),
     onSuccess: invalidar,
   });
@@ -138,7 +139,7 @@ export interface EntrouInput {
 export function useEntrouDinheiro(hojeISO: string) {
   const { user } = useAuth();
   const invalidar = useInvalidarSaldo();
-  return useMutation({
+  return useMutacao({
     mutationFn: (data: EntrouInput) => carteirasService.entrouDinheiro(requireUserId(user?.id), data, hojeISO),
     onSuccess: invalidar,
   });
@@ -154,7 +155,7 @@ export interface TransferirInput {
 export function useTransferir(hojeISO: string) {
   const { user } = useAuth();
   const invalidar = useInvalidarSaldo();
-  return useMutation({
+  return useMutacao({
     mutationFn: (data: TransferirInput) => carteirasService.transferir(requireUserId(user?.id), data, hojeISO),
     onSuccess: invalidar,
   });
@@ -163,7 +164,7 @@ export function useTransferir(hojeISO: string) {
 export function useCorrigirSaldo(hojeISO: string) {
   const { user } = useAuth();
   const invalidar = useInvalidarSaldo();
-  return useMutation({
+  return useMutacao({
     onMutate: (data: { carteira_id: string; saldo_real: number; chave?: string }) => { data.chave = crypto.randomUUID(); },
     mutationFn: (data: { carteira_id: string; saldo_real: number; chave?: string }) =>
       carteirasService.corrigirSaldo(requireUserId(user?.id), data, hojeISO, data.chave),
@@ -174,7 +175,7 @@ export function useCorrigirSaldo(hojeISO: string) {
 export function useReceberRenda() {
   const { user } = useAuth();
   const invalidar = useInvalidarSaldo();
-  return useMutation({
+  return useMutacao({
     mutationFn: ({ rendaId, competencia, carteira_id }: { rendaId: string; competencia: Competencia; carteira_id?: string | null }) =>
       carteirasService.receberRenda(requireUserId(user?.id), rendaId, { competencia, carteira_id }),
     // Também no erro: 409 "já recebida" (outra aba) precisa refletir o estado real.
@@ -185,7 +186,7 @@ export function useReceberRenda() {
 export function useDesfazerRecebimento() {
   const { user } = useAuth();
   const invalidar = useInvalidarSaldo();
-  return useMutation({
+  return useMutacao({
     mutationFn: ({ rendaId, competencia }: { rendaId: string; competencia: Competencia }) =>
       carteirasService.desfazerRecebimento(requireUserId(user?.id), rendaId, competencia),
     onSettled: invalidar,

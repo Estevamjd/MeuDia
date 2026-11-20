@@ -59,7 +59,7 @@ Configuração que só o painel do Supabase muda (o conector MCP não tem ferram
 ## Imagem standalone (P1.6)
 
 O build usa Node 22 Bookworm slim e pnpm 10.33.0 via Corepack; instala com lockfile congelado e filtro
-`@meudia/web...` (o manifesto mobile mantém o glob do workspace válido). O runner parte de outra imagem
+`@meudia/web...`. O runner parte de outra imagem
 Node limpa, roda como UID 1001 e contém somente `.next/standalone`, `.next/static` e `public` nos caminhos
 do monorepo. Inicia com `node apps/web/server.js`; não precisa de pnpm, fontes ou dependências de desenvolvimento.
 `APP_MODE` continua exclusivamente em runtime, nunca como ARG/ENV do estágio de build.

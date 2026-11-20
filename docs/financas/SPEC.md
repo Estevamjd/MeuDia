@@ -317,3 +317,7 @@ Reaproveita `packages/ai/src/agent` (`intencao.ts`, `chat.ts`). Em modo finança
 - Vercel Hobby: cron 1x/dia e com janela de execução imprecisa (pode atrasar); aceitável para lembretes diários.
 - Env vars (VAPID, `CRON_SECRET`, `APP_MODE`, `SUPABASE_SERVICE_ROLE_KEY`) criadas só pelo Estevam.
 - Dados reais dela nunca em prints/fixtures.
+
+### Chat web — decisão de stack (20/11/2026)
+
+WhatsApp e `/api/ia/chat` usam um único provedor: Anthropic Messages, Claude Haiku 4.5 (`lib/ia/provedor.ts`). `ANTHROPIC_API_KEY` fica somente no servidor; `IA_MODELO` é opcional, com fallback para `WHATSAPP_IA_MODELO` e `claude-haiku-4-5`. O chat força a ferramenta `propor_gasto`, com até 256 tokens; mantém confirmação do card, RLS e cota atômica da 016. Sem chave ou em falha, usa as regras. Esta decisão substitui a referência anterior ao Gemini/STACK-DECISION para o chat web.

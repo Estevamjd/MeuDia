@@ -1,19 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildManifest } from '../manifest';
+import { ROTAS_LEGADAS } from '../app-mode';
 import { GET as getWebmanifest } from '../../app/manifest.webmanifest/route';
 import { GET as getManifestJson } from '../../app/manifest.json/route';
 
 afterEach(() => vi.unstubAllEnvs());
 
-// /treinos saiu: Saúde e Treino aparece para todos (decisão do Estevam, 04/11/2026).
-const OCULTOS_NO_FINANCAS = ['/inicio', '/agenda', '/habitos', '/dieta', '/compras', '/medicamentos', '/notas', '/veiculo'];
+// Módulos legados removidos (20/11/2026): nenhum atalho aponta para eles, em nenhum modo.
+const OCULTOS_NO_FINANCAS: readonly string[] = ROTAS_LEGADAS;
 
 describe('buildManifest', () => {
-  it('modo padrão: igual ao antigo public/manifest.json', () => {
+  it('modo padrão: start_url /financas e só atalhos de módulos que existem', () => {
     const m = buildManifest('padrao');
-    expect(m.start_url).toBe('/inicio');
-    expect(m.shortcuts.map((s) => s.url)).toEqual(['/treinos', '/habitos', '/notas', '/financas', '/agenda']);
-    expect(m.categories).toEqual(['health', 'fitness', 'productivity', 'finance']);
+    expect(m.start_url).toBe('/financas');
+    expect(m.shortcuts.map((s) => s.url)).toEqual(['/treinos', '/financas']);
+    expect(m.categories).toEqual(['finance', 'health', 'fitness']);
     expect(m.icons).toHaveLength(4);
   });
 
@@ -39,10 +40,11 @@ describe.each([
     expect(m.shortcuts.map((s: { url: string }) => s.url)).toContain('/treinos');
   });
 
-  it('sem APP_MODE: manifest padrão (inclui /treinos)', async () => {
+  it('sem APP_MODE: manifest padrão (start_url /financas, inclui /treinos)', async () => {
     vi.stubEnv('APP_MODE', '');
     const m = await GET().json();
-    expect(m.start_url).toBe('/inicio');
+    expect(m.start_url).toBe('/financas');
+    for (const atalho of m.shortcuts) expect(OCULTOS_NO_FINANCAS).not.toContain(atalho.url);
     expect(m.shortcuts.map((s: { url: string }) => s.url)).toContain('/treinos');
   });
 });

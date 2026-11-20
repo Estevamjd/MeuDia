@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { AlertCircle, ChevronRight } from 'lucide-react';
 import { DIAS_SEMANA } from '@meudia/shared';
 import type { Exercicio } from '@meudia/shared';
-import { calcularDescansoSugerido } from '@meudia/ai';
+import { calcularDescansoSugerido } from '../../../../lib/treino-analise';
 
 import {
   useTreinos,

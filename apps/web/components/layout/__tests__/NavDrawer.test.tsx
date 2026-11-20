@@ -165,8 +165,8 @@ describe('Drawer do Topbar (modo finanças)', () => {
     expect(document.body.style.overflow).toBe('');
   });
 
-  it('modo padrão: sem hamburger (comportamento atual)', () => {
+  it('modo padrão: mesmo ☰ do modo Finanças (navegação única desde a faxina dos módulos legados)', () => {
     renderTopbar('padrao');
-    expect(screen.queryByRole('button', { name: 'Abrir menu' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Abrir menu' })).toBeTruthy();
   });
 });

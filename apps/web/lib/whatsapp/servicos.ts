@@ -6,6 +6,7 @@ export interface Extras {
   planejado?: number;
   gasto_mes?: number;
   conta_paga?: string;
+  conta_divergente?: { descricao: string; valor: number };
   valor_registrado?: number;
   conta_descricao?: string;
   conta_valor?: number;

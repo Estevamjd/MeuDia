@@ -1,6 +1,7 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutacao } from './useMutacao';
 import { agenteService } from '@meudia/api';
 import type {
   NotificacaoAgenteInsert,
@@ -55,7 +56,7 @@ export function useCriarNotificacao() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: (data: NotificacaoAgenteInsert) => {
       if (!user?.id) throw new Error('Usuário não autenticado');
       return agenteService.criarNotificacao(user.id, data);
@@ -71,26 +72,9 @@ export function useCriarNotificacao() {
 export function useMarcarNotificacaoLida() {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: (notificacaoId: string) =>
       agenteService.marcarNotificacaoLida(notificacaoId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notificacoes-agente'] });
-      queryClient.invalidateQueries({ queryKey: ['notificacoes-agente-nao-lidas'] });
-      queryClient.invalidateQueries({ queryKey: ['notificacoes-agente-count'] });
-    },
-  });
-}
-
-export function useMarcarTodasLidas() {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: () => {
-      if (!user?.id) throw new Error('Usuário não autenticado');
-      return agenteService.marcarTodasNotificacoesLidas(user.id);
-    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notificacoes-agente'] });
       queryClient.invalidateQueries({ queryKey: ['notificacoes-agente-nao-lidas'] });
@@ -102,7 +86,7 @@ export function useMarcarTodasLidas() {
 export function useDispensarNotificacao() {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: (notificacaoId: string) =>
       agenteService.dispensarNotificacao(notificacaoId),
     onSuccess: () => {
@@ -131,7 +115,7 @@ export function useEnviarMensagem() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: (data: MensagemChatInsert) => {
       if (!user?.id) throw new Error('Usuário não autenticado');
       return agenteService.enviarMensagem(user.id, data);
@@ -146,7 +130,7 @@ export function useLimparChat() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: () => {
       if (!user?.id) throw new Error('Usuário não autenticado');
       return agenteService.limparChat(user.id);
@@ -175,7 +159,7 @@ export function useAtualizarPreferencias() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: (data: PreferenciasAgenteUpdate) => {
       if (!user?.id) throw new Error('Usuário não autenticado');
       return agenteService.atualizarPreferencias(user.id, data);

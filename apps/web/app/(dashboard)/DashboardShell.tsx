@@ -11,13 +11,10 @@ import { useProfile } from '../../hooks/useProfile';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { InstallPrompt } from '../../components/ui/InstallPrompt';
 import { OfflineIndicator } from '../../components/ui/OfflineIndicator';
-import { useOfflineSync } from '../../hooks/useOfflineSync';
-import { handleOfflineAction } from '../../lib/offline-handlers';
 import { AgentFAB } from '../../components/agent/AgentFAB';
 import { AgentPanel } from '../../components/agent/AgentPanel';
 import { BottomNav } from '../../components/layout/BottomNav';
 import { VinculoPendente } from '../../components/whatsapp/VinculoPendente';
-import { useAppMode } from '../../components/AppModeProvider';
 import { deveRedirecionarOnboarding, precisaOnboarding } from '../../lib/onboarding';
 import { clsx } from 'clsx';
 
@@ -32,10 +29,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     isFetchedAfterMount,
   } = useProfile({ refetchOnMount: 'always' });
   const router = useRouter();
-  const { isOnline, isSyncing, pendingCount, lastSyncError, forceSync } =
-    useOfflineSync(handleOfflineAction);
   const [agentOpen, setAgentOpen] = useState(false);
-  const financas = useAppMode() === 'financas';
 
   // Redirect to onboarding if user hasn't completed it
   const redirecionarOnboarding = deveRedirecionarOnboarding({
@@ -87,44 +81,31 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <Sidebar onSignOut={signOut} userName={userName} onOpenAgent={() => setAgentOpen(true)} />
         </div>
 
-        <div className={clsx('relative z-10 flex flex-1 flex-col', financas && 'min-w-0')}>
-          <Topbar onSignOut={signOut} onOpenChat={financas ? () => setAgentOpen(true) : undefined} chatAberto={agentOpen} />
+        <div className="relative z-10 flex min-w-0 flex-1 flex-col">
+          <Topbar onSignOut={signOut} onOpenChat={() => setAgentOpen(true)} chatAberto={agentOpen} />
           <main
             className={clsx(
               'flex-1 overflow-y-auto p-8 md:pb-8',
-              // Modo Finanças: espaço da BottomNav (~53px, folga de 7px) + safe-area, ou o do banner de instalação enquanto ele
-              // aparece (`--reserva-banner`, InstallPrompt.tsx), para ele nunca cobrir botão; topo mais curto no celular para a Início caber
-              // em 390×844 sem rolar; sem overflow horizontal em 375px.
-              financas
-                ? 'min-w-0 overflow-x-hidden pb-[max(calc(3.75rem+env(safe-area-inset-bottom)),var(--reserva-banner,0px))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-2 md:p-8'
-                : 'pb-[max(6rem,var(--reserva-banner,0px))]',
+              // Espaço da BottomNav (~53px, folga de 7px) + safe-area, ou o do banner de instalação enquanto ele aparece
+              // (`--reserva-banner`, InstallPrompt.tsx), para ele nunca cobrir botão; topo mais curto no celular para a Início
+              // caber em 390×844 sem rolar; sem overflow horizontal em 375px. Igual nos dois modos (mesma navegação).
+              'min-w-0 overflow-x-hidden pb-[max(calc(3.75rem+env(safe-area-inset-bottom)),var(--reserva-banner,0px))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-2 md:p-8',
             )}
-            style={financas ? undefined : {
-              paddingLeft: 'max(2rem, env(safe-area-inset-left))',
-              paddingRight: 'max(2rem, env(safe-area-inset-right))',
-            }}
           >
             {children}
           </main>
         </div>
       </div>
 
-      {financas && <BottomNav />}
+      <BottomNav />
 
-      {/* Agente IA (no modo Finanças o ícone do header substitui o FAB no mobile).
+      {/* Agente IA (no celular o ícone do header substitui o FAB).
           O painel vai em portal no body com z-agente: fica acima de BottomNav/banner/modais em qualquer ordem. */}
-      <AgentFAB onClick={() => setAgentOpen(true)} className={financas ? 'hidden md:flex' : undefined} />
+      <AgentFAB onClick={() => setAgentOpen(true)} className="hidden md:flex" />
       <AgentPanel isOpen={agentOpen} onClose={() => setAgentOpen(false)} />
 
-      {!financas && <BottomNav />}
       <InstallPrompt />
-      <OfflineIndicator
-        isOnline={isOnline}
-        isSyncing={isSyncing}
-        pendingCount={pendingCount}
-        lastSyncError={lastSyncError}
-        onForceSync={forceSync}
-      />
+      <OfflineIndicator />
     </ToastProvider>
   );
 }

@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 
 static() {
   pnpm turbo run type-check
-  # Lint só onde já está limpo. ai/api/mobile têm dívida antiga (ver AGENTS.md, tabela de regras).
+  # Lint só onde já está limpo. api tem dívida antiga (ver AGENTS.md, tabela de regras).
   pnpm turbo run lint --filter=@meudia/web --filter=@meudia/shared
   pnpm test
 }
@@ -62,7 +62,8 @@ db() {
     "${q[@]}" -f tests/015_rpc_saldo_painel.sql >/dev/null
     "${q[@]}" -f tests/016_whatsapp_v2_saude.sql >/dev/null
     "${q[@]}" -f tests/017_parcelamento.sql >/dev/null
-    echo "ok: tests/005..017 (financas, carteiras, excluir_metas, saude_treino, origem_lancamento, treino_dieta_whatsapp, whatsapp_onboarding, whatsapp_amigo, whatsapp_lembretes, cofrinho, rpc_saldo_painel, whatsapp_v2_saude, parcelamento)"
+    "${q[@]}" -f tests/018_whatsapp_paguei_tolerancia.sql >/dev/null
+    echo "ok: tests/005..018 (financas, carteiras, excluir_metas, saude_treino, origem_lancamento, treino_dieta_whatsapp, whatsapp_onboarding, whatsapp_amigo, whatsapp_lembretes, cofrinho, rpc_saldo_painel, whatsapp_v2_saude, parcelamento, whatsapp_paguei_tolerancia)"
     bash tests/006_corrigir_saldo_concorrencia.sh
     bash tests/016_cota_concorrencia.sh
   )

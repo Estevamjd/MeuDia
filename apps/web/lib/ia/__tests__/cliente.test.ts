@@ -9,7 +9,7 @@ describe('deveConsultarIA', () => {
     expect(deveConsultarIA(texto)).toBe(true);
   });
 
-  it.each(['almoço 32 reais', 'uber 18,90', 'R$ 50 mercado', 'r$50 farmácia', 'mercado 120', 'café 7.50', 'pizza 45 conto', 'recebi 100', 'lanche 20 no banco teste'])(
+  it.each(['almoço 32 reais', 'uber 18,90', 'R$ 50 mercado', 'r$50 farmácia', 'mercado 120', 'café 7.50', 'pizza 45 conto', 'lanche 20 no banco teste'])(
     'relato sem verbo, com valor: %s consulta IA',
     (texto) => {
       expect(deveConsultarIA(texto)).toBe(true);
@@ -39,3 +39,5 @@ describe('deveConsultarIA', () => {
     expect(deveConsultarIA(texto)).toBe(false);
   });
 });
+
+it.each(['recebi 500 do freela', 'caiu o salário 3000', 'ganhei 50 da minha mãe', 'entrou 200 de pix', 'transferi 100 pra poupança', 'guardei 50 na meta', 'emprestei 30 pro joão', 'vendi 80 de bolo'])('%s não é gasto', (texto) => { expect(deveConsultarIA(texto)).toBe(false); });

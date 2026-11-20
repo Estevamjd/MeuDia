@@ -1,4 +1,4 @@
-import type { Refeicao, RefeicaoInsert, RegistroAgua, RegistroAguaInsert, RegistroPeso, RegistroPesoInsert } from '@meudia/shared';
+import type { Refeicao, RefeicaoInsert, RegistroPeso, RegistroPesoInsert } from '@meudia/shared';
 import { AppError } from '@meudia/shared';
 import { getSupabase } from './supabase';
 
@@ -50,47 +50,7 @@ export async function removeRefeicao(refeicaoId: string, userId: string): Promis
   if (error) throw new AppError(error.message, 'DB_ERROR');
 }
 
-// ── Registro de Água ──
-
-export async function findRegistroAguaByDate(userId: string, date: string): Promise<RegistroAgua | null> {
-  const { data, error } = await getSupabase()
-    .from('registros_agua')
-    .select('id, user_id, data, quantidade_ml, meta_ml, created_at, updated_at')
-    .eq('user_id', userId)
-    .eq('data', date)
-    .maybeSingle();
-
-  if (error) throw new AppError(error.message, 'DB_ERROR');
-  return (data as unknown) as RegistroAgua | null;
-}
-
-export async function upsertRegistroAgua(userId: string, input: RegistroAguaInsert & { data: string }): Promise<RegistroAgua> {
-  const { data, error } = await getSupabase()
-    .from('registros_agua')
-    .upsert(
-      { ...input, user_id: userId },
-      { onConflict: 'user_id,data' },
-    )
-    .select('id, user_id, data, quantidade_ml, meta_ml, created_at, updated_at')
-    .single();
-
-  if (error) throw new AppError(error.message, 'DB_ERROR');
-  return (data as unknown) as RegistroAgua;
-}
-
 // ── Registro de Peso ──
-
-export async function findRegistrosPeso(userId: string, limit = 30): Promise<RegistroPeso[]> {
-  const { data, error } = await getSupabase()
-    .from('registros_peso')
-    .select('id, user_id, peso, data, observacao')
-    .eq('user_id', userId)
-    .order('data', { ascending: false })
-    .limit(limit);
-
-  if (error) throw new AppError(error.message, 'DB_ERROR');
-  return (data as unknown) as RegistroPeso[];
-}
 
 /** Registros desde `desde` (inclusive), do mais antigo ao mais novo. Base do gráfico 7/30/90 e da média de 7 dias. */
 export async function findRegistrosPesoDesde(userId: string, desde: string): Promise<RegistroPeso[]> {
@@ -111,17 +71,6 @@ export async function upsertRegistroPeso(userId: string, input: RegistroPesoInse
   const { data, error } = await getSupabase()
     .from('registros_peso')
     .upsert({ ...input, user_id: userId }, { onConflict: 'user_id,data' })
-    .select('id, user_id, peso, data, observacao')
-    .single();
-
-  if (error) throw new AppError(error.message, 'DB_ERROR');
-  return (data as unknown) as RegistroPeso;
-}
-
-export async function createRegistroPeso(userId: string, input: RegistroPesoInsert): Promise<RegistroPeso> {
-  const { data, error } = await getSupabase()
-    .from('registros_peso')
-    .insert({ ...input, user_id: userId })
     .select('id, user_id, peso, data, observacao')
     .single();
 

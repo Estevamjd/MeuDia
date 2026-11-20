@@ -8,14 +8,6 @@ export type Objetivo = 'saude_geral' | 'emagrecer' | 'ganhar_massa' | 'condicion
 
 export type AIPrioridade = 'info' | 'aviso' | 'alerta';
 
-export interface OfflineAction {
-  id: string;
-  type: string;
-  payload: unknown;
-  timestamp: number;
-  tentativas: number;
-}
-
 export interface PaginatedResult<T> {
   data: T[];
   count: number;

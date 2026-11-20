@@ -1,9 +1,7 @@
-export { Card } from './Card';
 export { Badge } from './Badge';
 export { Button } from './Button';
 export { Input } from './Input';
 export { Select } from './Select';
-export { Textarea } from './Textarea';
 export { ProgressBar } from './ProgressBar';
 export { StatCard } from './StatCard';
 export { WeekProgress } from './WeekProgress';

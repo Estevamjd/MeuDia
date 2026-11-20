@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { ChevronRight, CreditCard, Eye, EyeOff, Plus } from 'lucide-react';
 import { competenciaDe, hojeSP } from '@meudia/shared';
 import { Button } from '../../../components/ui';
-import { AgentBannerAuto } from '../../../components/agent';
 import { useAppMode } from '../../../components/AppModeProvider';
 import { FinancasHomeView } from '../../../components/financas/home/FinancasHomeView';
 import { useFinancasHome } from '../../../components/financas/home/useFinancasHome';
@@ -58,7 +57,6 @@ export default function FinancasPage() {
       <LancamentoRapidoSheet open={folha !== null} inicial={folha ?? 'menu'} onClose={() => setFolha(null)} />
 
       {/* Agente IA (fala de todos os módulos; fora do modo Finanças) */}
-      {mode !== 'financas' && <AgentBannerAuto />}
 
       <FinancasHomeView {...home} />
 

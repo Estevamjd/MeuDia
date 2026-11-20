@@ -1,6 +1,7 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutacao } from './useMutacao';
 import { orcamentoService } from '@meudia/api';
 import type { OrcamentoCategoria, Renda } from '@meudia/shared';
 import { useAuth } from './useAuth';
@@ -56,7 +57,7 @@ export function useCriarRenda() {
   const { user } = useAuth();
   const invalidar = useInvalidarOrcamento();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: (data: RendaInput) => orcamentoService.criarRenda(requireUserId(user?.id), data),
     onSuccess: invalidar,
   });
@@ -66,7 +67,7 @@ export function useAtualizarRenda() {
   const { user } = useAuth();
   const invalidar = useInvalidarOrcamento();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: ({ id, data }: { id: string; data: Partial<RendaInput> }) =>
       orcamentoService.atualizarRenda(requireUserId(user?.id), id, data),
     onSuccess: invalidar,
@@ -77,7 +78,7 @@ export function useExcluirRenda() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: (id: string) => orcamentoService.excluirRenda(requireUserId(user?.id), id),
     onSuccess: () => {
       for (const queryKey of chavesAfetadasPorExclusaoDeRenda()) void queryClient.invalidateQueries({ queryKey });
@@ -100,7 +101,7 @@ export function useSalvarOrcamento() {
   const { user } = useAuth();
   const invalidar = useInvalidarOrcamento();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: (data: OrcamentoInput) => orcamentoService.salvarOrcamento(requireUserId(user?.id), data),
     onSuccess: invalidar,
   });
@@ -110,7 +111,7 @@ export function useExcluirOrcamento() {
   const { user } = useAuth();
   const invalidar = useInvalidarOrcamento();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: (id: string) => orcamentoService.excluirOrcamento(requireUserId(user?.id), id),
     onSuccess: invalidar,
   });

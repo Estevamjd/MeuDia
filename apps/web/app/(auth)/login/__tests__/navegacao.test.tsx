@@ -60,11 +60,11 @@ it.each(['rede', '429'])('login funciona se destinoAposAuth rejeitar: %s', async
   fireEvent.change(screen.getByLabelText('Senha'), { target: { value: 'senha1234' } });
   fireEvent.click(screen.getByRole('button', { name: 'Entrar' }));
   await waitFor(() => expect(mocks.auth.signInWithPassword).toHaveBeenCalledOnce());
-  await waitFor(() => expect(mocks.assign).toHaveBeenCalledWith('/inicio'));
+  await waitFor(() => expect(mocks.assign).toHaveBeenCalledWith('/financas'));
   expect(mocks.assign).toHaveBeenCalledOnce();
 });
 
-it('nova senha usa /inicio quando destinoAposAuth rejeita', async () => {
+it('nova senha usa /financas quando destinoAposAuth rejeita', async () => {
   mocks.home.mockRejectedValueOnce(new Error('429'));
   sessionStorage.setItem('meudia:recuperacao-senha', '1');
   navegador();
@@ -73,7 +73,7 @@ it('nova senha usa /inicio quando destinoAposAuth rejeita', async () => {
   fireEvent.change(screen.getByLabelText('Confirmar nova senha'), { target: { value: 'senhaNova123' } });
   fireEvent.click(screen.getByRole('button', { name: 'Salvar nova senha' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Ir para o MeuDia' }));
-  await waitFor(() => expect(mocks.assign).toHaveBeenCalledWith('/inicio'));
+  await waitFor(() => expect(mocks.assign).toHaveBeenCalledWith('/financas'));
   expect(mocks.assign).toHaveBeenCalledOnce();
 });
 
@@ -90,7 +90,7 @@ it('login limita a descoberta sem resposta a 2,5 segundos', async () => {
   await act(async () => { await vi.advanceTimersByTimeAsync(1); });
   expect(mocks.auth.signInWithPassword).toHaveBeenCalledOnce();
   expect(mocks.assign).toHaveBeenCalledOnce();
-  expect(mocks.assign).toHaveBeenCalledWith('/inicio');
+  expect(mocks.assign).toHaveBeenCalledWith('/financas');
   expect(screen.getByRole('button', { name: 'Entrar' }).hasAttribute('disabled')).toBe(false);
 });
 
@@ -110,7 +110,7 @@ it('nova senha limita a descoberta sem resposta e desabilita o botão enquanto e
   expect(mocks.assign).not.toHaveBeenCalled();
   await act(async () => { await vi.advanceTimersByTimeAsync(1); });
   expect(mocks.assign).toHaveBeenCalledOnce();
-  expect(mocks.assign).toHaveBeenCalledWith('/inicio');
+  expect(mocks.assign).toHaveBeenCalledWith('/financas');
   expect(desabilitadoDuranteEspera).toBe(true);
   expect(botao.hasAttribute('disabled')).toBe(false);
 });

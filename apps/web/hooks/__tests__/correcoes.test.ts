@@ -14,10 +14,10 @@ vi.mock('../../lib/supabase/client', () => ({ createClient: () => ({ auth: mocks
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock('@meudia/api', () => ({ setSupabaseClient: vi.fn(), financasService: {} }));
 vi.mock('../../components/AppModeProvider', () => ({ useVapidPublicKey: () => 'fixture' }));
-vi.mock('../../lib/offline-mutation', () => ({ withOfflineSupport: vi.fn() }));
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }),
   useMutation: (options: unknown) => options,
+  onlineManager: { isOnline: () => true },
 }));
 beforeEach(() => {
   vi.resetAllMocks();

@@ -17,14 +17,17 @@ const criar = (arquivos: Record<string, string>) => {
 };
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-describe('verificar-bundle-ia (chave do Gemini fora de .next/static)', () => {
-  const termos = termosProibidos({ GEMINI_API_KEY: CHAVE });
+describe('verificar-bundle-ia (chaves dos provedores fora de .next/static)', () => {
+  const termos = termosProibidos({ GEMINI_API_KEY: CHAVE, ANTHROPIC_API_KEY: 'anthropic-sintetica-bundle' });
 
   it('bundle limpo passa', () => {
     expect(procurarVazamentos(criar({ 'chunks/app.js': 'fetch("/api/ia/chat")' }), termos)).toEqual([]);
   });
 
   it.each([
+    ['env Anthropic', 'process.env.ANTHROPIC_API_KEY'],
+    ['host Anthropic', 'https://api.anthropic.com/v1/messages'],
+    ['valor Anthropic', 'anthropic-sintetica-bundle'],
     ['nome da env', 'process.env.GEMINI_API_KEY'],
     ['host da API', 'https://generativelanguage.googleapis.com/v1beta'],
     ['valor da chave', `headers:{"x-goog-api-key":"${CHAVE}"}`],
@@ -41,6 +44,6 @@ describe('verificar-bundle-ia (chave do Gemini fora de .next/static)', () => {
   });
 
   it('sem chave no ambiente procura só nome e host', () => {
-    expect(termosProibidos({}).map((t) => t.rotulo)).toEqual(['GEMINI_API_KEY', 'generativelanguage.googleapis.com']);
+    expect(termosProibidos({}).map((t) => t.rotulo)).toEqual(['ANTHROPIC_API_KEY', 'api.anthropic.com', 'GEMINI_API_KEY', 'generativelanguage']);
   });
 });

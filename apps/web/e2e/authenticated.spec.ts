@@ -13,12 +13,12 @@ test.describe('Dashboard (autenticado)', () => {
     await page.getByPlaceholder(/email/i).fill(TEST_EMAIL);
     await page.getByPlaceholder(/senha/i).fill(TEST_PASSWORD);
     await page.getByRole('button', { name: /entrar/i }).click();
-    await page.waitForURL(/\/inicio/, { timeout: 15000 });
+    await page.waitForURL(/\/financas/, { timeout: 15000 });
   }
 
   test('deve fazer login e exibir o dashboard', async ({ page }) => {
     await login(page);
-    await expect(page).toHaveURL(/\/inicio/);
+    await expect(page).toHaveURL(/\/financas/);
     // Deve exibir o nome do usuário ou saudação
     await expect(
       page.getByText(/olá|bem-vindo|início|dashboard/i).first()
@@ -32,32 +32,11 @@ test.describe('Dashboard (autenticado)', () => {
     await expect(page).toHaveURL(/\/treinos/);
   });
 
-  test('deve navegar para Hábitos', async ({ page }) => {
-    await login(page);
-    await page.getByRole('link', { name: /hábit/i }).first().click();
-    await page.waitForURL(/\/habitos/);
-    await expect(page).toHaveURL(/\/habitos/);
-  });
-
-  test('deve navegar para Dieta', async ({ page }) => {
-    await login(page);
-    await page.getByRole('link', { name: /dieta|nutrição/i }).first().click();
-    await page.waitForURL(/\/dieta/);
-    await expect(page).toHaveURL(/\/dieta/);
-  });
-
   test('deve navegar para Finanças', async ({ page }) => {
     await login(page);
     await page.getByRole('link', { name: /finanç/i }).first().click();
     await page.waitForURL(/\/financas/);
     await expect(page).toHaveURL(/\/financas/);
-  });
-
-  test('deve navegar para Agenda', async ({ page }) => {
-    await login(page);
-    await page.getByRole('link', { name: /agenda/i }).first().click();
-    await page.waitForURL(/\/agenda/);
-    await expect(page).toHaveURL(/\/agenda/);
   });
 
   test('sidebar deve fechar ao navegar no mobile', async ({ page }) => {

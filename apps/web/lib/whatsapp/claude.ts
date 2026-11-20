@@ -45,7 +45,7 @@ const FERRAMENTA = {
 } as const;
 
 export async function interpretarComClaude(mensagem: string, hojeISO: string, fetchFn: typeof fetch = fetch): Promise<Intencao | null> {
-  const r = await chamarClaude({ uso: 'interpretar', system: prompt(hojeISO), mensagem, maxTokens: 200, ferramenta: FERRAMENTA as never }, fetchFn);
+  const r = await chamarClaude({ uso: 'interpretar', temperatura: 0, system: prompt(hojeISO), mensagem, maxTokens: 200, ferramenta: FERRAMENTA as never }, fetchFn);
   if (r?.tipo !== 'ferramenta') return null;
   const parsed = saida.safeParse(r.input);
   if (!parsed.success) {

@@ -1,6 +1,7 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutacao } from './useMutacao';
 import { profileService } from '@meudia/api';
 import type { ProfileUpdate } from '@meudia/shared';
 import { profileKey } from '../lib/onboarding';
@@ -22,7 +23,7 @@ export function useUpdateProfile() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: (data: ProfileUpdate) => profileService.atualizarPerfil(user!.id, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: profileKey(user?.id) });

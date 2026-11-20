@@ -16,7 +16,6 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
-    "@meudia/ai": "workspace:*",
     "@meudia/api": "workspace:*",
     "@meudia/shared": "workspace:*",
     "@sentry/nextjs": "^8.42.0",

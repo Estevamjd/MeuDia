@@ -1,16 +1,9 @@
 export * as treinoService from './treino.service';
-export * as habitoService from './habito.service';
-export * as scoreService from './score.service';
 export * as profileService from './profile.service';
-export * as agendaService from './agenda.service';
 export * as financasService from './financas.service';
 export * as assinaturasService from './assinaturas.service';
-export * as comprasService from './compras.service';
-export * as veiculoService from './veiculo.service';
 export * as agenteService from './agente.service';
-export * as notasService from './notas.service';
 export * as dietaService from './dieta.service';
-export * as medicamentosService from './medicamentos.service';
 export * as contasPagarService from './contas-pagar.service';
 export * as orcamentoService from './orcamento.service';
 export * as carteirasService from './carteiras.service';

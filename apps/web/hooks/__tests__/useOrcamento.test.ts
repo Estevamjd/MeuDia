@@ -36,6 +36,7 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }),
   useQuery: (options: unknown) => options,
   useMutation: (options: unknown) => options,
+  onlineManager: { isOnline: () => true },
 }));
 
 interface QueryOpts { queryKey: unknown[]; queryFn: () => unknown; enabled: boolean }
@@ -103,9 +104,10 @@ it('excluir renda invalida os vínculos (recebimentos saem em cascata; o selo "R
   expect(chavesInvalidadas()).toContainEqual(['resumo-financeiro-mes']);
 });
 
-it('mutation sem sessão falha antes de chamar o serviço', () => {
+it('mutation sem sessão falha antes de chamar o serviço', async () => {
   mocks.user = null;
   const { result } = renderHook(() => useSalvarOrcamento() as unknown as MutationOpts<{ categoria: string; valor_planejado: number }>);
-  expect(() => result.current.mutationFn({ categoria: 'X', valor_planejado: 1 })).toThrow('Não autenticado');
+  // mutationFn passa por useMutacao (async): o erro chega como rejeição.
+  await expect(Promise.resolve().then(() => result.current.mutationFn({ categoria: 'X', valor_planejado: 1 }))).rejects.toThrow('Não autenticado');
   expect(mocks.salvarOrcamento).not.toHaveBeenCalled();
 });

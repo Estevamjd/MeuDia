@@ -63,7 +63,7 @@ describe('interpretarPorRegras', () => {
   });
 });
 
- describe('desfazer WhatsApp', () => {
+describe('desfazer WhatsApp', () => {
   it.each(['desfazer', 'desfaz', 'apaga o último', 'cancela o último', 'apagar último!', 'cancelar o último.', 'apaga o último registro', 'apagar o último', 'cancela o último gasto', 'desfaz o último', 'desfazer o último lançamento'])('%s', (texto) => {
     expect(interpretarPorRegras(texto, { hojeISO: '2026-11-20', horaSP: 12 })).toEqual({ tipo: 'desfazer' });
   });
@@ -71,4 +71,8 @@ describe('interpretarPorRegras', () => {
 
 it.each(['gastei 45 no mercado', 'almoço 32 reais', 'gastei 20 no último café', 'apaga o último registro de 50 reais'])('não desfaz ao receber %s', (texto) => {
   expect(ler(texto).tipo).not.toBe('desfazer');
+});
+
+it.each([['paguei 5 de luz', 5], ['paguei 120 de luz', 120], ['paguei 119,50 de luz', 119.5], ['paguei 118 de luz', 118], ['paguei a luz', null]])('%s preserva pagar e valor', (texto, valor) => {
+  expect(ler(String(texto))).toMatchObject({ tipo: 'gasto', pagar: true, valor, descricao: 'Luz' });
 });

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Plus, SkipForward } from 'lucide-react';
-import { obterDicaDescanso } from '@meudia/ai';
+import { obterDicaDescanso } from '../../lib/treino-analise';
 
 interface TimerDescansoProps {
   isOpen: boolean;

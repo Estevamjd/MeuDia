@@ -15,31 +15,6 @@ export interface NavSection {
   items: NavItem[];
 }
 
-const SECOES_PADRAO: NavSection[] = [
-  {
-    label: 'Geral',
-    items: [
-      { href: '/inicio', label: 'Início', emoji: '🏠' },
-      { href: '/notas', label: 'Notas', emoji: '📝' },
-      { href: '/agenda', label: 'Agenda', emoji: '📅' },
-      { href: '/financas', label: 'Finanças', emoji: '💸' },
-      { href: '/compras', label: 'Compras', emoji: '🛒' },
-      { href: '/habitos', label: 'Hábitos', emoji: '🔁' },
-      { href: '/veiculo', label: 'Veículo', emoji: '🚗' },
-      { href: '/assinaturas', label: 'Assinaturas', emoji: '💳' },
-    ],
-  },
-  {
-    label: 'Saúde',
-    items: [
-      { href: '/saude', label: 'Saúde', emoji: '🩺', colorClass: 'green' },
-      { href: '/treinos', label: 'Treinos', emoji: '🏋️', colorClass: 'orange' },
-      { href: '/dieta', label: 'Dieta', emoji: '🍽️', colorClass: 'green' },
-      { href: '/medicamentos', label: 'Medicamentos', emoji: '💊' },
-    ],
-  },
-];
-
 // Modo Finanças (IA de navegação 19/11/2026, docs/ia-navegacao.md): a barra de baixo tem as 4 áreas do dia
 // (Início · Treino · Dieta · Painel); o menu ☰ tem só o que NÃO está na barra, em grupos. Sem "Mais".
 const RESUMO_DO_MES: NavItem = { href: '/financas', label: 'Resumo do mês', emoji: '💸', exato: true };
@@ -76,14 +51,14 @@ const SECOES_DRAWER_FINANCAS: NavSection[] = [
   { label: 'Conta', items: [CONFIGURACOES] },
 ];
 
+/** Os dois modos têm a mesma navegação desde a faxina dos módulos legados (20/11/2026). */
 export function secoesSidebar(mode: AppMode): NavSection[] {
-  const secoes = mode === 'financas' ? SECOES_FINANCAS : SECOES_PADRAO;
-  return secoes
+  return SECOES_FINANCAS
     .map((secao) => ({ ...secao, items: filtrarPorModo(secao.items, mode) }))
     .filter((secao) => secao.items.length > 0);
 }
 
-/** Menu ☰ mobile (modo Finanças), em seções. */
+/** Menu ☰ mobile, em seções. */
 export function secoesDrawer(mode: AppMode): NavSection[] {
   return SECOES_DRAWER_FINANCAS
     .map((secao) => ({ ...secao, items: filtrarPorModo(secao.items, mode) }))
@@ -96,26 +71,6 @@ export function itensDrawer(mode: AppMode): NavItem[] {
 }
 
 // --- BottomNav ---
-
-export const BOTTOM_TABS_PADRAO: readonly NavItem[] = [
-  { href: '/inicio', label: 'Início', emoji: '🏠' },
-  { href: '/agenda', label: 'Agenda', emoji: '📅' },
-  { href: '/habitos', label: 'Hábitos', emoji: '✅' },
-  { href: '/financas', label: 'Finanças', emoji: '💰' },
-  { href: '/mais', label: 'Mais', emoji: '⋯' },
-];
-
-export const MENU_MAIS_PADRAO: readonly NavItem[] = [
-  { href: '/saude', label: 'Saúde', emoji: '🩺' },
-  { href: '/treinos', label: 'Treinos', emoji: '🏋️' },
-  { href: '/dieta', label: 'Dieta', emoji: '🍽️' },
-  { href: '/medicamentos', label: 'Medicamentos', emoji: '💊' },
-  { href: '/notas', label: 'Notas', emoji: '📝' },
-  { href: '/compras', label: 'Compras', emoji: '🛒' },
-  { href: '/veiculo', label: 'Veículo', emoji: '🚗' },
-  { href: '/assinaturas', label: 'Assinaturas', emoji: '💳' },
-  { href: '/configuracoes', label: 'Config', emoji: '⚙️' },
-];
 
 /** Abre o modal "Nova conta" que já existe em /financas/contas. */
 export const HREF_NOVA_CONTA = '/financas/contas?nova=1';

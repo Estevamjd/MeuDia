@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { isRotaVisivel } from '../app-mode';
+import { ROTAS_LEGADAS, isRotaLegada, isRotaVisivel } from '../app-mode';
 import {
-  BOTTOM_TABS_PADRAO,
   HREF_NOVA_CONTA,
-  MENU_MAIS_PADRAO,
   isNavAtivo,
   itensBottomFinancas,
   itensDrawer,
@@ -11,18 +9,14 @@ import {
   secoesSidebar,
 } from '../navegacao';
 
-// /treinos saiu: Saúde e Treino aparece para todos (decisão do Estevam, 04/11/2026). Dieta entra na F3.
-const OCULTOS_NO_FINANCAS = ['/inicio', '/agenda', '/habitos', '/dieta', '/compras', '/medicamentos', '/notas', '/veiculo'];
+// Módulos legados removidos (20/11/2026): nenhuma navegação aponta para eles, em nenhum modo.
+const OCULTOS_NO_FINANCAS = [...ROTAS_LEGADAS];
 const hrefs = (itens: readonly { href?: string }[]) => itens.flatMap((i) => (i.href ? [i.href.split('?')[0] ?? i.href] : []));
 
 describe('Sidebar por APP_MODE', () => {
-  it('modo padrão: inalterada (Geral + Saúde, todos os módulos)', () => {
-    const secoes = secoesSidebar('padrao');
-    expect(secoes.map((s) => s.label)).toEqual(['Geral', 'Saúde']);
-    expect(secoes.flatMap((s) => hrefs(s.items))).toEqual([
-      '/inicio', '/notas', '/agenda', '/financas', '/compras', '/habitos', '/veiculo', '/assinaturas',
-      '/saude', '/treinos', '/dieta', '/medicamentos',
-    ]);
+  it('modo padrão: mesma Sidebar do modo Finanças (os módulos legados saíram do código)', () => {
+    expect(secoesSidebar('padrao')).toEqual(secoesSidebar('financas'));
+    for (const href of secoesSidebar('padrao').flatMap((s) => hrefs(s.items))) expect(isRotaLegada(href)).toBe(false);
   });
 
   it('modo finanças: Finanças (com Painel) + Saúde (Treino, Dieta, Plano, Calorias e peso)', () => {
@@ -53,9 +47,12 @@ describe('BottomNav modo finanças', () => {
     expect(isNavAtivo('/treinos/plano', treino)).toBe(false);
   });
 
-  it('Saúde antiga fica no menu; a /dieta antiga não entra no modo Finanças', () => {
-    for (const r of ['/saude', '/saude/dieta', '/saude/peso', '/treinos/plano', '/refeicoes']) expect(isRotaVisivel(r, 'financas')).toBe(true);
-    expect(isRotaVisivel('/dieta', 'financas')).toBe(false);
+  it('Saúde fica no menu; a /dieta antiga é rota legada (redireciona), não a /saude/dieta', () => {
+    for (const r of ['/saude', '/saude/dieta', '/saude/peso', '/treinos/plano', '/refeicoes']) {
+      expect(isRotaVisivel(r, 'financas')).toBe(true);
+      expect(isRotaLegada(r)).toBe(false);
+    }
+    expect(isRotaLegada('/dieta')).toBe(true);
   });
 
   it('todas apontam para rotas visíveis; sem "+" nem Chat na barra', () => {
@@ -66,9 +63,9 @@ describe('BottomNav modo finanças', () => {
     expect(HREF_NOVA_CONTA).toBe('/financas/contas?nova=1');
   });
 
-  it('modo padrão continua com Início/Agenda/Hábitos/Finanças/Mais', () => {
-    expect(hrefs(BOTTOM_TABS_PADRAO)).toEqual(['/inicio', '/agenda', '/habitos', '/financas', '/mais']);
-    expect(hrefs(MENU_MAIS_PADRAO)).toContain('/treinos');
+  it('modo padrão usa a mesma barra e o mesmo ☰ (sem "Mais" nem rotas legadas)', () => {
+    expect(itensBottomFinancas('padrao')).toEqual(itensBottomFinancas('financas'));
+    expect(secoesDrawer('padrao')).toEqual(secoesDrawer('financas'));
   });
 });
 

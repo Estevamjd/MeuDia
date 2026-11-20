@@ -5,25 +5,19 @@ import { test, expect } from '@playwright/test';
  * Verifica que as rotas públicas funcionam e redirecionam corretamente.
  */
 test.describe('Navegação', () => {
-  test('raiz redireciona para login ou inicio', async ({ page }) => {
+  test('raiz redireciona para login ou finanças', async ({ page }) => {
     await page.goto('/');
-    await page.waitForURL(/\/(login|inicio)/, { timeout: 10000 });
+    await page.waitForURL(/\/(login|financas)/, { timeout: 10000 });
     const url = page.url();
-    expect(url).toMatch(/\/(login|inicio)/);
+    expect(url).toMatch(/\/(login|financas)/);
   });
 
   test('páginas do dashboard redirecionam para login', async ({ page }) => {
     const dashboardPages = [
-      '/inicio',
       '/treinos',
-      '/habitos',
-      '/dieta',
       '/financas',
-      '/agenda',
-      '/compras',
-      '/medicamentos',
-      '/veiculo',
       '/assinaturas',
+      '/saude',
     ];
 
     for (const path of dashboardPages) {

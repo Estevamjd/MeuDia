@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-// Falha se a chave do Gemini vazar para o bundle do cliente (.next/static).
-// Procura o nome da env, o host da API do Gemini e, se `GEMINI_API_KEY` estiver definida no processo
-// (build de teste com chave SINTÉTICA), o valor dela. Nunca imprime o valor: só o rótulo do termo.
+// Falha se nomes, hosts ou valores de chaves dos provedores vazarem para .next/static.
+// Valores nunca são impressos: só o rótulo do termo.
 // Uso (depois do `next build`): node scripts/verificar-bundle-ia.mjs [diretório .next/static]
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -10,11 +9,15 @@ import { fileURLToPath } from 'node:url';
 /** @returns {{ rotulo: string; valor: string }[]} */
 export function termosProibidos(env = process.env) {
   const termos = [
+    { rotulo: 'ANTHROPIC_API_KEY', valor: 'ANTHROPIC_API_KEY' },
+    { rotulo: 'api.anthropic.com', valor: 'api.anthropic.com' },
     { rotulo: 'GEMINI_API_KEY', valor: 'GEMINI_API_KEY' },
-    { rotulo: 'generativelanguage.googleapis.com', valor: 'generativelanguage.googleapis.com' },
+    { rotulo: 'generativelanguage', valor: 'generativelanguage' },
   ];
-  const chave = env.GEMINI_API_KEY?.trim();
-  if (chave) termos.push({ rotulo: 'valor de GEMINI_API_KEY', valor: chave });
+  for (const nome of ['ANTHROPIC_API_KEY', 'GEMINI_API_KEY']) {
+    const chave = env[nome];
+    if (chave?.trim()) termos.push({ rotulo: `valor de ${nome}`, valor: chave });
+  }
   return termos;
 }
 
@@ -53,6 +56,6 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     for (const a of achados) console.error(`bundle-ia FALHOU: "${a.rotulo}" em ${path.relative(process.cwd(), a.arquivo)}`);
     process.exit(1);
   }
-  const comValor = termos.some((t) => t.rotulo === 'valor de GEMINI_API_KEY');
+  const comValor = termos.some((t) => t.rotulo.startsWith('valor de '));
   console.log(`bundle-ia ok: ${termos.length} termos (${comValor ? 'com' : 'sem'} valor de chave) ausentes de ${path.relative(process.cwd(), dir) || dir}`);
 }

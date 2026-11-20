@@ -4,14 +4,13 @@ import { useSyncExternalStore } from 'react';
 import { Bot } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useContarNaoLidas } from '../../hooks/useAgente';
-import { useAppMode } from '../AppModeProvider';
 
 interface AgentFABProps {
   onClick: () => void;
   className?: string;
 }
 
-// Mesmo corte do `md:` do Tailwind: no modo Finanças o FAB só aparece daí para cima (`hidden md:flex`).
+// Mesmo corte do `md:` do Tailwind: o FAB só aparece daí para cima (`hidden md:flex`).
 const CONSULTA_MD = '(min-width: 768px)';
 
 function assinarMd(avisar: () => void) {
@@ -24,10 +23,9 @@ function assinarMd(avisar: () => void) {
 const lerMd = () => typeof window.matchMedia === 'function' && window.matchMedia(CONSULTA_MD).matches;
 
 export function AgentFAB({ onClick, className }: AgentFABProps) {
-  const financas = useAppMode() === 'financas';
   const telaMd = useSyncExternalStore(assinarMd, lerMd, () => false);
-  // Padrão: badge com polling de 60s. Finanças: sem polling e só consulta com o FAB visível (desktop).
-  const { data: count } = useContarNaoLidas(financas ? { enabled: telaMd, poll: false } : undefined);
+  // Sem polling e só consulta com o FAB visível (desktop), nos dois modos.
+  const { data: count } = useContarNaoLidas({ enabled: telaMd, poll: false });
   const alertas = count ?? 0;
 
   return (

@@ -1,6 +1,7 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutacao } from './useMutacao';
 import { dietaService } from '@meudia/api';
 import { somarDias } from '@meudia/shared';
 import { useAuth } from './useAuth';
@@ -24,7 +25,7 @@ export function usePesoRecente() {
 export function useRegistrarPesoDoDia() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  return useMutation({
+  return useMutacao({
     mutationFn: (dados: { peso: number; data?: string }) => {
       if (!user?.id) throw new Error('Nao autenticado');
       return dietaService.registrarPesoDoDia(user.id, { peso: dados.peso, data: dados.data ?? hojeLocal() });

@@ -7,7 +7,7 @@ vi.mock('../../../lib/supabase/server', () => ({ createServerSupabaseClient: vi.
 
 import { POST } from '../ia/chat/route';
 import { createServerSupabaseClient } from '../../../lib/supabase/server';
-import { MODELO_PADRAO } from '../../../lib/ia/gemini';
+import { MODELO_CLAUDE_PADRAO } from '../../../lib/ia/provedor';
 
 /** Chave SINTÉTICA (nunca uma real). */
 const CHAVE = 'chave-sintetica-teste-123';
@@ -55,9 +55,9 @@ function clienteFalso({ usuario = { id: A } as { id: string } | null, mensagensH
   return { client, chamadas };
 }
 
-/** Resposta do Gemini com a chamada `propor_gasto`. */
-const respostaGemini = (args: unknown) =>
-  new Response(JSON.stringify({ candidates: [{ content: { parts: [{ functionCall: { name: 'propor_gasto', args } }] } }] }), { status: 200 });
+/** Resposta do Claude com a chamada `propor_gasto`. */
+const respostaClaude = (args: unknown) =>
+  new Response(JSON.stringify({ content: [{ type: 'tool_use', name: 'propor_gasto', input: { e_gasto: true, ...(args as object) } }] }), { status: 200 });
 
 const pedir = (mensagem: unknown) =>
   POST(new Request('http://localhost/api/ia/chat', { method: 'POST', body: JSON.stringify({ mensagem }) }));
@@ -70,8 +70,9 @@ const hojeSPISO = () => {
 let fetchMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   vi.resetAllMocks();
-  vi.stubEnv('GEMINI_API_KEY', CHAVE);
-  vi.stubEnv('GEMINI_MODEL', '');
+  vi.stubEnv('ANTHROPIC_API_KEY', CHAVE);
+  vi.stubEnv('IA_MODELO', '');
+  vi.stubEnv('WHATSAPP_IA_MODELO', '');
   vi.stubEnv('IA_LIMITE_DIARIO', '');
   fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
@@ -94,7 +95,7 @@ describe('POST /api/ia/chat', () => {
   it('"gastei 45 no mercado" → card R$45,00 / Mercado / hoje, gravando só a mensagem no chat', async () => {
     const { client, chamadas } = clienteFalso();
     vi.mocked(createServerSupabaseClient).mockReturnValue(client as never);
-    fetchMock.mockResolvedValue(respostaGemini({ valor: 45, categoria: 'Mercado', descricao: 'Mercado' }));
+    fetchMock.mockResolvedValue(respostaClaude({ valor: 45, categoria: 'Mercado', descricao: 'Mercado' }));
 
     const res = await pedir('gastei 45 no mercado');
     expect(res.status).toBe(200);
@@ -111,53 +112,53 @@ describe('POST /api/ia/chat', () => {
     expect(chamadas.some((c) => c.tabela === 'transacoes')).toBe(false);
   });
 
-  it('chama o modelo padrão no servidor com function calling, thinking mínimo, poucos tokens e só o mínimo de dados', async () => {
+  it('chama o modelo padrão no servidor com tool_use, poucos tokens e só o mínimo de dados', async () => {
     const { client } = clienteFalso();
     vi.mocked(createServerSupabaseClient).mockReturnValue(client as never);
-    fetchMock.mockResolvedValue(respostaGemini({ valor: 45, categoria: 'Mercado' }));
+    fetchMock.mockResolvedValue(respostaClaude({ valor: 45, categoria: 'Mercado' }));
     await pedir('gastei 45 no mercado');
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe(`https://generativelanguage.googleapis.com/v1beta/models/${MODELO_PADRAO}:generateContent`);
-    expect(MODELO_PADRAO).toBe('gemini-3.1-flash-lite');
-    expect((init.headers as Record<string, string>)['x-goog-api-key']).toBe(CHAVE);
+    expect(url).toBe('https://api.anthropic.com/v1/messages');
+    expect(MODELO_CLAUDE_PADRAO).toBe('claude-haiku-4-5');
+    expect((init.headers as Record<string, string>)['x-api-key']).toBe(CHAVE);
     const corpo = String(init.body);
     expect(corpo).not.toContain(CHAVE); // chave só no header
     const req = JSON.parse(corpo);
-    expect(req.tools[0].functionDeclarations[0].name).toBe('propor_gasto');
-    expect(req.generationConfig.maxOutputTokens).toBeLessThanOrEqual(256);
-    expect(req.generationConfig.thinkingConfig).toEqual({ thinkingLevel: 'minimal' });
+    expect(req.tools[0].name).toBe('propor_gasto');
+    expect(req.tools[0].input_schema.properties.carteira.enum).toEqual([CARTEIRA_A.nome]);
+    expect(req.tools[0].input_schema.properties.categoria.enum).toContain('Mercado');
+    expect(req.max_tokens).toBeLessThanOrEqual(256);
+    expect(req.model).toBe(MODELO_CLAUDE_PADRAO);
+    expect(req.tool_choice).toEqual({ type: 'tool', name: 'propor_gasto' });
     // Mínimo: mensagem, categorias, nomes das carteiras, data. Nem id de carteira nem id do usuário.
-    expect(req.contents).toEqual([{ role: 'user', parts: [{ text: 'gastei 45 no mercado' }] }]);
-    const sistema = req.systemInstruction.parts[0].text as string;
+    expect(req.messages).toEqual([{ role: 'user', content: 'gastei 45 no mercado' }]);
+    const sistema = JSON.stringify(req.tools[0].input_schema);
     expect(sistema).toContain('Mercado');
     expect(sistema).toContain(CARTEIRA_A.nome);
     expect(corpo).not.toContain(CARTEIRA_A.id);
     expect(corpo).not.toContain(A);
   });
 
-  it('GEMINI_MODEL troca o modelo; 2.5 usa thinkingBudget 0', async () => {
-    vi.stubEnv('GEMINI_MODEL', 'gemini-2.5-flash-lite');
-    const { client } = clienteFalso();
-    vi.mocked(createServerSupabaseClient).mockReturnValue(client as never);
-    fetchMock.mockResolvedValue(respostaGemini({ valor: 45, categoria: 'Mercado' }));
+  it('IA_MODELO troca o modelo no servidor', async () => {
+    vi.stubEnv('IA_MODELO', 'claude-modelo-teste');
+    vi.mocked(createServerSupabaseClient).mockReturnValue(clienteFalso().client as never);
+    fetchMock.mockResolvedValue(respostaClaude({ valor: 45, categoria: 'Mercado' }));
     await pedir('gastei 45 no mercado');
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain('/models/gemini-2.5-flash-lite:generateContent');
-    expect(JSON.parse(String(init.body)).generationConfig.thinkingConfig).toEqual({ thinkingBudget: 0 });
+    expect(JSON.parse(String(fetchMock.mock.calls[0]![1].body)).model).toBe('claude-modelo-teste');
   });
 
   it('carteira citada pelo modelo vira o id da carteira do usuário', async () => {
     const { client } = clienteFalso();
     vi.mocked(createServerSupabaseClient).mockReturnValue(client as never);
-    fetchMock.mockResolvedValue(respostaGemini({ valor: 20, categoria: 'Comida', carteira: 'banco teste' }));
+    fetchMock.mockResolvedValue(respostaClaude({ valor: 20, categoria: 'Comida', carteira: 'banco teste' }));
     const json = await (await pedir('lanche 20 no banco teste')).json();
     expect(json.proposta.carteira_id).toBe(CARTEIRA_A.id);
   });
 
-  it('sem GEMINI_API_KEY → fallback, sem chamar o modelo', async () => {
-    vi.stubEnv('GEMINI_API_KEY', '');
+  it('sem ANTHROPIC_API_KEY → fallback, sem chamar o modelo', async () => {
+    vi.stubEnv('ANTHROPIC_API_KEY', '');
     const { client } = clienteFalso();
     vi.mocked(createServerSupabaseClient).mockReturnValue(client as never);
     expect(await (await pedir('gastei 45 no mercado')).json()).toEqual({ fallback: true, gravada: true });
@@ -170,10 +171,10 @@ describe('POST /api/ia/chat', () => {
     ['rede caída', () => fetchMock.mockRejectedValue(new TypeError('fetch failed'))],
     ['timeout', () => fetchMock.mockRejectedValue(new DOMException('timeout', 'TimeoutError'))],
     ['JSON quebrado', () => fetchMock.mockResolvedValue(new Response('não é json', { status: 200 }))],
-    ['modelo não chamou a função', () => fetchMock.mockResolvedValue(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'oi' }] } }] })))],
-    ['valor negativo', () => fetchMock.mockResolvedValue(respostaGemini({ valor: -45, categoria: 'Mercado' }))],
-    ['categoria inventada', () => fetchMock.mockResolvedValue(respostaGemini({ valor: 45, categoria: 'Cassino' }))],
-    ['data inválida', () => fetchMock.mockResolvedValue(respostaGemini({ valor: 45, categoria: 'Mercado', data: 'ontem' }))],
+    ['modelo não chamou a função', () => fetchMock.mockResolvedValue(new Response(JSON.stringify({ content: [{ type: 'text', text: 'oi' }] })))],
+    ['valor negativo', () => fetchMock.mockResolvedValue(respostaClaude({ valor: -45, categoria: 'Mercado' }))],
+    ['categoria inventada', () => fetchMock.mockResolvedValue(respostaClaude({ valor: 45, categoria: 'Cassino' }))],
+    ['data inválida', () => fetchMock.mockResolvedValue(respostaClaude({ valor: 45, categoria: 'Mercado', data: 'ontem' }))],
   ])('LLM com problema (%s) → fallback 200, preservando só a mensagem no chat', async (_nome, preparar) => {
     preparar();
     const { client, chamadas } = clienteFalso();
@@ -203,7 +204,7 @@ describe('POST /api/ia/chat', () => {
   });
 
   it('exatamente 50 ainda passa; IA_LIMITE_DIARIO muda o limite', async () => {
-    fetchMock.mockResolvedValue(respostaGemini({ valor: 45, categoria: 'Mercado' }));
+    fetchMock.mockResolvedValue(respostaClaude({ valor: 45, categoria: 'Mercado' }));
     vi.mocked(createServerSupabaseClient).mockReturnValue(clienteFalso({ mensagensHoje: 49 }).client as never);
     expect((await (await pedir('gastei 45 no mercado')).json()).fallback).toBe(false);
 
@@ -213,10 +214,10 @@ describe('POST /api/ia/chat', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('60 POSTs diretos consomem cota: só 50 chegam ao Gemini', async () => {
+  it('60 POSTs diretos consomem cota: só 50 chegam ao Claude', async () => {
     const { client, chamadas } = clienteFalso();
     vi.mocked(createServerSupabaseClient).mockReturnValue(client as never);
-    fetchMock.mockImplementation(() => Promise.resolve(respostaGemini({ valor: 45, categoria: 'Mercado' })));
+    fetchMock.mockImplementation(() => Promise.resolve(respostaClaude({ valor: 45, categoria: 'Mercado' })));
     const resultados = [];
     for (let i = 0; i < 60; i++) resultados.push(await (await pedir('gastei 45 no mercado')).json());
     expect(fetchMock).toHaveBeenCalledTimes(50);
@@ -229,7 +230,7 @@ describe('POST /api/ia/chat', () => {
     const { client, chamadas } = clienteFalso({ mensagensHoje: 100 });
     client.rpc.mockResolvedValue({ data: { permitido: true }, error: null, status: 200 });
     vi.mocked(createServerSupabaseClient).mockReturnValue(client as never);
-    fetchMock.mockResolvedValue(respostaGemini({ valor: 45, categoria: 'Mercado' }));
+    fetchMock.mockResolvedValue(respostaClaude({ valor: 45, categoria: 'Mercado' }));
     expect((await (await pedir('gastei 45 no mercado')).json()).fallback).toBe(false);
     expect(client.rpc).toHaveBeenCalledWith('ia_consumir_cota', { p_limite: 50 });
     expect(chamadas.filter((c) => c.tabela === 'chat_agente').map((c) => c.metodo)).toEqual(['insert']);
@@ -246,7 +247,7 @@ describe('POST /api/ia/chat', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('erro no insert → fallback sem contagem nem Gemini', async () => {
+  it('erro no insert → fallback sem contagem nem Claude', async () => {
     const { client, chamadas } = clienteFalso({ erroInsert: true });
     vi.mocked(createServerSupabaseClient).mockReturnValue(client as never);
     expect(await (await pedir('gastei 45 no mercado')).json()).toEqual({ fallback: true, gravada: false });
@@ -258,6 +259,25 @@ describe('POST /api/ia/chat', () => {
     vi.mocked(createServerSupabaseClient).mockReturnValue(clienteFalso({ erroContagem: true }).client as never);
     expect(await (await pedir('gastei 45 no mercado')).json()).toEqual({ fallback: true, gravada: true });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('exceção após gravar → fallback sem expor erro', async () => {
+    const { client } = clienteFalso();
+    client.rpc.mockResolvedValue({ data: { permitido: true }, error: null, status: 200 });
+    const from = client.from.getMockImplementation()!;
+    client.from.mockImplementation((tabela) => {
+      if (tabela === 'carteiras') throw new Error(`detalhe do provedor ${CHAVE} secreto`);
+      return from(tabela);
+    });
+    vi.mocked(createServerSupabaseClient).mockReturnValue(client as never);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      expect(await (await pedir('gastei 45 no mercado secreto')).json()).toEqual({ fallback: true, gravada: true });
+      expect(warn.mock.calls).toEqual([['[ia/chat] fallback motivo=excecao']]);
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('corpo inválido → 400', async () => {
@@ -285,18 +305,18 @@ describe('POST /api/ia/chat: log do motivo do fallback, sem segredo nem texto', 
     for (const l of logs()) {
       expect(l).not.toContain(CHAVE);
       expect(l).not.toContain('secreto');
-      expect(l).not.toContain('generativelanguage');
-      expect(l).not.toContain('detalhe do google');
+      expect(l).not.toContain('api.anthropic.com');
+      expect(l).not.toContain('detalhe do provedor');
     }
   };
   const usar = (opts?: Parameters<typeof clienteFalso>[0]) =>
     vi.mocked(createServerSupabaseClient).mockReturnValue(clienteFalso(opts).client as never);
-  /** Erro no formato do Google, com mensagem que ecoa a chave e o texto (não pode ir para o log). */
-  const erroGoogle = (status: number, codigo: string) =>
-    new Response(JSON.stringify({ error: { code: status, message: `detalhe do google ${CHAVE} ${MENSAGEM}`, status: codigo } }), { status });
+  /** Erro do provedor, com mensagem que ecoa a chave e o texto (não pode ir para o log). */
+  const erroProvedor = (status: number, codigo: string) =>
+    new Response(JSON.stringify({ error: { message: `detalhe do provedor ${CHAVE} ${MENSAGEM}`, type: codigo } }), { status });
 
   it('sem chave → motivo=sem_chave', async () => {
-    vi.stubEnv('GEMINI_API_KEY', '');
+    vi.stubEnv('ANTHROPIC_API_KEY', '');
     usar();
     await pedir(MENSAGEM);
     expect(warn).toHaveBeenCalledWith('[ia/chat] fallback motivo=sem_chave');
@@ -305,46 +325,47 @@ describe('POST /api/ia/chat: log do motivo do fallback, sem segredo nem texto', 
   });
 
   it.each([
-    [400, 'INVALID_ARGUMENT'],
-    [429, 'RESOURCE_EXHAUSTED'],
-  ])('HTTP %i do Gemini → só status e error.status', async (status, codigo) => {
+    [400, 'invalid_request_error'],
+    [429, 'rate_limit_error'],
+  ])('HTTP %i do Claude → só status técnico', async (status, codigo) => {
     usar();
-    fetchMock.mockResolvedValue(erroGoogle(status, codigo));
+    fetchMock.mockResolvedValue(erroProvedor(status, codigo));
     await pedir(MENSAGEM);
-    expect(warn.mock.calls).toEqual([[`[ia/chat] fallback motivo=gemini_http status=${status} erro=${codigo}`]]);
+    expect(warn.mock.calls).toEqual([[`[ia] uso=chat_gasto fallback status=${status}`], ['[ia/chat] fallback motivo=provedor_sem_proposta']]);
     semSegredo();
   });
 
-  it('HTTP sem JSON → só o status; error.status fora do formato é descartado', async () => {
+  it('HTTP sem JSON ou corpo com segredo → só o status', async () => {
     usar();
     fetchMock.mockResolvedValueOnce(new Response(`<html>${CHAVE}</html>`, { status: 500 }));
     await pedir(MENSAGEM);
     fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ error: { status: `x ${CHAVE}` } }), { status: 403 }));
     await pedir(MENSAGEM);
-    expect(warn.mock.calls).toEqual([['[ia/chat] fallback motivo=gemini_http status=500'], ['[ia/chat] fallback motivo=gemini_http status=403']]);
+    expect(warn.mock.calls).toEqual([['[ia] uso=chat_gasto fallback status=500'], ['[ia/chat] fallback motivo=provedor_sem_proposta'], ['[ia] uso=chat_gasto fallback status=403'], ['[ia/chat] fallback motivo=provedor_sem_proposta']]);
     semSegredo();
   });
 
   it.each([
     ['limite', () => usar({ mensagensHoje: 51 }), 'limite'],
     ['erro ao gravar', () => usar({ erroInsert: true }), 'erro_gravar'],
-    ['timeout', () => { usar(); fetchMock.mockRejectedValue(new DOMException(`timeout ${CHAVE}`, 'TimeoutError')); }, 'gemini_timeout'],
-    ['rede', () => { usar(); fetchMock.mockRejectedValue(new TypeError(`fetch failed ${CHAVE}`)); }, 'gemini_rede'],
-    ['JSON quebrado', () => { usar(); fetchMock.mockResolvedValue(new Response(`não é json ${CHAVE}`, { status: 200 })); }, 'excecao'],
-    ['sem função', () => { usar(); fetchMock.mockResolvedValue(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: MENSAGEM }] } }] }))); }, 'gemini_sem_funcao'],
-    ['proposta inválida', () => { usar(); fetchMock.mockResolvedValue(respostaGemini({ valor: -45, categoria: 'Mercado' })); }, 'proposta_invalida'],
+    ['timeout', () => { usar(); fetchMock.mockRejectedValue(new DOMException(`timeout ${CHAVE}`, 'TimeoutError')); }, 'provedor_sem_proposta'],
+    ['rede', () => { usar(); fetchMock.mockRejectedValue(new TypeError(`fetch failed ${CHAVE}`)); }, 'provedor_sem_proposta'],
+    ['JSON quebrado', () => { usar(); fetchMock.mockResolvedValue(new Response(`não é json ${CHAVE}`, { status: 200 })); }, 'provedor_sem_proposta'],
+    ['sem função', () => { usar(); fetchMock.mockResolvedValue(new Response(JSON.stringify({ content: [{ type: 'text', text: MENSAGEM }] }))); }, 'provedor_sem_proposta'],
+    ['proposta inválida', () => { usar(); fetchMock.mockResolvedValue(respostaClaude({ valor: -45, categoria: 'Mercado' })); }, 'proposta_invalida'],
   ])('%s → um motivo só', async (_nome, preparar, motivo) => {
     preparar();
     expect((await (await pedir(MENSAGEM)).json()).fallback).toBe(true);
-    expect(warn.mock.calls).toEqual([[`[ia/chat] fallback motivo=${motivo}`]]);
+    expect(warn.mock.calls).toContainEqual([`[ia/chat] fallback motivo=${motivo}`]);
+    expect(warn.mock.calls.filter(([l]) => String(l).startsWith('[ia/chat]'))).toHaveLength(1);
     semSegredo();
   });
 
   it('sucesso → [ia/chat] ok, sem warn', async () => {
     usar();
-    fetchMock.mockResolvedValue(respostaGemini({ valor: 45, categoria: 'Mercado', descricao: 'secreto' }));
+    fetchMock.mockResolvedValue(respostaClaude({ valor: 45, categoria: 'Mercado', descricao: 'secreto' }));
     expect((await (await pedir(MENSAGEM)).json()).fallback).toBe(false);
-    expect(info.mock.calls).toEqual([['[ia/chat] ok']]);
+    expect(info.mock.calls).toEqual([['[ia] uso=chat_gasto in=0 out=0 custo_usd=0.00000'], ['[ia/chat] ok']]);
     expect(warn).not.toHaveBeenCalled();
     semSegredo();
   });
@@ -368,15 +389,29 @@ describe('rotas e módulos de IA: sem service-role, chave só no servidor', () =
     }
   });
 
-  it('GEMINI_API_KEY só no módulo server-only da rota, nunca com NEXT_PUBLIC_', () => {
+  it('ANTHROPIC_API_KEY só na rota e no provedor server-only, nunca com NEXT_PUBLIC_', () => {
     for (const f of fontes) {
       const s = readFileSync(f, 'utf8');
-      expect(s, f).not.toContain('NEXT_PUBLIC_GEMINI');
-      if (s.includes('generativelanguage.googleapis.com')) expect(s.startsWith("import 'server-only';"), f).toBe(true);
+      expect(s, f).not.toContain('NEXT_PUBLIC_ANTHROPIC');
+      if (s.includes('api.anthropic.com')) expect(s.startsWith("import 'server-only';"), f).toBe(true);
     }
-    const comChave = fontes.filter((f) => readFileSync(f, 'utf8').includes('GEMINI_API_KEY'));
-    expect(comChave.map((f) => path.relative(raiz, f))).toEqual([path.join('lib', 'ia', 'gemini.ts')]);
-    const gemini = readFileSync(path.join(raiz, 'lib/ia/gemini.ts'), 'utf8');
-    expect(gemini.startsWith("import 'server-only';")).toBe(true);
+    const comChave = fontes.filter((f) => readFileSync(f, 'utf8').includes('ANTHROPIC_API_KEY'));
+    expect(comChave.map((f) => path.relative(raiz, f))).toEqual([path.join('app', 'api', 'ia', 'chat', 'route.ts'), path.join('lib', 'ia', 'provedor.ts')]);
+    const provedor = readFileSync(path.join(raiz, 'lib/ia/provedor.ts'), 'utf8');
+    expect(provedor.startsWith("import 'server-only';")).toBe(true);
   });
+});
+
+it.each(['recebi 500 do freela', 'caiu o salário 3000', 'ganhei 50 da minha mãe', 'entrou 200 de pix', 'transferi 100 pra poupança', 'guardei 50 na meta', 'emprestei 30 pro joão', 'vendi 80 de bolo'])('%s volta às regras quando não é gasto', async (texto) => {
+  const { client } = clienteFalso();
+  vi.mocked(createServerSupabaseClient).mockReturnValue(client as never);
+  fetchMock.mockResolvedValue(respostaClaude({ e_gasto: false, valor: 500, categoria: 'Outros' }));
+  expect(await (await pedir(texto)).json()).toEqual({ fallback: true, gravada: true });
+});
+
+it('não gasto pode omitir valor e categoria', async () => {
+  const { client } = clienteFalso();
+  vi.mocked(createServerSupabaseClient).mockReturnValue(client as never);
+  fetchMock.mockResolvedValue(respostaClaude({ e_gasto: false }));
+  expect(await (await pedir('recebi 500')).json()).toEqual({ fallback: true, gravada: true });
 });

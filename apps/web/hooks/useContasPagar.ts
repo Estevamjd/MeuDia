@@ -1,6 +1,7 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutacao } from './useMutacao';
 import { contasPagarRepository, contasPagarService } from '@meudia/api';
 import type { Competencia, ContaPagarInsert } from '@meudia/shared';
 import { useAuth } from './useAuth';
@@ -68,7 +69,7 @@ export function useCriarConta() {
   const { user } = useAuth();
   const invalidar = useInvalidarContas();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: (data: ContaPagarInsert) => contasPagarService.criarConta(requireUserId(user?.id), data),
     onSuccess: invalidar,
   });
@@ -78,7 +79,7 @@ export function useAtualizarConta() {
   const { user } = useAuth();
   const invalidar = useInvalidarContas();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: ({ id, data }: { id: string; data: Partial<ContaPagarInsert> }) =>
       contasPagarService.atualizarConta(requireUserId(user?.id), id, data),
     onSuccess: invalidar,
@@ -90,7 +91,7 @@ export function useDesativarConta() {
   const { user } = useAuth();
   const invalidar = useInvalidarContas();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: (id: string) => contasPagarService.desativarConta(requireUserId(user?.id), id),
     onSuccess: invalidar,
   });
@@ -110,7 +111,7 @@ export function usePagarConta() {
   const { user } = useAuth();
   const invalidar = useInvalidarPagamento();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: ({ contaId, competencia, pago_em, banco, carteira_id }: PagarVars) =>
       contasPagarService.pagarConta(requireUserId(user?.id), contaId, { competencia, pago_em, banco, carteira_id }),
     // Também no erro: 409 "já paga" (outra aba/aparelho) precisa refletir o estado real.
@@ -122,7 +123,7 @@ export function useDesfazerPagamento() {
   const { user } = useAuth();
   const invalidar = useInvalidarPagamento();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: ({ contaId, competencia }: PagamentoVars) =>
       contasPagarService.desfazerPagamento(requireUserId(user?.id), contaId, competencia),
     onSettled: (_data, _error, vars) => invalidar(vars),

@@ -1,113 +1,50 @@
-import type { AcaoRapida, MensagemChat, NotificacaoAgente, RespostaAgente, TipoIntencao } from '@meudia/shared';
-import { classificarIntencao } from '@meudia/ai';
-import { isRotaVisivel, type AppMode } from './app-mode';
+import type { AcaoRapida, MensagemChat, NotificacaoAgente } from '@meudia/shared';
+import { isRotaLegada } from './app-mode';
+import { mensagemModuloIndisponivel, SUGESTOES_ASSISTENTE, type ModuloIndisponivel } from './assistente/chat';
 
-/** Conteúdo do AgentPanel filtrado pelo APP_MODE (modo Finanças: finanças; a rota /treinos também é visível). */
+/**
+ * O que o AgentPanel mostra, igual nos dois modos. As respostas novas (lib/assistente) já não citam agenda,
+ * hábitos nem notas; o filtro daqui cuida do que veio do banco: mensagens antigas do chat (`chat_agente`) e
+ * notificações (`notificacoes_agente`) que ofereciam ações desses módulos ou de rotas que saíram do app.
+ */
 
-export type AbaAgente = 'resumo' | 'treino' | 'alertas';
+export type AbaAgente = 'treino' | 'alertas';
 
-/** Modo Finanças: sem a aba Resumo (treinos/hábitos) e abre direto no Chat. */
-export function abasAgente(mode: AppMode): AbaAgente[] {
-  return mode === 'financas' ? ['treino', 'alertas'] : ['resumo', 'treino', 'alertas'];
-}
+/** Chat (id histórico 'treino') e Alertas; a aba Resumo (treinos/hábitos) saiu com os módulos legados. */
+export const ABAS_AGENTE: readonly AbaAgente[] = ['treino', 'alertas'];
 
-export function abaInicialAgente(mode: AppMode): AbaAgente {
-  return mode === 'financas' ? 'treino' : 'resumo';
-}
+export const SUGESTOES_AGENTE: readonly AcaoRapida[] = SUGESTOES_ASSISTENTE;
 
-// Ações que dependem de módulos ocultos no modo Finanças.
-const ACOES_SO_PADRAO = new Set(['CRIAR_COMPROMISSO']);
-
-export function isAcaoPermitida(acao: Pick<AcaoRapida, 'acao' | 'payload'>, mode: AppMode): boolean {
-  if (mode === 'padrao') return true;
-  if (ACOES_SO_PADRAO.has(acao.acao)) return false;
+export function isAcaoPermitida(acao: Pick<AcaoRapida, 'acao' | 'payload'>): boolean {
+  if (acao.acao === 'CRIAR_COMPROMISSO') return false;
   if (acao.acao === 'NAVEGAR') {
     const rota = acao.payload?.rota;
-    return typeof rota === 'string' && isRotaVisivel(rota.split('?')[0] ?? rota, mode);
+    return typeof rota === 'string' && !isRotaLegada(rota);
   }
   return true;
 }
 
-export function filtrarAcoes(acoes: readonly AcaoRapida[] | null | undefined, mode: AppMode): AcaoRapida[] {
-  return (acoes ?? []).filter((a) => isAcaoPermitida(a, mode));
+export function filtrarAcoes(acoes: readonly AcaoRapida[] | null | undefined): AcaoRapida[] {
+  return (acoes ?? []).filter(isAcaoPermitida);
 }
 
-const SUGESTOES_FINANCAS: AcaoRapida[] = [
-  { label: 'Resumo financeiro', acao: 'COMANDO', payload: { comando: 'como estão minhas finanças?' } },
-  { label: 'Quanto gastei?', acao: 'COMANDO', payload: { comando: 'quanto gastei este mês?' } },
-  { label: 'Ver contas', acao: 'NAVEGAR', payload: { rota: '/financas/contas' } },
-  { label: 'Ver orçamento', acao: 'NAVEGAR', payload: { rota: '/financas/orcamento' } },
-];
-
-/** Sugestões iniciais do chat; no modo padrão mantém as do agente. */
-export function sugestoesAgente(mode: AppMode, padrao: () => AcaoRapida[]): AcaoRapida[] {
-  return mode === 'financas' ? SUGESTOES_FINANCAS : padrao();
+/** Só notificações de finanças (como no modo Finanças em produção), sem ações para rotas que saíram. */
+export function filtrarNotificacoes(notificacoes: readonly NotificacaoAgente[]): NotificacaoAgente[] {
+  return notificacoes.filter((n) => n.modulo === 'financas').map((n) => ({ ...n, acoes: filtrarAcoes(n.acoes) }));
 }
 
-/** Modo Finanças: só notificações do módulo finanças, e só com ações permitidas. */
-export function filtrarNotificacoes(notificacoes: readonly NotificacaoAgente[], mode: AppMode): NotificacaoAgente[] {
-  if (mode === 'padrao') return [...notificacoes];
-  return notificacoes
-    .filter((n) => n.modulo === 'financas')
-    .map((n) => ({ ...n, acoes: filtrarAcoes(n.acoes, mode) }));
-}
-
-// Treinos saiu desta lista: o módulo aparece no modo Finanças (decisão do Estevam, 04/11/2026; C6 do PLANO-F1).
-type ModuloOculto = 'agenda' | 'habitos' | 'notas';
-
-const MODULO_POR_INTENCAO: Partial<Record<TipoIntencao, ModuloOculto>> = {
-  CRIAR_COMPROMISSO: 'agenda',
-  CONSULTA_AGENDA: 'agenda',
-  CRIAR_HABITO: 'habitos',
-  CONSULTA_HABITOS: 'habitos',
-  CONSULTA_NOTAS: 'notas',
-};
-
-const NOME_MODULO: Record<ModuloOculto, string> = {
-  agenda: 'A agenda (compromissos e tarefas) não está disponível',
-  habitos: 'Hábitos não estão disponíveis',
-  notas: 'Notas não estão disponíveis',
-};
-
-export function mensagemModuloIndisponivel(modulo: ModuloOculto): string {
-  return `${NOME_MODULO[modulo]} no modo Finanças. Aqui eu anoto gastos e acompanho suas contas: tente "gastei 45 no mercado".`;
-}
-
-/** Módulo oculto que uma ação removida pelo filtro levaria (Criar Agora, Abrir Agenda...). */
-function moduloDaAcao(acao: AcaoRapida): ModuloOculto | null {
+/** Módulo que uma ação antiga levaria (Criar Agora, Abrir Agenda, Ver Hábitos...). */
+function moduloDaAcao(acao: AcaoRapida): ModuloIndisponivel | null {
   if (acao.acao === 'CRIAR_COMPROMISSO') return 'agenda';
   const rota = acao.acao === 'NAVEGAR' ? acao.payload?.rota : undefined;
   if (typeof rota !== 'string') return null;
-  const modulo = (['agenda', 'habitos', 'notas'] as const).find((m) => rota === `/${m}` || rota.startsWith(`/${m}/`) || rota.startsWith(`/${m}?`));
-  return modulo ?? null;
+  return (['agenda', 'habitos', 'notas'] as const).find((m) => isRotaLegada(rota) && rota.startsWith(`/${m}`)) ?? null;
 }
 
-function moduloRemovido(acoes: readonly AcaoRapida[] | null | undefined, mode: AppMode): ModuloOculto | null {
-  for (const a of acoes ?? []) {
-    if (isAcaoPermitida(a, mode)) continue;
-    const modulo = moduloDaAcao(a);
-    if (modulo) return modulo;
-  }
-  return null;
-}
-
-/**
- * Modo Finanças: o motor de regras (pacote ai) não conhece o modo. Se o texto pede agenda/tarefa,
- * hábito ou notas, ou se a resposta oferecia ação desses módulos, a resposta diz que o módulo não está
- * disponível, em vez de citar um botão ("Criar Agora", "Abrir Agenda") que o filtro tirou.
- */
-export function adaptarRespostaAoModo(texto: string, resposta: RespostaAgente, mode: AppMode): RespostaAgente {
-  if (mode === 'padrao') return resposta;
-  const modulo = MODULO_POR_INTENCAO[classificarIntencao(texto).tipo] ?? moduloRemovido(resposta.acoes, mode);
-  if (!modulo) return { ...resposta, acoes: filtrarAcoes(resposta.acoes, mode) };
-  return { mensagem: mensagemModuloIndisponivel(modulo), acoes: SUGESTOES_FINANCAS.slice(0, 2) };
-}
-
-/** Remove das mensagens do chat ações que levariam a módulos ocultos (e reescreve o texto que as citava). */
-export function filtrarMensagens(mensagens: readonly MensagemChat[], mode: AppMode): MensagemChat[] {
-  if (mode === 'padrao') return [...mensagens];
+/** Mensagem antiga do agente que oferecia agenda/hábitos/notas é reescrita (sem botão órfão no texto). */
+export function filtrarMensagens(mensagens: readonly MensagemChat[]): MensagemChat[] {
   return mensagens.map((m) => {
-    const modulo = m.role === 'agent' ? moduloRemovido(m.acoes, mode) : null;
-    return { ...m, ...(modulo ? { conteudo: mensagemModuloIndisponivel(modulo) } : {}), acoes: filtrarAcoes(m.acoes, mode) };
+    const modulo = m.role === 'agent' ? ((m.acoes ?? []).map(moduloDaAcao).find(Boolean) ?? null) : null;
+    return { ...m, ...(modulo ? { conteudo: mensagemModuloIndisponivel(modulo) } : {}), acoes: filtrarAcoes(m.acoes) };
   });
 }

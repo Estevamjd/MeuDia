@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { hojeSP } from '@meudia/shared';
 import { createServerSupabaseClient } from '../../../../lib/supabase/server';
-import { chamarProporGasto, chaveGemini, logFallback } from '../../../../lib/ia/gemini';
+import { chamarClaude } from '../../../../lib/ia/provedor';
 import { passouDoLimite } from '../../../../lib/ia/limite';
 import { CATEGORIAS_IA, validarProposta, type RespostaIaChat } from '../../../../lib/ia/proposta';
 
@@ -10,9 +10,9 @@ export const dynamic = 'force-dynamic';
 
 const corpoSchema = z.object({ mensagem: z.string().trim().min(1).max(500) });
 
-/** Fallbacks do próprio Gemini (`chamarProporGasto` → null) já são logados lá, com o motivo. */
+/** Motivos fixos, sem conteúdo do usuário ou do provedor. */
 const fallback = (gravada: boolean, motivo?: string) => {
-  if (motivo) logFallback(motivo);
+  if (motivo) console.warn(`[ia/chat] fallback motivo=${motivo}`);
   return NextResponse.json({ fallback: true, gravada } satisfies RespostaIaChat, { headers: { 'Cache-Control': 'no-store' } });
 };
 
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
 
     gravada = true;
 
-    const chave = chaveGemini();
+    const chave = process.env.ANTHROPIC_API_KEY?.trim();
     if (!chave) return fallback(gravada, 'sem_chave');
 
     if (await passouDoLimite(client, user.id)) return fallback(gravada, 'limite');
@@ -54,11 +54,34 @@ export async function POST(req: Request) {
     const ativas = (carteiras ?? []) as { id: string; nome: string }[];
 
     const hojeISO = hojeSP();
-    const args = await chamarProporGasto(
-      { mensagem: corpo.data.mensagem, categorias: CATEGORIAS_IA, carteiras: ativas.map((c) => c.nome), hojeISO },
-      chave,
-    );
-    if (args === null) return fallback(gravada);
+    const respostaModelo = await chamarClaude({
+      uso: 'chat_gasto',
+      mensagem: corpo.data.mensagem,
+      maxTokens: 256,
+      temperatura: 0,
+      system: `Você ajuda a anotar gastos em reais (pt-BR). Hoje é ${hojeISO} (America/Sao_Paulo). Preencha somente o card do gasto relatado; não grava nada. Marque e_gasto=false para receitas, transferências, dinheiro guardado, empréstimos, vendas ou qualquer mensagem que não relate uma despesa. Não invente valores: quando e_gasto=false, valor pode ser 0 ou omitido.`,
+      ferramenta: {
+        name: 'propor_gasto',
+        description: 'Preenche o card de um gasto para confirmação posterior.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            e_gasto: { type: 'boolean', description: 'True somente para uma despesa relatada.' },
+            valor: { type: 'number', description: 'Valor positivo em reais.' },
+            categoria: { type: 'string', enum: CATEGORIAS_IA },
+            descricao: { type: 'string', description: 'Descrição curta.' },
+            data: { type: 'string', description: `AAAA-MM-DD; sem data explícita use ${hojeISO}.` },
+            carteira: { type: 'string', ...(ativas.length ? { enum: ativas.map((c) => c.nome) } : {}) },
+          },
+          required: ['e_gasto'],
+        },
+      },
+    });
+    if (!respostaModelo || respostaModelo.tipo !== 'ferramenta') return fallback(gravada, 'provedor_sem_proposta');
+    const args = respostaModelo.input;
+    const classificacao = z.object({ e_gasto: z.boolean() }).safeParse(args);
+    if (!classificacao.success) return fallback(gravada, 'proposta_invalida');
+    if (!classificacao.data.e_gasto) return fallback(gravada, 'nao_gasto');
 
     const proposta = validarProposta(args, { categorias: CATEGORIAS_IA, carteiras: ativas, hojeISO });
     if (!proposta) return fallback(gravada, 'proposta_invalida');

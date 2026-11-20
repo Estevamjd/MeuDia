@@ -69,7 +69,7 @@ function Conteudo() {
               <MessageCircle className="mx-auto text-green" size={32} aria-hidden="true" />
               <p className="text-base text-text">WhatsApp ligado! 🎉</p>
               <p className="text-sm text-muted">Agora é só mandar no WhatsApp: “gastei 30 no uber”, “treinei peito 40min”.</p>
-              <Link href="/inicio" className="block rounded-xl bg-accent px-5 py-3 font-medium text-accent-fg">
+              <Link href="/financas" className="block rounded-xl bg-accent px-5 py-3 font-medium text-accent-fg">
                 Abrir o painel
               </Link>
             </div>
@@ -82,7 +82,7 @@ function Conteudo() {
           {typeof estado === 'object' && (
             <div className="space-y-4">
               <p className="text-sm text-red" role="alert">{estado.erro}</p>
-              <Link href="/inicio" className="block text-sm text-accent hover:underline">Ir para o painel</Link>
+              <Link href="/financas" className="block text-sm text-accent hover:underline">Ir para o painel</Link>
             </div>
           )}
         </section>

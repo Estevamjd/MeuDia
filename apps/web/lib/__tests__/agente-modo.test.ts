@@ -1,123 +1,122 @@
 import { describe, expect, it } from 'vitest';
-import type { AcaoRapida, ContextoUsuario, MensagemChat } from '@meudia/shared';
-import { processarMensagem } from '@meudia/ai';
-import {
-  abaInicialAgente,
-  abasAgente,
-  adaptarRespostaAoModo,
-  filtrarAcoes,
-  filtrarMensagens,
-  isAcaoPermitida,
-  sugestoesAgente,
-} from '../agente-modo';
+import type { AcaoRapida, MensagemChat, NotificacaoAgente } from '@meudia/shared';
+import { ABAS_AGENTE, SUGESTOES_AGENTE, filtrarAcoes, filtrarMensagens, filtrarNotificacoes, isAcaoPermitida } from '../agente-modo';
+import { processarMensagem, type ContextoAssistente } from '../assistente/chat';
 
 const ACOES: AcaoRapida[] = [
   { label: 'Finanças', acao: 'NAVEGAR', payload: { rota: '/financas' } },
   { label: 'Contas', acao: 'NAVEGAR', payload: { rota: '/financas/contas?nova=1' } },
   { label: 'Treinos', acao: 'NAVEGAR', payload: { rota: '/treinos' } },
   { label: 'Agenda', acao: 'CRIAR_COMPROMISSO', payload: { titulo: 'x', data_inicio: 'y' } },
+  { label: 'Hábitos', acao: 'NAVEGAR', payload: { rota: '/habitos' } },
   { label: 'Pergunta', acao: 'COMANDO', payload: { comando: 'saldo' } },
 ];
 
-describe('agente-modo', () => {
-  it('abas e aba inicial por modo', () => {
-    expect(abasAgente('financas')).toEqual(['treino', 'alertas']);
-    expect(abaInicialAgente('financas')).toBe('treino');
-    expect(abasAgente('padrao')).toEqual(['resumo', 'treino', 'alertas']);
-    expect(abaInicialAgente('padrao')).toBe('resumo');
+describe('agente-modo (igual nos dois modos)', () => {
+  it('abas: Chat e Alertas, sem Resumo', () => {
+    expect(ABAS_AGENTE).toEqual(['treino', 'alertas']);
   });
 
-  it('financas: remove navegação para módulos ocultos e criar compromisso; Treinos fica (aparece para todos)', () => {
-    expect(filtrarAcoes(ACOES, 'financas').map((a) => a.label)).toEqual(['Finanças', 'Contas', 'Treinos', 'Pergunta']);
-    expect(isAcaoPermitida({ acao: 'NAVEGAR' }, 'financas')).toBe(false);
-    expect(filtrarAcoes(ACOES, 'padrao')).toEqual(ACOES);
+  it('remove criar compromisso e navegação para rotas legadas; Treinos fica', () => {
+    expect(filtrarAcoes(ACOES).map((a) => a.label)).toEqual(['Finanças', 'Contas', 'Treinos', 'Pergunta']);
+    expect(isAcaoPermitida({ acao: 'NAVEGAR' })).toBe(false);
   });
 
-  it('sugestões: financas só navega para rotas visíveis; padrão usa as do agente', () => {
-    const fin = sugestoesAgente('financas', () => ACOES);
-    expect(filtrarAcoes(fin, 'financas')).toEqual(fin);
-    expect(sugestoesAgente('padrao', () => ACOES)).toBe(ACOES);
+  it('sugestões só navegam para rotas que existem', () => {
+    expect(filtrarAcoes(SUGESTOES_AGENTE)).toEqual(SUGESTOES_AGENTE);
   });
 
-  it('mensagens do chat perdem ações ocultas só no modo financas', () => {
-    const msg = { id: 'm', role: 'agent', conteudo: 'oi', acoes: ACOES } as MensagemChat;
-    expect(filtrarMensagens([msg], 'financas')[0]!.acoes).toHaveLength(4);
-    expect(filtrarMensagens([msg], 'padrao')[0]!.acoes).toHaveLength(5);
+  it('mensagens antigas do chat perdem ações de módulos removidos', () => {
+    const msg = { id: 'm', role: 'agent', conteudo: 'oi', acoes: [ACOES[0]!, ACOES[2]!, ACOES[5]!] } as MensagemChat;
+    expect(filtrarMensagens([msg])[0]).toEqual(msg);
   });
 
-  it('mensagem antiga que oferecia "Criar Agora" é reescrita no modo financas (sem botão órfão)', () => {
+  it('mensagem antiga que oferecia "Criar Agora" é reescrita (sem botão órfão)', () => {
     const msg = { id: 'm', role: 'agent', conteudo: 'Clique em "Criar Agora" para confirmar.', acoes: [ACOES[3]!] } as MensagemChat;
-    const [fin] = filtrarMensagens([msg], 'financas');
-    expect(fin!.conteudo).toMatch(/agenda .*não está disponível no modo Finanças/);
-    expect(fin!.conteudo).not.toContain('Criar Agora');
-    expect(fin!.acoes).toEqual([]);
-    expect(filtrarMensagens([msg], 'padrao')[0]!.conteudo).toBe(msg.conteudo);
+    const [r] = filtrarMensagens([msg]);
+    expect(r!.conteudo).toMatch(/agenda .*não está disponível/);
+    expect(r!.conteudo).not.toContain('Criar Agora');
+    expect(r!.acoes).toEqual([]);
+  });
+
+  it('mensagem antiga com "Ver Hábitos" vira o aviso de hábitos; mensagem do usuário não muda', () => {
+    const agente = { id: 'a', role: 'agent', conteudo: '3/5 hábitos', acoes: [ACOES[4]!] } as MensagemChat;
+    const usuario = { id: 'u', role: 'user', conteudo: 'meus hábitos', acoes: null } as unknown as MensagemChat;
+    const [a, u] = filtrarMensagens([agente, usuario]);
+    expect(a!.conteudo).toMatch(/Hábitos não estão disponíveis/);
+    expect(u!.conteudo).toBe('meus hábitos');
+  });
+
+  it('notificações: só as de finanças, sem ações para rotas legadas', () => {
+    const n = (modulo: string, acoes: AcaoRapida[] = []) => ({ id: modulo, modulo, lida: false, acoes }) as unknown as NotificacaoAgente;
+    const r = filtrarNotificacoes([n('financas', [ACOES[0]!, ACOES[4]!]), n('habitos'), n('agenda')]);
+    expect(r.map((x) => x.modulo)).toEqual(['financas']);
+    expect(r[0]!.acoes?.map((a) => a.label)).toEqual(['Finanças']);
   });
 });
 
-describe('adaptarRespostaAoModo (motor de regras real)', () => {
-  const contexto: ContextoUsuario = {
-    userId: 'u1',
+describe('respostas locais (lib/assistente) não oferecem módulos removidos', () => {
+  const contexto: ContextoAssistente = {
     nome: 'Ana',
-    objetivo: null,
     horaAtual: 10,
-    diaSemana: 6,
     treinoHoje: null,
     sessoesSemana: 0,
     metaTreinosSemana: 0,
-    habitosTotal: 0,
-    habitosConcluidos: 0,
-    habitosPendentes: [],
-    percentualHabitos: 0,
-    compromissosHoje: 0,
-    proximoCompromisso: null,
     saldoMes: 100,
     despesasMes: 50,
     receitasMes: 150,
-    streakAtual: 0,
-    scoreHoje: 0,
   };
-  const responder = (texto: string, mode: 'financas' | 'padrao') => adaptarRespostaAoModo(texto, processarMensagem(texto, contexto), mode);
 
-  it('agenda com título e data: o pacote ai oferece o botão sem citar o nome no texto', () => {
-    const r = processarMensagem('marcar reunião dia 15 às 10h', contexto);
-    expect(r.acoes?.map((a) => a.acao)).toContain('CRIAR_COMPROMISSO');
-    expect(r.mensagem).not.toContain('Criar Agora');
-  });
-
-  it.each(['marcar reunião dia 15 às 10h', 'Adicione uma tarefa: comprar pão amanhã às 9h', 'o que tenho amanhã', 'criar compromisso'])(
-    'financas: "%s" diz que a agenda não está disponível, sem ação de agenda',
+  it.each(['marcar reunião dia 15 às 10h', 'Adicione uma tarefa: comprar pão amanhã às 9h', 'o que tenho amanhã', 'criar compromisso', 'agenda treino para segunda'])(
+    '"%s" diz que a agenda não está disponível, sem ação de agenda',
     (texto) => {
-      const r = responder(texto, 'financas');
+      const r = processarMensagem(texto, contexto);
       expect(r.mensagem).toMatch(/agenda \(compromissos e tarefas\) não está disponível no modo Finanças/);
       expect(r.mensagem).not.toContain('Criar Agora');
-      expect(r.acoes?.some((a) => a.acao === 'CRIAR_COMPROMISSO' || a.payload?.rota === '/agenda')).toBe(false);
-      expect(filtrarAcoes(r.acoes, 'financas')).toEqual(r.acoes);
+      expect(filtrarAcoes(r.acoes)).toEqual(r.acoes);
     },
   );
 
-  it.each(['cria um treino de peito', 'qual meu treino de hoje'])('financas: "%s" responde como no modo padrão (Treinos aparece para todos)', (texto) => {
-    const r = responder(texto, 'financas');
+  it.each(['cria um treino de peito', 'qual meu treino de hoje'])('"%s" responde sobre treino (sem aviso de indisponível)', (texto) => {
+    const r = processarMensagem(texto, contexto);
     expect(r.mensagem).not.toMatch(/não está disponível|não estão disponíveis/);
-    expect(r.mensagem).toBe(processarMensagem(texto, contexto).mensagem);
+    expect(r.mensagem).toMatch(/[Tt]reino|descanso/);
+  });
+
+  it('"cria um treino de peito" leva para Treinos', () => {
+    const r = processarMensagem('cria um treino de peito', contexto);
+    expect(r.mensagem).toBe('Para criar um treino de peito (nível intermediário), vá até a página de Treinos e use o botão de adicionar.');
+    expect(r.acoes).toEqual([{ label: 'Ir para Treinos', acao: 'NAVEGAR', payload: { rota: '/treinos' } }]);
   });
 
   it.each([
     ['criar hábito de ler', /Hábitos não estão disponíveis/],
+    ['como estão meus hábitos?', /Hábitos não estão disponíveis/],
     ['abrir minhas notas', /Notas não estão disponíveis/],
-  ])('financas: "%s" avisa o módulo indisponível', (texto, esperado) => {
-    expect(responder(texto, 'financas').mensagem).toMatch(esperado);
+  ])('"%s" avisa o módulo indisponível', (texto, esperado) => {
+    expect(processarMensagem(texto, contexto).mensagem).toMatch(esperado);
   });
 
-  it('padrão mantém a resposta e o botão de criar', () => {
-    const texto = 'marcar reunião dia 15 às 10h';
-    expect(responder(texto, 'padrao')).toEqual(processarMensagem(texto, contexto));
-    expect(responder(texto, 'padrao').acoes?.map((a) => a.label)).toContain('Criar Agora');
+  it('finanças: resumo do mês e ações que existem', () => {
+    const r = processarMensagem('como estão minhas finanças?', contexto);
+    expect(r.mensagem).toBe('Saldo do mês: R$ 100.00. Gastos em 33% da receita.');
+    expect(filtrarAcoes(r.acoes)).toEqual(r.acoes);
   });
 
-  it('financas: resposta de finanças segue igual (só filtra ações ocultas)', () => {
-    const texto = 'como estão minhas finanças?';
-    const r = responder(texto, 'financas');
-    expect(r.mensagem).toBe(processarMensagem(texto, contexto).mensagem);
+  it.each(['oi', 'resumo do dia', 'blablabla', 'quero ver a rotina', 'gastei 45 no mercado', 'recebi 100'])(
+    '"%s": nenhuma ação para rota legada',
+    (texto) => {
+      const r = processarMensagem(texto, contexto);
+      expect(filtrarAcoes(r.acoes)).toEqual(r.acoes ?? []);
+      expect(r.mensagem).not.toMatch(/[Hh]ábitos —|Agenda —/);
+    },
+  );
+
+  it('continuação: "gasto" depois de "gasto ou receita?" registra despesa', () => {
+    const historico = [
+      { role: 'user', conteudo: 'mercado 50' },
+      { role: 'agent', conteudo: 'Valor: R$ 50. É um gasto ou receita?' },
+    ];
+    expect(processarMensagem('gasto', contexto, historico).mensagem).toMatch(/Para registrar uma transação/);
   });
 });

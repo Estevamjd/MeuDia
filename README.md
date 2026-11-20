@@ -1,17 +1,15 @@
 # MeuDia
 
-Assistente pessoal de produtividade e saúde criado para centralizar rotina, hábitos, treinos, finanças, agenda e lembretes em uma experiência web e mobile.
+Assistente pessoal de finanças e saúde: gastos, contas, metas, assinaturas, treinos, dieta e lembretes, num PWA web mobile-first e pelo WhatsApp.
 
-O projeto usa um monorepo com aplicação web em Next.js, aplicativo mobile em Expo/React Native e pacotes compartilhados para API, banco de dados, regras de IA e utilitários de domínio.
+O projeto usa um monorepo com a aplicação web em Next.js e pacotes compartilhados para API, banco de dados e utilitários de domínio.
 
 ## Principais recursos
 
 - Autenticação e sincronização de dados com Supabase.
 - Aplicação web instalável como PWA.
-- Aplicativo mobile com Expo Router.
-- Módulos para treinos, hábitos, dieta, medicamentos, agenda, finanças e notificações.
-- Motor de regras para gerar alertas, saudações, dicas e resumos diários.
-- Análises de consistência, descanso sugerido, carga de treino e finanças mensais.
+- Módulos de Finanças, Assinaturas, Saúde (Hoje, Dieta, Peso), Treinos (rápido e Plano), Refeições, Configurações e WhatsApp.
+- Assistente no app: regras locais (`apps/web/lib/assistente`) e IA só para lançar gasto (`/api/ia/chat`).
 - Estado local e consultas assíncronas com Zustand e TanStack Query.
 - Formulários tipados com React Hook Form e Zod.
 - Observabilidade preparada com Sentry.
@@ -21,11 +19,9 @@ O projeto usa um monorepo com aplicação web em Next.js, aplicativo mobile em E
 
 ```text
 apps/
-├── web/       # Next.js App Router, PWA, dashboards e rotas web
-└── mobile/    # Expo/React Native com navegação por Expo Router
+└── web/       # Next.js App Router, PWA, dashboards e rotas web
 
 packages/
-├── ai/        # Regras, classificação de intenções, análises e geradores
 ├── api/       # Camada compartilhada de acesso e contratos de API
 ├── database/  # Configurações e utilitários relacionados ao banco
 └── shared/    # Tipos, constantes e funções reutilizáveis
@@ -37,11 +33,10 @@ packages/
 | --- | --- |
 | Monorepo | pnpm, Turborepo, TypeScript |
 | Web | Next.js 14, React 18, Tailwind CSS |
-| Mobile | Expo 52, React Native 0.76, NativeWind |
 | Dados | Supabase, PostgreSQL |
 | Estado e dados | Zustand, TanStack Query |
 | Formulários | React Hook Form, Zod |
-| Gráficos | Recharts, Victory Native |
+| Gráficos | Recharts |
 | Qualidade | Vitest, Playwright, ESLint, Prettier |
 | Observabilidade | Sentry |
 
@@ -62,12 +57,6 @@ pnpm dev
 
 ```bash
 pnpm --filter @meudia/web dev
-```
-
-### Mobile
-
-```bash
-pnpm --filter @meudia/mobile dev
 ```
 
 ## Variáveis de ambiente

@@ -22,7 +22,7 @@ test.describe('Autenticação', () => {
   });
 
   test('deve redirecionar para login quando não autenticado', async ({ page }) => {
-    await page.goto('/inicio');
+    await page.goto('/financas');
     // Deve redirecionar para login
     await page.waitForURL(/\/login/, { timeout: 10000 });
     await expect(page).toHaveURL(/\/login/);

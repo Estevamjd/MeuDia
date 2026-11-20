@@ -9,8 +9,7 @@
     "paths": {
       "@/*": ["./src/*"],
       "@meudia/shared": ["../../packages/shared/src"],
-      "@meudia/api": ["../../packages/api/src"],
-      "@meudia/ai": ["../../packages/ai/src"]
+      "@meudia/api": ["../../packages/api/src"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

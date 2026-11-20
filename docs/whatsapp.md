@@ -219,7 +219,7 @@ Variáveis do app (`/docker/meudia/.env` no VPS):
 | `WHATSAPP_LEMBRETES_ATIVOS` | `true` | Interruptor global dos lembretes proativos |
 | `WHATSAPP_LEMBRETES_SEGREDO` | definido | Bearer que o n8n usa para chamar `/api/whatsapp/lembretes` |
 | `ANTHROPIC_API_KEY` | definido | Claude Haiku 4.5: onboarding, persona e frases que as regras não entendem |
-| `WHATSAPP_IA_MODELO` | (padrão `claude-haiku-4-5`) | Opcional |
+| `IA_MODELO` | (padrão `claude-haiku-4-5`) | Opcional; provedor único Anthropic Messages para WhatsApp e chat web. Na ausência, aceita `WHATSAPP_IA_MODELO` por compatibilidade. |
 
 ## 5. Passo final (Estevam): só chip, QR e números
 
@@ -328,3 +328,11 @@ Custo: ~US$ 0,0006 por lembrete, no máx. 2 por pessoa por dia.
 
 - Resumo do mês sob pedido ("como está meu mês?"), usando o mesmo cartão do Relatório.
 - API oficial (Cloud API) se o volume crescer: sem risco de banimento, mas com custo por conversa.
+
+### Conciliação de contas (20/11/2026)
+
+Com a 018, “paguei 5 de luz” para Luz de R$ 120 registra um gasto separado e mantém a conta pendente. Só concilia com diferença de até 1% (mínimo R$ 0,01). “paguei a luz” sem valor paga pelo valor cadastrado. Nomes ambíguos não conciliam nem geram aviso de divergência.
+
+Na divergência de valor, o bot confirma o gasto separado e avisa que a conta continua pendente. Só sugere “paguei <nome>” quando a frase volta corretamente pelo parser; nomes com números ou datas recebem a orientação Contas a vencer → Paguei. Se o gasto já era a conta, mande “desfazer” em até 30 minutos antes de marcar paga para evitar duplicidade.
+
+Logs do provedor usam o prefixo `[ia]` com `uso=` (inclusive WhatsApp); ajuste os filtros de custo para esse prefixo. `custo_usd` só aparece no Haiku padrão; outros modelos registram tokens.

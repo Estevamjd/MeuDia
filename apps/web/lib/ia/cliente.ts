@@ -1,4 +1,4 @@
-import { classificarIntencao } from '@meudia/ai';
+import { classificarIntencao } from '../assistente/intencao';
 import type { PropostaGasto, RespostaIaChat } from './proposta';
 
 const TIMEOUT_MS = 10_000;
@@ -17,6 +17,7 @@ const VALOR_MONETARIO = /r\$\s*\d|\d\s*(?:reais|real|contos?|pilas?)\b|\d[.,]\d{
  */
 const NAO_GASTO = new RegExp(
   [
+    /\b(?:recebi|ganhei|caiu|entrou|transferi|guardei|vendi|emprestei|me devem)\b/,
     /\b(?:tarefa|lembr|agend|marc(?:a|ar|ue)\b|reuniao|compromisso|evento|treino|treinar|academia|exercicio|habito|rotina)/,
     /\bas \d|\b\d{1,2}(?::\d{2}|h\d{0,2})\b|\bdia \d/,
     /\d\s*(?:hs?|horas?|min|minutos?|km|kg|l|litros?|ml|paginas?|vezes|x|dias?|semanas?|meses|anos?|copos?|passos|series|reps?|%)(?:\s|$|[.,!])/,

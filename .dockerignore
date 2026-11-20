@@ -8,8 +8,6 @@
 **/playwright-report
 **/test-results
 **/*.tsbuildinfo
-apps/mobile/**
-!apps/mobile/package.json
 apps/web/e2e
 apps/web/e2e/artifacts
 **/.env

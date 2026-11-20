@@ -4,7 +4,6 @@ export type {
   DiaSemana,
   Objetivo,
   AIPrioridade,
-  OfflineAction,
   PaginatedResult,
 } from './common';
 
@@ -24,16 +23,6 @@ export type {
   SerieRealizada,
   SerieRealizadaInsert,
 } from './treino';
-
-export type {
-  FrequenciaHabito,
-  Habito,
-  HabitoInsert,
-  RegistroHabito,
-  RegistroHabitoInsert,
-  ScoreDiario,
-  Conquista,
-} from './habito';
 
 export type {
   TipoTransacao,
@@ -68,25 +57,6 @@ export type {
 } from './financas';
 
 export type {
-  Compromisso,
-  CompromissoInsert,
-} from './agenda';
-
-export type {
-  ListaCompras,
-  ListaComprasInsert,
-  ItemCompra,
-  ItemCompraInsert,
-} from './compras';
-
-export type {
-  Veiculo,
-  VeiculoInsert,
-  Manutencao,
-  ManutencaoInsert,
-} from './veiculo';
-
-export type {
   TipoRefeicao,
   ItemRefeicao,
   FonteNutricional,
@@ -97,13 +67,6 @@ export type {
   RegistroAgua,
   RegistroAguaInsert,
 } from './dieta';
-
-export type {
-  Medicamento,
-  MedicamentoInsert,
-  RegistroMedicamento,
-  RegistroMedicamentoInsert,
-} from './medicamentos';
 
 export type {
   TipoNotificacao,
@@ -122,14 +85,6 @@ export type {
   TipoIntencao,
   Intencao,
   RespostaAgente,
-  ContextoUsuario,
-  RegraNotificacao,
-  TipoSugestaoCarga,
-  SugestaoCarga,
-  ExercicioGerado,
-  TreinoGerado,
-  ResumoDiario,
-  ItemResumo,
 } from './agente';
 
 export { SELO_LIMITES, LEMBRETE_TEXTOS } from './financas';

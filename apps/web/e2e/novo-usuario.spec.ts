@@ -255,7 +255,7 @@ test('novo usuário: cadastro → onboarding → finanças → logout → login'
   await digitarComFoco(entrada, 'Quanto gastei este mes?');
   await painel.getByRole('button', { name: 'Enviar mensagem' }).click();
   await expect(painel.getByText('Quanto gastei este mes?')).toBeVisible();
-  // Resposta do agente (processamento local em @meudia/ai, sem LLM): pelo menos 2 mensagens.
+  // Resposta do agente (regras locais em lib/assistente, sem LLM): pelo menos 2 mensagens.
   await expect.poll(async () => {
     const st = await (await fetch(`${MOCK_URL}/__mock/state`)).json();
     return (st.tables.chat_agente ?? []).filter((m: { role: string }) => m.role === 'agent').length;

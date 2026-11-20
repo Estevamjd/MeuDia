@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 export default function TermosPage() {
   return (
     <div className="mx-auto max-w-2xl px-6 py-16 text-text">
-      <Link href="/inicio" className="mb-8 inline-block text-sm text-accent hover:underline">
+      <Link href="/financas" className="mb-8 inline-block text-sm text-accent hover:underline">
         &larr; Voltar ao app
       </Link>
 

@@ -1,6 +1,7 @@
-import { rotuloRefeicao } from '@meudia/shared';
+import { hojeSP, rotuloRefeicao } from '@meudia/shared';
 import { formatBRL } from '../financas-ui';
 import { aplicarEstilo, ESTILO_PADRAO, primeiroNome, type Estilo } from './contato';
+import { interpretarPorRegras } from './regras';
 import type { IntencaoEscrita } from './intencao';
 import type { Extras } from './servicos';
 
@@ -72,6 +73,17 @@ export function confirmacao(i: IntencaoEscrita, nome?: string | null, extras?: E
       break;
   }
   if (i.tipo === 'gasto' && extras?.conta_paga) base = `${base.replace(/\.$/, '')} e marquei a conta ${extras.conta_paga} como paga.`;
+  if (i.tipo === 'gasto' && extras?.conta_divergente) {
+    const conta = extras.conta_divergente;
+    const frase = `paguei ${conta.descricao.toLocaleLowerCase('pt-BR')}`;
+    const lida = interpretarPorRegras(frase, { hojeISO: hojeSP(), horaSP: 12 });
+    const normalizar = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim().replace(/\s+/g, ' ');
+    const segura = lida.tipo === 'gasto' && lida.pagar === true && lida.valor === null
+      && normalizar(lida.descricao ?? '') === normalizar(conta.descricao);
+    base += ` Lancei como gasto separado: a conta ${conta.descricao} é de ${formatBRL(Number(conta.valor))} e continua pendente. `;
+    base += segura ? `Para marcar como paga, mande "${frase}".` : 'Marque como paga no app (Contas a vencer → Paguei).';
+    base += ' Se esse gasto já era a conta, mande "desfazer" (válido por 30 min) antes de marcar como paga, para evitar contar duas vezes.';
+  }
   // Curto: só a dica mais útil (o comentário de amigo, quando há, vem no lugar dela). Detalhado: todas + comentário.
   const todas = dicasProativas(i, extras);
   const dicas = estilo.tamanho === 'detalhado' ? todas : comentario ? [] : todas.slice(0, 1);

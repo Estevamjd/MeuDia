@@ -214,7 +214,7 @@ test('modo Finanças: cadastro de saúde, Hoje, Dieta, Peso e o vazio do Caderno
   await pc.getByLabel('Email').fill(EMAIL);
   await pc.getByLabel('Senha', { exact: true }).fill(SENHA);
   await pc.getByRole('button', { name: 'Entrar' }).click();
-  // Login = push('/inicio') + refresh() → /financas: a URL muda antes do router terminar e o
+  // Login = push('/financas') + refresh(): a URL muda antes do router terminar e o
   // 1º goto pode ser interrompido. Espera a Início e repete o goto até completar.
   await pc.waitForURL(/\/financas$/);
   await expect(pc.getByRole('heading', { name: /^Olá/, level: 1 })).toBeVisible();

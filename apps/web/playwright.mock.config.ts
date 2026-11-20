@@ -18,11 +18,11 @@ const appEnv = {
 const iPhone = devices['iPhone 13'];
 
 /** Chave SINTÉTICA só no `next build`: o verificar-bundle-ia falha se ela (ou o nome da env) aparecer em .next/static. */
-const CHAVE_SINTETICA_BUILD = 'gemini-chave-sintetica-bundle-e2e';
+const CHAVE_SINTETICA_BUILD = 'anthropic-chave-sintetica-bundle-e2e';
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: /(modo-runtime|novo-usuario|onboarding-loop|onboarding-pular|contas-saldo|excluir-metas|assistente|abas|config|treinos|saude|registros|whatsapp-link|recuperar-senha|cofrinho|tema|cartao-painel|ritmo-busca-parcelas|treino-plano-semana|perfil-saude-conta)\.spec\.ts$/,
+  testMatch: /(modo-runtime|novo-usuario|onboarding-loop|onboarding-pular|contas-saldo|excluir-metas|assistente|abas|config|treinos|saude|registros|whatsapp-link|recuperar-senha|cofrinho|tema|cartao-painel|ritmo-busca-parcelas|treino-plano-semana|perfil-saude-conta|rotas-legadas)\.spec\.ts$/,
   fullyParallel: false,
   workers: 1,
   retries: 0,
@@ -61,8 +61,8 @@ export default defineConfig({
       // Build sem APP_MODE e start com APP_MODE=financas: prova que o modo é lido em runtime (e2e/modo-runtime.spec.ts).
       // A chave sintética entra só no build e na varredura do bundle; o `next start` sobe sem ela (IA em fallback).
       command:
-        `env -u APP_MODE GEMINI_API_KEY=${CHAVE_SINTETICA_BUILD} pnpm exec next build` +
-        ` && GEMINI_API_KEY=${CHAVE_SINTETICA_BUILD} node scripts/verificar-bundle-ia.mjs` +
+        `env -u APP_MODE ANTHROPIC_API_KEY=${CHAVE_SINTETICA_BUILD} pnpm exec next build` +
+        ` && ANTHROPIC_API_KEY=${CHAVE_SINTETICA_BUILD} node scripts/verificar-bundle-ia.mjs` +
         ` && pnpm exec next start -p ${APP_PORT}`,
       url: `http://localhost:${APP_PORT}/login`,
       env: appEnv,

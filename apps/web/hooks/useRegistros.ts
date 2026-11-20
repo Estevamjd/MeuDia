@@ -1,6 +1,7 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutacao } from './useMutacao';
 import { registrosService } from '@meudia/api';
 import type { RegistroRefeicaoInsert, RegistroTreinoInsert } from '@meudia/shared';
 import { useAuth } from './useAuth';
@@ -42,7 +43,7 @@ function useInvalidar(prefixo: 'registros-treino' | 'registros-refeicao') {
 export function useRegistrarTreino() {
   const { user } = useAuth();
   const invalidar = useInvalidar('registros-treino');
-  return useMutation({
+  return useMutacao({
     mutationFn: (data: RegistroTreinoInsert) => registrosService.registrarTreino(requireUserId(user?.id), data),
     onSuccess: invalidar,
   });
@@ -51,7 +52,7 @@ export function useRegistrarTreino() {
 export function useExcluirRegistroTreino() {
   const { user } = useAuth();
   const invalidar = useInvalidar('registros-treino');
-  return useMutation({
+  return useMutacao({
     mutationFn: (id: string) => registrosService.excluirTreino(requireUserId(user?.id), id),
     onSuccess: invalidar,
   });
@@ -60,7 +61,7 @@ export function useExcluirRegistroTreino() {
 export function useRegistrarRefeicao() {
   const { user } = useAuth();
   const invalidar = useInvalidar('registros-refeicao');
-  return useMutation({
+  return useMutacao({
     mutationFn: (data: RegistroRefeicaoInsert) => registrosService.registrarRefeicao(requireUserId(user?.id), data),
     onSuccess: invalidar,
   });
@@ -69,7 +70,7 @@ export function useRegistrarRefeicao() {
 export function useExcluirRegistroRefeicao() {
   const { user } = useAuth();
   const invalidar = useInvalidar('registros-refeicao');
-  return useMutation({
+  return useMutacao({
     mutationFn: (id: string) => registrosService.excluirRefeicao(requireUserId(user?.id), id),
     onSuccess: invalidar,
   });

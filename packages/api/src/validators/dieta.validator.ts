@@ -30,9 +30,3 @@ export const registroPesoInsertSchema = z.object({
   data: z.string().optional(),
   observacao: z.string().nullable().optional(),
 });
-
-export const registroAguaSchema = z.object({
-  data: z.string().optional(),
-  quantidade_ml: z.number().int().min(0).optional(),
-  meta_ml: z.number().int().min(1).optional(),
-});

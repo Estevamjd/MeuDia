@@ -1,10 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import ts from 'typescript';
-import * as veiculo from '../veiculo.repository';
-import * as medicamento from '../medicamento.repository';
 import * as dieta from '../dieta.repository';
-import * as compras from '../compras.repository';
 import * as notificacao from '../notificacao-agente.repository';
 import * as sessao from '../sessao.repository';
 import * as push from '../push-subscriptions.repository';
@@ -29,17 +26,8 @@ const query = {
 const client = { from: vi.fn(() => query) };
 beforeEach(() => { vi.clearAllMocks(); filters.length = 0; action = ''; affected = 0; getSupabase.mockReturnValue(client); });
 const cases: [string, () => Promise<unknown>][] = [
-  ['veículo findById', () => veiculo.findById('alvo', 'dono')],
-  ['veículo update', () => veiculo.update('alvo', { modelo: 'x' }, 'dono')],
-  ['veículo remove', () => veiculo.remove('alvo', 'dono')],
-  ['medicamento findById', () => medicamento.findById('alvo', 'dono')],
-  ['medicamento update', () => medicamento.update('alvo', { nome: 'x' }, 'dono')],
-  ['medicamento remove', () => medicamento.remove('alvo', 'dono')],
   ['refeição update', () => dieta.updateRefeicao('alvo', {}, 'dono')],
   ['refeição remove', () => dieta.removeRefeicao('alvo', 'dono')],
-  ['lista findById', () => compras.findListaById('alvo', 'dono')],
-  ['lista update', () => compras.updateLista('alvo', { nome: 'x' }, 'dono')],
-  ['lista remove', () => compras.removeLista('alvo', 'dono')],
   ['notificação lida', () => notificacao.marcarLida('alvo', 'dono')],
   ['notificação dispensar', () => notificacao.dispensar('alvo', 'dono')],
   ['sessão findById', () => sessao.findById('alvo', 'dono')],
@@ -94,5 +82,6 @@ it('toda consulta por id com user_id filtra o dono; filhas não inventam coluna'
     }
     visit(source);
   }
-  expect(checked).toBeGreaterThan(35);
+  // 34 cadeias depois da faxina dos módulos legados (veículo, medicamentos, compras... saíram em 20/11/2026).
+  expect(checked).toBeGreaterThanOrEqual(34);
 });

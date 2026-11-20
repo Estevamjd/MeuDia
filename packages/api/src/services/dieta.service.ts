@@ -1,7 +1,7 @@
 import { usuarioAtualId } from './usuario-atual';
-import { AGUA, AppError, hojeSP } from '@meudia/shared';
+import { AppError, hojeSP } from '@meudia/shared';
 import { dietaRepository } from '../repositories';
-import { refeicaoInsertSchema, registroPesoInsertSchema, registroAguaSchema } from '../validators';
+import { refeicaoInsertSchema, registroPesoInsertSchema } from '../validators';
 
 // ── Refeições ──
 
@@ -25,40 +25,7 @@ export async function excluirRefeicao(refeicaoId: string) {
   return dietaRepository.removeRefeicao(refeicaoId, await usuarioAtualId());
 }
 
-// ── Água ──
-
-export async function aguaHoje(userId: string, date?: string) {
-  if (!userId) throw new AppError('userId é obrigatório', 'VALIDATION_ERROR');
-  const targetDate = date ?? hojeSP();
-  return dietaRepository.findRegistroAguaByDate(userId, targetDate);
-}
-
-export async function registrarAgua(userId: string, date?: string) {
-  if (!userId) throw new AppError('userId é obrigatório', 'VALIDATION_ERROR');
-  const targetDate = date ?? hojeSP();
-
-  const atual = await dietaRepository.findRegistroAguaByDate(userId, targetDate);
-  const quantidadeAtual = atual?.quantidade_ml ?? 0;
-  const metaMl = atual?.meta_ml ?? AGUA.META_ML_PADRAO;
-
-  return dietaRepository.upsertRegistroAgua(userId, {
-    data: targetDate,
-    quantidade_ml: quantidadeAtual + AGUA.ML_POR_COPO,
-    meta_ml: metaMl,
-  });
-}
-
 // ── Peso ──
-
-export async function historicosPeso(userId: string, limit?: number) {
-  if (!userId) throw new AppError('userId é obrigatório', 'VALIDATION_ERROR');
-  return dietaRepository.findRegistrosPeso(userId, limit);
-}
-
-export async function registrarPeso(userId: string, data: unknown) {
-  const parsed = registroPesoInsertSchema.parse(data);
-  return dietaRepository.createRegistroPeso(userId, parsed);
-}
 
 /** Registros desde `desde` ('AAAA-MM-DD'), em ordem de data. */
 export async function pesoDesde(userId: string, desde: string) {
@@ -71,22 +38,4 @@ export async function registrarPesoDoDia(userId: string, data: unknown) {
   if (!userId) throw new AppError('userId é obrigatório', 'VALIDATION_ERROR');
   const parsed = registroPesoInsertSchema.parse(data);
   return dietaRepository.upsertRegistroPeso(userId, { ...parsed, data: parsed.data ?? hojeSP() });
-}
-
-// ── Resumo Nutricional ──
-
-export async function resumoNutricionalDia(userId: string, date?: string) {
-  if (!userId) throw new AppError('userId é obrigatório', 'VALIDATION_ERROR');
-  const targetDate = date ?? hojeSP();
-  const refeicoes = await dietaRepository.findRefeicoesByDate(userId, targetDate);
-
-  return refeicoes.reduce(
-    (acc, ref) => ({
-      calorias: acc.calorias + (ref.total_calorias ?? 0),
-      proteina: acc.proteina + (ref.total_proteina ?? 0),
-      carbo: acc.carbo + (ref.total_carbo ?? 0),
-      gordura: acc.gordura + (ref.total_gordura ?? 0),
-    }),
-    { calorias: 0, proteina: 0, carbo: 0, gordura: 0 },
-  );
 }

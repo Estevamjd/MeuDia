@@ -11,10 +11,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.js
 COPY apps/web/package.json apps/web/package.json
 COPY packages/shared/package.json packages/shared/package.json
 COPY packages/api/package.json packages/api/package.json
-COPY packages/ai/package.json packages/ai/package.json
 COPY packages/database/package.json packages/database/package.json
-# Keep the workspace glob valid without installing the Expo app.
-COPY apps/mobile/package.json apps/mobile/package.json
 # pnpm 10 ignores dependency build scripts unless allowlisted (package.json untouched on purpose).
 RUN printf 'onlyBuiltDependencies[]=sharp\n' >> .npmrc  && pnpm install --frozen-lockfile --filter @meudia/web...
 

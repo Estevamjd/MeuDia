@@ -9,7 +9,7 @@ test.describe('PWA', () => {
     expect(manifest.name).toBe('MeuDia');
     expect(manifest.short_name).toBe('MeuDia');
     expect(manifest.display).toBe('standalone');
-    expect(manifest.start_url).toBe('/inicio');
+    expect(manifest.start_url).toBe('/financas');
     expect(manifest.icons).toBeDefined();
     expect(manifest.icons.length).toBeGreaterThan(0);
   });

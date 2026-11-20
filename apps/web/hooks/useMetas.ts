@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutacao } from './useMutacao';
 import { metasService } from '@meudia/api';
 import type { MetaInsert, SobraDoMes } from '@meudia/shared';
 import { competenciaDe, sobraDoMes } from '@meudia/shared';
@@ -32,7 +33,7 @@ export function useMetas() {
 export function useCriarMeta() {
   const { user } = useAuth();
   const invalidar = useInvalidarMetas();
-  return useMutation({
+  return useMutacao({
     mutationFn: (data: MetaInsert) => metasService.criarMeta(requireUserId(user?.id), data),
     onSuccess: invalidar,
   });
@@ -42,7 +43,7 @@ export function useCriarMeta() {
 export function useAtualizarMeta() {
   const { user } = useAuth();
   const invalidar = useInvalidarMetas();
-  return useMutation({
+  return useMutacao({
     mutationFn: ({ id, data }: { id: string; data: Partial<MetaInsert> & { valor_guardado?: number } }) =>
       metasService.atualizarMeta(requireUserId(user?.id), id, data),
     onSuccess: invalidar,
@@ -53,7 +54,7 @@ export function useAtualizarMeta() {
 export function useGuardarNaMeta() {
   const { user } = useAuth();
   const invalidar = useInvalidarMetas();
-  return useMutation({
+  return useMutacao({
     mutationFn: ({ id, valor }: { id: string; valor: number }) => metasService.guardar(requireUserId(user?.id), id, valor),
     onSettled: invalidar,
   });
@@ -62,7 +63,7 @@ export function useGuardarNaMeta() {
 export function useExcluirMeta() {
   const { user } = useAuth();
   const invalidar = useInvalidarMetas();
-  return useMutation({
+  return useMutacao({
     mutationFn: (id: string) => metasService.excluirMeta(requireUserId(user?.id), id),
     onSuccess: invalidar,
   });

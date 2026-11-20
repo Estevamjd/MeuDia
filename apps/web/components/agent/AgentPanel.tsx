@@ -5,37 +5,26 @@ import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { clsx } from 'clsx';
-import { X, Bot, Bell, LayoutDashboard, CheckCheck } from 'lucide-react';
-import {
-  processarMensagem,
-  acoesRapidasPadrao,
-  gerarResumoDiario,
-  obterSaudacao,
-} from '@meudia/ai';
-import type { ContextoUsuario, AcaoRapida, ResumoDiario, ItemResumo, NotificacaoAgente } from '@meudia/shared';
+import { X, Bot, Bell, CheckCheck } from 'lucide-react';
+import type { NotificacaoAgente } from '@meudia/shared';
 import {
   useNotificacoes,
   useMensagensChat,
   useEnviarMensagem,
   useMarcarNotificacaoLida,
-  useMarcarTodasLidas,
   useDispensarNotificacao,
-  useContarNaoLidas,
 } from '../../hooks/useAgente';
 import { useAuth } from '../../hooks/useAuth';
 import { anoMesSP, diaSemanaDe, hojeSP } from '../../lib/hoje';
-import { useProfile, useTreinos, useSessoesSemana, useHabitos, useRegistrosHoje, useResumoMensal } from '../../hooks';
-import { useCriarCompromisso } from '../../hooks/useAgenda';
+import { useProfile, useTreinos, useSessoesSemana, useResumoMensal } from '../../hooks';
 import { useTravaScroll } from '../../hooks/useTravaScroll';
-import { useAppMode } from '../AppModeProvider';
+import { obterSaudacao, processarMensagem, type ContextoAssistente } from '../../lib/assistente/chat';
 import {
-  abaInicialAgente,
-  abasAgente,
-  adaptarRespostaAoModo,
+  ABAS_AGENTE,
+  SUGESTOES_AGENTE,
   filtrarMensagens,
   filtrarNotificacoes,
   isAcaoPermitida,
-  sugestoesAgente,
   type AbaAgente,
 } from '../../lib/agente-modo';
 import { AgentChat } from './AgentChat';
@@ -111,32 +100,24 @@ function AgentPanelContent({ onClose, estado }: { onClose: () => void; estado: E
     estado;
   const queryClient = useQueryClient();
   const router = useRouter();
-  const mode = useAppMode();
-  const financas = mode === 'financas';
-  // Monta a cada abertura: começa na aba inicial do modo (Finanças: Chat).
-  const [activeTab, setActiveTab] = useState<Tab>(() => abaInicialAgente(mode));
+  // Monta a cada abertura: começa no Chat.
+  const [activeTab, setActiveTab] = useState<Tab>('treino');
   const { user } = useAuth();
 
-  // Data hooks. Modo Finanças: Hábitos fica oculto (sem consulta); Treinos é visível e o chat responde
-  // "treino de hoje" com `useTreinos` (as sessões da semana já não consultam no modo Finanças por padrão).
+  // Dados do chat: treino de hoje (`useTreinos`; as sessões da semana não consultam no modo Finanças por padrão)
+  // e o resumo do mês. Nada de hábitos/agenda (módulos removidos).
   const { data: profile } = useProfile();
   const { data: treinos } = useTreinos();
   const { data: sessoesSemana } = useSessoesSemana();
-  const { data: habitos } = useHabitos({ enabled: !financas });
-  const { data: registrosHoje } = useRegistrosHoje({ enabled: !financas });
   const now = new Date();
   const { data: resumoMensal } = useResumoMensal(anoMesSP(now).ano, anoMesSP(now).mes);
 
   // Agent hooks
   const { data: notificacoes, isLoading: loadingNotif } = useNotificacoes();
   const { data: mensagens, isLoading: loadingChat } = useMensagensChat();
-  // Painel aberto: sem polling. Modo Finanças conta pelas notificações filtradas (abaixo), sem consultar.
-  const { data: countNaoLidas } = useContarNaoLidas({ enabled: !financas, poll: false });
   const enviarMensagem = useEnviarMensagem();
   const marcarLida = useMarcarNotificacaoLida();
-  const marcarTodasLidas = useMarcarTodasLidas();
   const dispensar = useDispensarNotificacao();
-  const criarCompromisso = useCriarCompromisso();
 
   // `onClose` chega inline do layout: em ref, para o efeito abaixo não re-rodar a cada render.
   const onCloseRef = useRef(onClose);
@@ -189,8 +170,8 @@ function AgentPanelContent({ onClose, estado }: { onClose: () => void; estado: E
     if (e.type === 'pointerup' && dy > LIMIAR_ARRASTE_FECHAR) onCloseRef.current();
   };
 
-  // Contexto do usuário
-  const contexto: ContextoUsuario = useMemo(() => {
+  // Contexto das respostas locais (lib/assistente).
+  const contexto: ContextoAssistente = useMemo(() => {
     const hojeStr = hojeSP(now);
     const diaSemana = diaSemanaDe(hojeStr);
     const treinoHoje = treinos?.find((t) => t.dia_semana === diaSemana) ?? null;
@@ -199,53 +180,20 @@ function AgentPanelContent({ onClose, estado }: { onClose: () => void; estado: E
       (s) => s.treino_id === treinoHoje?.id && s.data === hojeStr && s.concluido,
     ) ?? false;
 
-    const habitosAtivos = habitos?.filter(
-      (h) => h.ativo && (h.frequencia === 'diario' || h.dias_semana.includes(diaSemana)),
-    ) ?? [];
-    const registrosMap = new Map<string, boolean>();
-    registrosHoje?.forEach((r) => {
-      if (r.concluido) registrosMap.set(r.habito_id, true);
-    });
-    const habitosConcluidos = habitosAtivos.filter((h) => registrosMap.has(h.id)).length;
-    const habitosPendentes = habitosAtivos
-      .filter((h) => !registrosMap.has(h.id))
-      .map((h) => h.nome);
-
     return {
-      userId: user?.id ?? '',
       nome: profile?.nome ?? user?.email?.split('@')[0] ?? 'Usuário',
-      objetivo: profile?.objetivo ?? null,
       horaAtual: now.getHours(),
-      diaSemana,
       treinoHoje: treinoHoje
-        ? {
-            nome: treinoHoje.nome,
-            exercicios: treinoHoje.exercicios?.length ?? 0,
-            concluido: treinoHojeConcluido,
-          }
+        ? { nome: treinoHoje.nome, exercicios: treinoHoje.exercicios?.length ?? 0, concluido: treinoHojeConcluido }
         : null,
       sessoesSemana: sessoesConcluidas,
       metaTreinosSemana: 5,
-      habitosTotal: habitosAtivos.length,
-      habitosConcluidos,
-      habitosPendentes,
-      percentualHabitos:
-        habitosAtivos.length > 0
-          ? Math.round((habitosConcluidos / habitosAtivos.length) * 100)
-          : 0,
-      compromissosHoje: 0,
-      proximoCompromisso: null,
       saldoMes: resumoMensal?.saldo ?? 0,
       despesasMes: resumoMensal?.totalDespesas ?? 0,
       receitasMes: resumoMensal?.totalReceitas ?? 0,
-      streakAtual: 0,
-      scoreHoje: 0,
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [treinos, sessoesSemana, habitos, registrosHoje, resumoMensal, profile, user]);
-
-  // Resumo diário
-  const resumo: ResumoDiario = useMemo(() => gerarResumoDiario(contexto), [contexto]);
+  }, [treinos, sessoesSemana, resumoMensal, profile, user]);
 
   // Handler de enviar mensagem no chat (definido antes de handleAcao pois COMANDO depende dele)
   const handleEnviarChat = useCallback(
@@ -282,8 +230,8 @@ function AgentPanelContent({ onClose, estado }: { onClose: () => void; estado: E
         }
       }
 
-      // Processar e gerar resposta do agente
-      const resposta = adaptarRespostaAoModo(texto, processarMensagem(texto, contexto, historico), mode);
+      // Resposta local (regras): agenda/hábitos/notas respondem que não estão disponíveis.
+      const resposta = processarMensagem(texto, contexto, historico);
 
       // Salvar resposta do agente
       await enviarMensagem.mutateAsync({
@@ -292,14 +240,14 @@ function AgentPanelContent({ onClose, estado }: { onClose: () => void; estado: E
         acoes: resposta.acoes,
       });
     },
-    [enviarMensagem, contexto, mensagens, queryClient, mode, setConsultandoIA, mostrarProposta],
+    [enviarMensagem, contexto, mensagens, queryClient, setConsultandoIA, mostrarProposta],
   );
 
-  // Handler de ações (NAVEGAR + COMANDO + CRIAR_COMPROMISSO)
+  // Handler de ações (NAVEGAR + COMANDO)
   const handleAcao = useCallback(
-    async (acao: string, payload?: Record<string, unknown>) => {
-      // Modo Finanças: ignora ações de módulos ocultos (ex.: respostas antigas do chat).
-      if (!isAcaoPermitida({ acao, payload }, mode)) return;
+    (acao: string, payload?: Record<string, unknown>) => {
+      // Ignora ações de módulos removidos (ex.: respostas antigas do chat ou notificações).
+      if (!isAcaoPermitida({ acao, payload })) return;
       if (acao === 'NAVEGAR' && payload?.rota) {
         router.push(payload.rota as string);
         onClose();
@@ -307,45 +255,20 @@ function AgentPanelContent({ onClose, estado }: { onClose: () => void; estado: E
       if (acao === 'COMANDO' && payload?.comando) {
         handleEnviarChat(payload.comando as string);
       }
-      if (acao === 'CRIAR_COMPROMISSO' && payload?.titulo && payload?.data_inicio) {
-        try {
-          await criarCompromisso.mutateAsync({
-            titulo: payload.titulo as string,
-            data_inicio: payload.data_inicio as string,
-            data_fim: (payload.data_fim as string) ?? null,
-            descricao: (payload.descricao as string) ?? null,
-            local: (payload.local as string) ?? null,
-            tipo: (payload.tipo as string) ?? 'geral',
-            prioridade: (payload.prioridade as 'baixa' | 'media' | 'alta' | 'urgente') ?? 'media',
-          });
-          // Confirmar no chat que foi criado
-          await enviarMensagem.mutateAsync({
-            role: 'agent',
-            conteudo: `Compromisso "${payload.titulo}" criado com sucesso na sua agenda!`,
-          });
-        } catch {
-          await enviarMensagem.mutateAsync({
-            role: 'agent',
-            conteudo: 'Ops, não consegui criar o compromisso. Tente pela página da agenda.',
-            acoes: [{ label: 'Abrir Agenda', acao: 'NAVEGAR', payload: { rota: '/agenda' } }],
-          });
-        }
-      }
     },
-    [router, onClose, handleEnviarChat, criarCompromisso, enviarMensagem, mode],
+    [router, onClose, handleEnviarChat],
   );
 
-  const notificacoesModo = useMemo(() => filtrarNotificacoes(notificacoes ?? [], mode), [notificacoes, mode]);
-  const mensagensModo = useMemo(() => filtrarMensagens(mensagens ?? [], mode), [mensagens, mode]);
-  // Modo Finanças: o contador do servidor inclui módulos ocultos; conta só as visíveis.
-  const naoLidas = mode === 'padrao' ? (countNaoLidas ?? 0) : notificacoesModo.filter((n) => !n.lida).length;
+  const notificacoesVisiveis = useMemo(() => filtrarNotificacoes(notificacoes ?? []), [notificacoes]);
+  const mensagensVisiveis = useMemo(() => filtrarMensagens(mensagens ?? []), [mensagens]);
+  // O contador do servidor inclui notificações que não aparecem aqui; conta só as visíveis.
+  const naoLidas = notificacoesVisiveis.filter((n) => !n.lida).length;
 
-  const todasTabs: { id: Tab; label: string; icon: typeof LayoutDashboard; badge?: number }[] = [
-    { id: 'resumo', label: 'Resumo', icon: LayoutDashboard },
+  const todasTabs: { id: Tab; label: string; icon: typeof Bot; badge?: number }[] = [
     { id: 'treino', label: 'Chat', icon: Bot },
     { id: 'alertas', label: 'Alertas', icon: Bell, badge: naoLidas },
   ];
-  const tabs = todasTabs.filter((tab) => abasAgente(mode).includes(tab.id));
+  const tabs = todasTabs.filter((tab) => ABAS_AGENTE.includes(tab.id));
 
   // Portal no body + camada `z-agente` (lib/camadas.ts): acima de Topbar, banner de instalação, BottomNav
   // e modais. No mobile é um bottom sheet que nunca cobre o topo (`.agente-sheet` em globals.css):
@@ -439,12 +362,9 @@ function AgentPanelContent({ onClose, estado }: { onClose: () => void; estado: E
 
         {/* Conteúdo: só ele rola (cada aba tem o próprio overflow-y-auto) */}
         <div className="min-h-0 flex-1 overflow-hidden">
-          {activeTab === 'resumo' && (
-            <ResumoTab resumo={resumo} onAcao={handleAcao} />
-          )}
           {activeTab === 'treino' && (
             <AgentChat
-              mensagens={mensagensModo}
+              mensagens={mensagensVisiveis}
               isLoading={loadingChat}
               isSending={enviarMensagem.isPending || consultandoIA}
               onEnviar={handleEnviarChat}
@@ -469,22 +389,18 @@ function AgentPanelContent({ onClose, estado }: { onClose: () => void; estado: E
                   />
                 )
               }
-              sugestoesIniciais={sugestoesAgente(mode, () => acoesRapidasPadrao(contexto))}
-              dicaInicial={
-                mode === 'financas' ? 'Pergunte sobre gastos, contas, orçamento ou assinaturas.' : undefined
-              }
+              sugestoesIniciais={[...SUGESTOES_AGENTE]}
+              dicaInicial="Pergunte sobre gastos, contas, orçamento ou assinaturas."
             />
           )}
           {activeTab === 'alertas' && (
             <AlertasTab
-              notificacoes={notificacoesModo}
+              notificacoes={notificacoesVisiveis}
               isLoading={loadingNotif}
               onMarcarLida={(id) => marcarLida.mutate(id)}
               onMarcarTodasLidas={() =>
-                mode === 'padrao'
-                  ? marcarTodasLidas.mutate()
-                  : // Não marca como lidas as notificações ocultas no modo.
-                    notificacoesModo.filter((n) => !n.lida).forEach((n) => marcarLida.mutate(n.id))
+                // Não marca como lidas as notificações que não aparecem aqui.
+                notificacoesVisiveis.filter((n) => !n.lida).forEach((n) => marcarLida.mutate(n.id))
               }
               onDispensar={(id) => dispensar.mutate(id)}
               onAcao={handleAcao}
@@ -501,60 +417,6 @@ function AgentPanelContent({ onClose, estado }: { onClose: () => void; estado: E
 // ══════════════════════════════════════════════════════════════════════════════
 // Sub-componentes internos
 // ══════════════════════════════════════════════════════════════════════════════
-
-function ResumoTab({
-  resumo,
-  onAcao,
-}: {
-  resumo: ResumoDiario;
-  onAcao: (acao: string, payload?: Record<string, unknown>) => void;
-}) {
-  const priorityBorder: Record<string, string> = {
-    info: 'border-accent/20',
-    aviso: 'border-yellow/20',
-    alerta: 'border-red/20',
-  };
-
-  return (
-    <div className="h-full overflow-y-auto overscroll-contain px-4 py-4 space-y-4">
-      {/* Saudação */}
-      <div>
-        <p className="font-syne text-base font-bold text-text">{resumo.saudacao}</p>
-        <p className="mt-1 text-sm text-muted leading-relaxed">{resumo.mensagemPrincipal}</p>
-      </div>
-
-      {/* Itens */}
-      <div className={clsx('space-y-2 rounded-xl border p-3', priorityBorder[resumo.prioridade] ?? 'border-border')}>
-        {resumo.itens.map((item: ItemResumo, i: number) => (
-          <div key={i} className="flex items-start gap-2.5">
-            <span className="text-sm shrink-0">{item.icone}</span>
-            <p className="text-sm text-text/90">{item.texto}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Ações */}
-      {resumo.acoes.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {resumo.acoes.map((acao: AcaoRapida, i: number) => (
-            <button
-              key={i}
-              onClick={() => onAcao(acao.acao, acao.payload)}
-              className={clsx(
-                'rounded-lg px-3 py-2 text-xs font-medium transition-colors',
-                i === 0
-                  ? 'bg-accent text-accent-fg hover:bg-accent/80'
-                  : 'border border-border text-muted hover:text-text hover:border-accent/30',
-              )}
-            >
-              {acao.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function AlertasTab({
   notificacoes,

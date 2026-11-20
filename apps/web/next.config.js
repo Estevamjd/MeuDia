@@ -1,6 +1,10 @@
 const path = require('path');
 const { withSentryConfig } = require('@sentry/nextjs');
 
+// Módulos do antigo modo padrão removidos em 20/11/2026 (mesma lista de ROTAS_LEGADAS em lib/app-mode.ts,
+// conferida em lib/__tests__/rotas-legadas.test.ts). URL antiga vai para /financas com 307, antes do middleware.
+const ROTAS_LEGADAS = ['/inicio', '/agenda', '/habitos', '/notas', '/compras', '/medicamentos', '/veiculo', '/dieta'];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
@@ -8,7 +12,12 @@ const nextConfig = {
     instrumentationHook: true,
     outputFileTracingRoot: path.join(__dirname, '../../'),
   },
-  transpilePackages: ['@meudia/shared', '@meudia/api', '@meudia/ai'],
+  transpilePackages: ['@meudia/shared', '@meudia/api'],
+  redirects: async () =>
+    ROTAS_LEGADAS.flatMap((rota) => [
+      { source: rota, destination: '/financas', permanent: false },
+      { source: `${rota}/:resto*`, destination: '/financas', permanent: false },
+    ]),
   images: {
     remotePatterns: [
       {

@@ -1,10 +1,10 @@
 'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutacao } from './useMutacao';
 import { sessaoRepository, treinoService } from '@meudia/api';
 import type { TreinoInsert, ExercicioInsert, SerieRealizadaInsert } from '@meudia/shared';
 import { useAuth } from './useAuth';
-import { withOfflineSupport } from '../lib/offline-mutation';
 import { useAppMode } from '../components/AppModeProvider';
 import { hojeSP } from '../lib/hoje';
 
@@ -32,18 +32,11 @@ export function useCriarTreino() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: withOfflineSupport(
-      'treino:criar',
-      (data: TreinoInsert) => {
-        if (!user?.id) throw new Error('Não autenticado');
-        return treinoService.criarTreino(user.id, data);
-      },
-      (data) => {
-        if (!user?.id) throw new Error('Não autenticado');
-        return { userId: user.id, data };
-      },
-    ),
+  return useMutacao({
+    mutationFn: (data: TreinoInsert) => {
+      if (!user?.id) throw new Error('Não autenticado');
+      return treinoService.criarTreino(user.id, data);
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['treinos'] });
     },
@@ -54,15 +47,11 @@ export function useAtualizarTreino() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: withOfflineSupport(
-      'treino:atualizar',
-      ({ id, data }: { id: string; data: Partial<TreinoInsert> }) => {
-        if (!user?.id) throw new Error('Não autenticado');
-        return treinoService.atualizarTreino(user.id, id, data);
-      },
-      ({ id, data }) => ({ userId: user?.id, id, data }),
-    ),
+  return useMutacao({
+    mutationFn: ({ id, data }: { id: string; data: Partial<TreinoInsert> }) => {
+      if (!user?.id) throw new Error('Não autenticado');
+      return treinoService.atualizarTreino(user.id, id, data);
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['treinos'] });
     },
@@ -73,15 +62,11 @@ export function useExcluirTreino() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: withOfflineSupport(
-      'treino:excluir',
-      (id: string) => {
-        if (!user?.id) throw new Error('Não autenticado');
-        return treinoService.excluirTreino(user.id, id);
-      },
-      (id) => ({ userId: user?.id, id }),
-    ),
+  return useMutacao({
+    mutationFn: (id: string) => {
+      if (!user?.id) throw new Error('Não autenticado');
+      return treinoService.excluirTreino(user.id, id);
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['treinos'] });
     },
@@ -91,7 +76,7 @@ export function useExcluirTreino() {
 export function useAdicionarExercicio() {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: (data: ExercicioInsert) => treinoService.adicionarExercicio(data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['treinos'] });
@@ -102,7 +87,7 @@ export function useAdicionarExercicio() {
 export function useAtualizarExercicio() {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: ({ id, data }: { id: string; data: Partial<ExercicioInsert> }) =>
       treinoService.atualizarExercicio(id, data),
     onSuccess: () => {
@@ -114,7 +99,7 @@ export function useAtualizarExercicio() {
 export function useExcluirExercicio() {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: (id: string) => treinoService.excluirExercicio(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['treinos'] });
@@ -125,7 +110,7 @@ export function useExcluirExercicio() {
 export function useReordenarExercicios() {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: (exercicios: { id: string; ordem: number }[]) =>
       treinoService.reordenarExercicios(exercicios),
     onSuccess: () => {
@@ -192,7 +177,7 @@ export function useSalvarLembreteTreino() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: (ligado: boolean) => {
       if (!user?.id) throw new Error('Não autenticado');
       return treinoService.salvarLembreteTreino(user.id, ligado);
@@ -224,7 +209,7 @@ export function useIniciarSessao() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: (treinoId: string) => {
       if (!user?.id) throw new Error('Não autenticado');
       return treinoService.iniciarSessao(user.id, treinoId);
@@ -238,7 +223,7 @@ export function useIniciarSessao() {
 export function useFinalizarSessao() {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: ({ sessaoId, duracao }: { sessaoId: string; duracao: number }) =>
       treinoService.finalizarSessao(sessaoId, duracao),
     onSuccess: () => {
@@ -254,12 +239,8 @@ export function useFinalizarSessao() {
 export function useRegistrarSerie() {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: withOfflineSupport<SerieRealizadaInsert, unknown>(
-      'treino:registrar-serie',
-      (data) => treinoService.registrarSerie(data),
-      (data) => ({ data }),
-    ),
+  return useMutacao({
+    mutationFn: (data: SerieRealizadaInsert) => treinoService.registrarSerie(data),
     onSuccess: (_, variables: SerieRealizadaInsert) => {
       void queryClient.invalidateQueries({ queryKey: ['series', variables.sessao_id] });
     },
@@ -269,7 +250,7 @@ export function useRegistrarSerie() {
 export function useAtualizarSerie() {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  return useMutacao({
     mutationFn: ({ id, data }: { id: string; data: Partial<SerieRealizadaInsert> }) =>
       treinoService.atualizarSerie(id, data),
     onSuccess: () => {

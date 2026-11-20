@@ -5,7 +5,10 @@ import { AppModeProvider } from '../../AppModeProvider';
 import type { AppMode } from '../../../lib/app-mode';
 import { AgentFAB } from '../AgentFAB';
 
-/** P0.1: no modo Finanças o FAB fica escondido no celular (`hidden md:flex`) e fazia polling de 60s mesmo assim. */
+/**
+ * P0.1: o FAB fica escondido no celular (`hidden md:flex`) e fazia polling de 60s mesmo assim. Desde a faxina dos
+ * módulos legados o modo padrão segue a mesma regra (sem polling, só conta com o FAB visível).
+ */
 const { useContarNaoLidas } = vi.hoisted(() => ({ useContarNaoLidas: vi.fn(() => ({ data: 3 })) }));
 vi.mock('../../../hooks/useAgente', () => ({ useContarNaoLidas }));
 
@@ -26,23 +29,17 @@ afterEach(() => {
 });
 
 describe('AgentFAB: contador de não lidas', () => {
-  it('padrão: mantém o polling de 60s (opções padrão do hook) e mostra o badge', () => {
+  it.each(['financas', 'padrao'] as const)('%s no celular (FAB escondido): não consulta nem faz polling', (mode) => {
     telaMd(false);
-    montar('padrao');
-    expect(useContarNaoLidas.mock.calls.every((c: unknown[]) => c[0] === undefined)).toBe(true);
-    expect(screen.getByRole('button', { name: 'Abrir agente IA' }).textContent).toBe('3');
-  });
-
-  it('finanças no celular (FAB escondido): não consulta nem faz polling', () => {
-    telaMd(false);
-    montar('financas');
+    montar(mode);
     expect(useContarNaoLidas).toHaveBeenCalled();
     for (const [op] of useContarNaoLidas.mock.calls as unknown[][]) expect(op).toEqual({ enabled: false, poll: false });
   });
 
-  it('finanças no desktop (FAB visível): consulta sem polling', () => {
+  it.each(['financas', 'padrao'] as const)('%s no desktop (FAB visível): consulta sem polling e mostra o badge', (mode) => {
     telaMd(true);
-    montar('financas');
+    montar(mode);
     for (const [op] of useContarNaoLidas.mock.calls as unknown[][]) expect(op).toEqual({ enabled: true, poll: false });
+    expect(screen.getByRole('button', { name: 'Abrir agente IA' }).textContent).toBe('3');
   });
 });
