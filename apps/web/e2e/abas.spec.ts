@@ -104,7 +104,7 @@ test('design v2: Início, Treino, Dieta e Painel (menu no ☰); Ver todos, Chat 
   await expect(page.getByRole('region', { name: 'Para onde foi' })).toContainText('Mercado');
   await expect(page.getByTestId('linha-cofrinho-valor')).toHaveText(brl('1.280,00'));
   await expect(page.getByRole('region', { name: 'Contas a vencer' }).locator('[data-conta]')).toHaveCount(2);
-  await expect(page.getByRole('region', { name: 'A conta de outubro' })).toHaveCount(1);
+  await expect(page.getByRole('region', { name: 'Ritmo de outubro' })).toHaveCount(1);
   await expect(page.getByText('Sobra do mês', { exact: true })).toHaveCount(0);
   const caixaNav = (await nav.boundingBox())!;
 

@@ -4,7 +4,7 @@ import { test, expect } from './mock-guard';
 import { pastaEvidencias } from './evidencias';
 
 /**
- * Início v5 (maço de cartões: Resumo · A conta · Meta só se houver meta) e Relatório → Painel, iPhone 13 contra o
+ * Início v5 (maço de cartões: Resumo · Ritmo · Meta só se houver meta) e Relatório → Painel, iPhone 13 contra o
  * mock do Supabase, no claro e no escuro. Relógio fixo em 18/10/2026 12:00 (SP); dados semeados por POST /__mock/seed.
  */
 
@@ -110,7 +110,7 @@ test('maço de cartões: 2 sem meta, 3 com meta; formato de cartão (230–250px
   await page.reload();
   await fecharBanner(page);
 
-  // ── Sem meta: 2 cartões (Resumo, A conta); a conta continua com os mesmos testids ──
+  // ── Sem meta: 2 cartões (Resumo, Ritmo); a conta continua com os mesmos testids ──
   const cartao = page.getByTestId('cartao-resumo');
   const anuncio = cartao.locator('[aria-live="polite"]');
   await expect(cartao).toHaveAttribute('data-paginas', '2');
@@ -129,7 +129,7 @@ test('maço de cartões: 2 sem meta, 3 com meta; formato de cartão (230–250px
   expect(caixa.width / caixa.height).toBeLessThan(1.62);
   expect((await page.getByTestId('cartao-maco').boundingBox())!.height).toBeLessThanOrEqual(285);
   // Setas menores (30px), mas com área de toque ≥ 24px.
-  const seta = (await page.getByRole('button', { name: 'Próximo cartão: A conta' }).boundingBox())!;
+  const seta = (await page.getByRole('button', { name: 'Próximo cartão: Ritmo' }).boundingBox())!;
   expect(seta.height).toBeLessThanOrEqual(32);
   expect(seta.height).toBeGreaterThanOrEqual(24);
   await expect(page.getByRole('region', { name: 'Contas a vencer' })).toBeInViewport();
@@ -151,16 +151,16 @@ test('maço de cartões: 2 sem meta, 3 com meta; formato de cartão (230–250px
       await page.screenshot({ path: path.join(pasta, '00-arrastando-escuro.png') });
     });
     await naFrente(page, 'cartao-pagina-conta');
-    await expect(anuncio).toHaveText('Cartão 2 de 2: A conta');
+    await expect(anuncio).toHaveText('Cartão 2 de 2: Ritmo');
     await expect(cartao).not.toHaveClass(/maco-segurando/);
     await page.getByRole('button', { name: 'Cartão anterior: Resumo' }).click();
     await naFrente(page, 'cartao-pagina-resumo');
   }
 
-  await page.getByRole('button', { name: 'Próximo cartão: A conta' }).click();
+  await page.getByRole('button', { name: 'Próximo cartão: Ritmo' }).click();
   await naFrente(page, 'cartao-pagina-conta');
-  await expect(anuncio).toHaveText('Cartão 2 de 2: A conta');
-  await expect(page.getByTestId('cartao-posicao')).toHaveText('2 de 2 · A conta');
+  await expect(anuncio).toHaveText('Cartão 2 de 2: Ritmo');
+  await expect(page.getByTestId('cartao-posicao')).toHaveText('2 de 2 · Ritmo');
   await expect(page.getByRole('button', { name: 'Próximo cartão' })).toBeDisabled();
   // Contas fixas do cartão abrem a lista abaixo do maço.
   await page.getByRole('button', { name: /Contas fixas/ }).click();
@@ -184,7 +184,7 @@ test('maço de cartões: 2 sem meta, 3 com meta; formato de cartão (230–250px
     await page.screenshot({ path: path.join(pasta, `02-inicio-p1-${sufixo}.png`) });
 
     await naFrente(page, 'cartao-pagina-resumo');
-    await page.getByRole('button', { name: 'Próximo cartão: A conta' }).click();
+    await page.getByRole('button', { name: 'Próximo cartão: Ritmo' }).click();
     await naFrente(page, 'cartao-pagina-conta');
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: path.join(pasta, `03-inicio-p2-${sufixo}.png`) });
@@ -255,19 +255,19 @@ test('maço na reserva (CSS.supports sem "timeline", como iOS < 26): ida e volta
   await naFrente(page, 'cartao-pagina-resumo');
 
   // Ida: 1 → 2 → 3; volta: 3 → 2 → 1.
-  await page.getByRole('button', { name: 'Próximo cartão: A conta' }).click();
+  await page.getByRole('button', { name: 'Próximo cartão: Ritmo' }).click();
   await naFrente(page, 'cartao-pagina-conta');
   await page.getByRole('button', { name: 'Próximo cartão: Meta' }).click();
   await naFrente(page, 'cartao-pagina-meta');
   await expect(anuncio).toHaveText('Cartão 3 de 3: Meta');
-  await page.getByRole('button', { name: 'Cartão anterior: A conta' }).click();
+  await page.getByRole('button', { name: 'Cartão anterior: Ritmo' }).click();
   await naFrente(page, 'cartao-pagina-conta');
   await page.getByRole('button', { name: 'Cartão anterior: Resumo' }).click();
   await naFrente(page, 'cartao-pagina-resumo');
   await expect(anuncio).toHaveText('Cartão 1 de 3: Resumo');
 
   // Interrompido: "Próximo" e, antes de a rolagem suave chegar, a pessoa assume e volta ao 1º.
-  await page.getByRole('button', { name: 'Próximo cartão: A conta' }).click();
+  await page.getByRole('button', { name: 'Próximo cartão: Ritmo' }).click();
   await page.getByLabel('Cartões do resumo do mês. Deslize para o lado ou use as setas.').evaluate((el) => {
     el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
     el.scrollTo({ left: 0, behavior: 'auto' });

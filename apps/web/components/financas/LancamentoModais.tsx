@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
-import type { Transacao, TransacaoInsert } from '@meudia/shared';
-import { useCarteiras, useCriarTransacao, useAtualizarTransacao } from '../../hooks';
+import { useState, useMemo, useCallback, useRef } from 'react';
+import { rotuloParcela, type Transacao, type TransacaoInsert } from '@meudia/shared';
+import { useCarteiras, useCriarTransacao, useAtualizarTransacao, useCriarDespesaParcelada } from '../../hooks';
 import { hojeSP } from '../../lib/hoje';
 import { Button, Modal, Input, Select, useToast } from '../ui';
 import { SeletorCarteira } from './SeletorCarteira';
+import { CampoParcelado, MENSAGEM_TOTAL_VAZIO, PARCELAS_PADRAO, avaliarParcelas } from './CampoParcelado';
+import { formatBRL } from '../../lib/financas-ui';
 
 /**
  * "Novo lançamento" (receita ou despesa, com banco em texto quando não há carteira) e "Editar lançamento":
@@ -22,6 +24,7 @@ export function useLancamentoModais() {
   // --- Mutations ---
   const criarTransacao = useCriarTransacao();
   const atualizarTransacao = useAtualizarTransacao();
+  const criarParcelada = useCriarDespesaParcelada();
 
   // --- Modal state ---
   const [showAddModal, setShowAddModal] = useState(false);
@@ -39,6 +42,9 @@ export function useLancamentoModais() {
   const [formValor, setFormValor] = useState('');
   const [formData, setFormData] = useState(hojeSP(hoje));
   const [formBanco, setFormBanco] = useState('');
+  // Parcelado no cartão: só em despesa nova (nunca receita nem edição).
+  const [formParcelar, setFormParcelar] = useState(false);
+  const [formParcelas, setFormParcelas] = useState(PARCELAS_PADRAO);
 
   // --- Reset form ---
   const resetForm = useCallback(() => {
@@ -49,6 +55,8 @@ export function useLancamentoModais() {
     setFormData(hojeSP(hoje));
     setFormBanco('');
     setFormCarteira(null);
+    setFormParcelar(false);
+    setFormParcelas(PARCELAS_PADRAO);
   }, [hoje]);
 
   const openAddModal = useCallback(() => {
@@ -67,6 +75,10 @@ export function useLancamentoModais() {
     setEditingTransacao(t);
   }, []);
 
+  // Trava síncrona do parcelado: dois envios antes do re-render (isPending) criariam dois grupos de parcelas.
+  // Liberada quando a gravação termina (sucesso ou erro).
+  const enviandoParceladoRef = useRef(false);
+
   // --- Handlers ---
   const handleSubmitAdd = useCallback(
     (e: React.FormEvent) => {
@@ -80,6 +92,27 @@ export function useLancamentoModais() {
         carteira_id: carteiraId ?? undefined,
         banco: carteiras.find((c) => c.id === carteiraId)?.nome ?? (formBanco || undefined),
       };
+      if (formTipo === 'despesa' && formParcelar) {
+        if (enviandoParceladoRef.current) return;
+        const { plano, erro } = avaliarParcelas(payload.valor, formParcelas, formData);
+        if (!plano) return toast.error(erro ?? MENSAGEM_TOTAL_VAZIO);
+        enviandoParceladoRef.current = true;
+        criarParcelada.mutate(
+          { base: payload, total: payload.valor, parcelas: formParcelas },
+          {
+            onSuccess: () => {
+              toast.success(`Compra salva em ${formParcelas}× de ${formatBRL(plano[1]!.valor)}`);
+              setShowAddModal(false);
+              resetForm();
+            },
+            onError: () => toast.error('Não foi possível salvar a compra parcelada. Tente de novo.'),
+            onSettled: () => {
+              enviandoParceladoRef.current = false;
+            },
+          },
+        );
+        return;
+      }
       criarTransacao.mutate(payload, {
         onSuccess: () => {
           toast.success('Lançamento criado!');
@@ -91,7 +124,7 @@ export function useLancamentoModais() {
         },
       });
     },
-    [carteiraId, carteiras, formTipo, formCategoria, formDescricao, formValor, formData, formBanco, criarTransacao, toast, resetForm],
+    [carteiraId, carteiras, formTipo, formCategoria, formDescricao, formValor, formData, formBanco, formParcelar, formParcelas, criarTransacao, criarParcelada, toast, resetForm],
   );
 
   const handleSubmitEdit = useCallback(
@@ -131,9 +164,17 @@ export function useLancamentoModais() {
   );
 
   // --- Form JSX (shared between add and edit) ---
-  const renderForm = (onSubmit: (e: React.FormEvent) => void, isSubmitting: boolean) => (
+  const renderForm = (onSubmit: (e: React.FormEvent) => void, isSubmitting: boolean, modo: 'novo' | 'editar') => {
+    // Parcela: edita só esta linha; continua despesa (o banco recusa parcela como receita), então o Tipo some.
+    const parcelaEditada = modo === 'editar' && editingTransacao ? rotuloParcela(editingTransacao) : null;
+    return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <Select
+      {parcelaEditada && (
+        <p className="rounded-lg border border-border bg-card2 px-3 py-2 text-[13px] text-muted" data-testid="nota-parcela-edicao">
+          Parcela {parcelaEditada}. Você muda só esta; as outras ficam como estão.
+        </p>
+      )}
+      {!parcelaEditada && <Select
         label="Tipo"
         value={formTipo}
         onChange={(e) => setFormTipo(e.target.value as 'receita' | 'despesa')}
@@ -141,7 +182,7 @@ export function useLancamentoModais() {
           { value: 'despesa', label: 'Despesa' },
           { value: 'receita', label: 'Receita' },
         ]}
-      />
+      />}
       <Input
         label="Categoria"
         placeholder="Ex.: Alimentação, Transporte…"
@@ -157,7 +198,7 @@ export function useLancamentoModais() {
         required
       />
       <Input
-        label="Valor (R$)"
+        label={modo === 'novo' && formTipo === 'despesa' && formParcelar ? 'Valor total da compra (R$)' : 'Valor (R$)'}
         type="number"
         step="0.01"
         min="0.01"
@@ -172,6 +213,16 @@ export function useLancamentoModais() {
         value={formData}
         onChange={(e) => setFormData(e.target.value)}
       />
+      {modo === 'novo' && formTipo === 'despesa' && (
+        <CampoParcelado
+          ligado={formParcelar}
+          onLigado={setFormParcelar}
+          parcelas={formParcelas}
+          onParcelas={setFormParcelas}
+          total={Number(formValor) || 0}
+          dataPrimeira={formData}
+        />
+      )}
       {carteiras.length > 0 ? (
         <SeletorCarteira
           id="lancamento-carteira" label="Banco ou carteira" carteiras={carteiras} value={carteiraId} onChange={setFormCarteira}
@@ -200,7 +251,8 @@ export function useLancamentoModais() {
         </Button>
       </div>
     </form>
-  );
+    );
+  };
 
   const modais = (
     <>
@@ -210,7 +262,7 @@ export function useLancamentoModais() {
         onClose={() => setShowAddModal(false)}
         title="Novo lançamento"
       >
-        {renderForm(handleSubmitAdd, criarTransacao.isPending)}
+        {renderForm(handleSubmitAdd, criarTransacao.isPending || criarParcelada.isPending, 'novo')}
       </Modal>
 
       {/* Edit Modal */}
@@ -219,7 +271,7 @@ export function useLancamentoModais() {
         onClose={() => setEditingTransacao(null)}
         title="Editar lançamento"
       >
-        {renderForm(handleSubmitEdit, atualizarTransacao.isPending)}
+        {renderForm(handleSubmitEdit, atualizarTransacao.isPending, 'editar')}
       </Modal>
 
     </>

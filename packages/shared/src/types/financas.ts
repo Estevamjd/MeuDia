@@ -17,6 +17,9 @@ export interface Transacao {
   carteira_id?: UUID | null;
   /** Correção de saldo: entra no saldo, mas fica fora de renda/gasto/gráficos. */
   ajuste?: boolean;
+  parcela_grupo?: UUID | null;
+  parcela_num?: number | null;
+  parcela_total?: number | null;
   /** Onde nasceu (009): `app` = manual, `whatsapp` = assistente. Ausente = legado/`app`. */
   origem?: OrigemLancamento;
 }
@@ -33,6 +36,9 @@ export interface TransacaoInsert {
   automatico?: boolean;
   carteira_id?: UUID | null;
   ajuste?: boolean;
+  parcela_grupo?: UUID | null;
+  parcela_num?: number | null;
+  parcela_total?: number | null;
 }
 
 export interface Assinatura {

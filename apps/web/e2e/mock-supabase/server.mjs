@@ -64,7 +64,8 @@ const DEFAULTS = {
   pagamentos_conta: () => ({ transacao_id: null, created_at: nowIso() }),
   rendas: () => ({ dia_recebimento: null, ativo: true, carteira_id: null, created_at: nowIso(), updated_at: nowIso() }),
   orcamento_categorias: () => ({ created_at: nowIso(), updated_at: nowIso() }),
-  transacoes: () => ({ data: hojeSP(), banco: null, automatico: false, carteira_id: null, ajuste: false, origem: 'app', created_at: nowIso() }),
+  // 017: parcela_grupo/parcela_num/parcela_total NULL por padrão (compra à vista).
+  transacoes: () => ({ data: hojeSP(), banco: null, automatico: false, carteira_id: null, ajuste: false, origem: 'app', parcela_grupo: null, parcela_num: null, parcela_total: null, created_at: nowIso() }),
   carteiras: () => ({ tipo: 'banco', saldo_inicial: 0, saldo_inicial_em: nowIso(), incluir_no_total: true, arquivada: false, ordem: 0, created_at: nowIso(), updated_at: nowIso() }),
   transferencias: () => ({ descricao: null, created_at: nowIso(), updated_at: nowIso() }),
   recebimentos_renda: () => ({ transacao_id: null, created_at: nowIso() }),
@@ -102,6 +103,8 @@ const UNIQUES = {
   preferencias_agente: [['user_id']],
   perfil_saude: [['user_id']],
   registros_habito: [['habito_id', 'data']],
+  // 017: uq_transacoes_parcela (parcial: só com parcela_grupo; NULL fica de fora pela regra do checkUnique).
+  transacoes: [['user_id', 'parcela_grupo', 'parcela_num']],
 };
 
 class PgError extends Error {
@@ -154,6 +157,13 @@ function checkRow(table, r) {
   if (table === 'transacoes') {
     notNull('user_id', 'tipo', 'categoria', 'descricao', 'valor');
     if (!['receita', 'despesa'].includes(r.tipo)) fail('tipo');
+    // 017 transacoes_parcela_check: os três NULL, ou despesa com 2 ≤ total ≤ 24 e 1 ≤ num ≤ total.
+    const nulo = (v) => v === null || v === undefined;
+    const g = r.parcela_grupo, n = r.parcela_num, t = r.parcela_total;
+    const avista = nulo(g) && nulo(n) && nulo(t);
+    const parcela = !nulo(g) && r.tipo === 'despesa' && Number.isInteger(Number(t)) && Number(t) >= 2 && Number(t) <= 24
+      && Number.isInteger(Number(n)) && Number(n) >= 1 && Number(n) <= Number(t);
+    if (!avista && !parcela) fail('transacoes_parcela_check');
   }
   if (table === 'carteiras') {
     notNull('user_id', 'nome');
@@ -635,7 +645,14 @@ function handleRest(req, res, url, body) {
       checkRow(table, row);
       checkFks(table, row);
       checkUnique(table, row);
-      for (const s of staged) if (s.kind === 'insert' && s.value.id === row.id) throw new PgError(409, '23505', 'duplicate key');
+      // Lote = um statement: duplicata dentro do próprio lote (id ou UNIQUE) derruba tudo, nada é gravado.
+      for (const s of staged) {
+        if (s.kind !== 'insert') continue;
+        for (const cols of [['id'], ...(UNIQUES[table] ?? [])]) {
+          if (cols.some((c) => row[c] === null || row[c] === undefined)) continue;
+          if (cols.every((c) => String(s.value[c]) === String(row[c]))) throw new PgError(409, '23505', `duplicate key value violates unique constraint "${table}_${cols.join('_')}_key"`);
+        }
+      }
       staged.push({ kind: 'insert', value: row });
     }
     for (const s of staged) {

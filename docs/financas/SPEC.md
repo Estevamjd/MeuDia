@@ -26,7 +26,28 @@ A usuária (iPhone, PWA) quer cadastrar contas e assinaturas, ser lembrada por p
 
 ## 3. Fora do escopo
 
-WhatsApp, SMS, e-mail (fase 2; o modelo já aceita `canal='email'`), Open Finance, App Store, push via Expo, LLM no chat, várias moedas, compartilhamento, ajuste para dia útil, juros/multa, parcelamento.
+WhatsApp, SMS, e-mail (fase 2; o modelo já aceita `canal='email'`), Open Finance, App Store, push via Expo, LLM no chat, várias moedas, compartilhamento, ajuste para dia útil, juros/multa.
+
+## Parcelado no cartão (017)
+
+Uma compra parcelada vira 2–24 despesas em `transacoes`, ligadas por `parcela_grupo` (UUID),
+com `parcela_num` e `parcela_total`. O trio fica inteiramente NULL para lançamentos comuns.
+CHECK limita a despesas e números válidos; índice único impede repetir (dono, grupo, número).
+A criação usa um único INSERT em lote: falha em qualquer linha reverte o lote inteiro.
+
+O total positivo, com até duas casas decimais, é dividido em centavos inteiros: cada parcela
+recebe `floor(totalCentavos / n)` e todo o resto vai para a primeira. A soma em centavos é
+exata. A descrição permanece igual; “k/N” aparece só na exibição. A primeira data é a compra;
+cada próxima soma meses ao dia **original**, limitado ao último dia do mês (31/01 → 28 ou
+29/02 → 31/03), sem acumular o ajuste de fevereiro.
+
+Saldo atual só desconta parcelas com data até hoje (RPCs da 015 inalteradas). O “Deve sobrar”
+de cada competência desconta somente a parcela datada naquele mês como gasto extra.
+Editar afeta só uma linha, sem poder mudar grupo/número/total. Excluir pode remover uma linha
+ou aquela e as seguintes (`parcela_num >= k`), sempre filtrando dono e grupo e com confirmação
+na interface. Não muda pagamentos/recebimentos vinculados, que continuam exigindo Desfazer.
+A 017 não cria RPCs/policies: a RLS existente protege as parcelas; down remove só o índice,
+CHECK e as três colunas, mantendo todas as linhas e perdendo apenas os metadados de parcela.
 
 ## 4. Modelo de dados — migration `005_financas.sql` (+ `005_financas_down.sql`)
 

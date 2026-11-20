@@ -4,13 +4,14 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { Transacao } from '@meudia/shared';
 import { useLancamentoModais } from '../LancamentoModais';
 const m = vi.hoisted(() => ({
-  criar: vi.fn(), atualizar: vi.fn(), carteiras: [] as unknown[],
+  criar: vi.fn(), atualizar: vi.fn(), parcelar: vi.fn(), carteiras: [] as unknown[],
   consulta: { isPending: false, isError: false, isSuccess: true },
   editar: null as Transacao | null,
 }));
 vi.mock('../../../hooks', () => ({
   useCarteiras: () => ({ data: m.consulta.isSuccess ? m.carteiras : undefined, ...m.consulta }),
   useCriarTransacao: () => ({ mutate: m.criar }), useAtualizarTransacao: () => ({ mutate: m.atualizar }),
+  useCriarDespesaParcelada: () => ({ mutate: m.parcelar, isPending: false }),
 }));
 vi.mock('../../ui', async (original) => ({ ...await original<object>(), useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
 /** A Início e Gastos usam o mesmo hook: botões de abrir + os modais. */

@@ -6,6 +6,7 @@ import { formatBRL, formatDiaMes } from '../../../lib/financas-ui';
 import { VALOR_OCULTO } from '../../../lib/carteiras-ui';
 import { CategoriaIcone } from '../CategoriaIcone';
 import { OrigemSelo } from '../OrigemSelo';
+import { SeloParcela } from '../SeloParcela';
 
 export interface UltimosLancamentosProps {
   lancamentos: Transacao[];
@@ -51,6 +52,7 @@ export function UltimosLancamentos({ lancamentos, escondido = false, onGastei }:
                     {t.categoria} · {formatDiaMes(t.data)}
                   </span>
                   <OrigemSelo t={t} />
+                  <SeloParcela t={t} />
                 </div>
               </div>
               <span

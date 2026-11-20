@@ -4,10 +4,11 @@ import { pagamentosContaRepository as pagamentos, recebimentosRendaRepository as
 vi.mock('../../repositories', () => ({
   pagamentosContaRepository: { findByTransacoes: vi.fn() },
   recebimentosRendaRepository: { findByTransacoes: vi.fn() },
-  transacaoRepository: { update: vi.fn(), remove: vi.fn(), findByDateRange: vi.fn() },
+  transacaoRepository: { findById: vi.fn().mockResolvedValue({ id: 't' }), update: vi.fn(), remove: vi.fn(), findByDateRange: vi.fn() },
 }));
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(transacoes.findById).mockResolvedValue({ id: 't' } as never);
   vi.mocked(pagamentos.findByTransacoes).mockResolvedValue([]);
   vi.mocked(recebimentos.findByTransacoes).mockResolvedValue([]);
 });

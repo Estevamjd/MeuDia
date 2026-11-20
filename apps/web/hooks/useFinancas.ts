@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { financasService } from '@meudia/api';
-import type { TransacaoInsert } from '@meudia/shared';
+import type { TransacaoInsert, UUID } from '@meudia/shared';
 import { useAuth } from './useAuth';
 import { chavesAfetadasPorLancamento } from '../lib/financas-query-keys';
 import { withOfflineSupport } from '../lib/offline-mutation';
@@ -105,6 +105,44 @@ export function useExcluirTransacao() {
       },
       (id) => ({ userId: user?.id, id }),
     ),
+    onSuccess: () => {
+      for (const queryKey of chavesAfetadasPorLancamento()) void queryClient.invalidateQueries({ queryKey });
+    },
+  });
+}
+
+export interface DespesaParceladaInput {
+  /** Dados comuns às parcelas (tipo despesa, categoria, descrição, banco, data da 1ª). */
+  base: TransacaoInsert;
+  /** Valor TOTAL da compra; a divisão em centavos é do service (`dividirParcelas`). */
+  total: number;
+  parcelas: number;
+}
+
+/** Compra parcelada no cartão: N despesas num insert só (tudo ou nada). Sem fila offline (lote atômico). */
+export function useCriarDespesaParcelada() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: DespesaParceladaInput) => {
+      if (!user?.id) throw new Error('Não autenticado');
+      return financasService.criarDespesaParcelada(user.id, input);
+    },
+    onSuccess: () => {
+      for (const queryKey of chavesAfetadasPorLancamento()) void queryClient.invalidateQueries({ queryKey });
+    },
+  });
+}
+
+/** "Esta e as próximas": apaga as parcelas do grupo a partir de `aPartirDe` (inclusive). */
+export function useExcluirParcelasDesde() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ grupo, aPartirDe }: { grupo: UUID; aPartirDe: number }) => {
+      if (!user?.id) throw new Error('Não autenticado');
+      return financasService.excluirParcelasDesde(user.id, grupo, aPartirDe);
+    },
     onSuccess: () => {
       for (const queryKey of chavesAfetadasPorLancamento()) void queryClient.invalidateQueries({ queryKey });
     },

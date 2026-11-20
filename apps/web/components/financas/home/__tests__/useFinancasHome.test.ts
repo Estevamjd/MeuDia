@@ -37,6 +37,9 @@ const m = vi.hoisted(() => ({
   criarRenda: { mutate: vi.fn(), reset: vi.fn(), isPending: false, isError: false },
   toast: { error: vi.fn(), success: vi.fn() },
   fecharMes: { mutate: vi.fn(), isPending: false },
+  metas: [] as unknown[],
+  guardar: { mutate: vi.fn(), reset: vi.fn(), isPending: false },
+  atualizarMeta: { mutate: vi.fn(), reset: vi.fn(), isPending: false },
 }));
 
 vi.mock('../../../../hooks', () => ({
@@ -45,7 +48,9 @@ vi.mock('../../../../hooks', () => ({
   useContasMes: () => q.contas,
   useTransacoesMes: () => q.transacoes,
   useRendas: () => q.rendas,
-  useMetas: () => ({ data: [] }),
+  useMetas: () => ({ data: m.metas }),
+  useGuardarNaMeta: () => m.guardar,
+  useAtualizarMeta: () => m.atualizarMeta,
   useCriarRenda: () => m.criarRenda,
   usePainelSaldo: () => m.painel,
   useReceberRenda: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false }),
@@ -58,6 +63,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   m.painel = { data: undefined, isLoading: false, isError: false, error: null };
   m.criarRenda.isError = false;
+  m.metas = [];
 });
 afterEach(cleanup);
 
@@ -237,5 +243,38 @@ describe('fechamento do mês (Cofrinho)', () => {
     preparar();
     m.painel.data = painel(['2026-09']);
     expect(montarEm().current.dashboard!.fechamentoSheet.pergunta).toBeNull();
+  });
+});
+
+describe('useFinancasHome: "+ Guardei" do cartão Meta', () => {
+  const META = { id: 'm1', nome: 'Viagem', valor_alvo: 1000, valor_guardado: 100 };
+  type Callbacks = { onSuccess: () => void; onError: () => void };
+
+  it('abre a meta pelo id, soma pelo useGuardarNaMeta (RPC) e, no sucesso, avisa e fecha', () => {
+    preparar();
+    m.metas = [META];
+    const r = montar();
+    expect(r.current.guardei?.meta).toBeNull();
+    act(() => r.current.guardei!.onAbrir('m1'));
+    expect(r.current.guardei?.meta).toEqual(META);
+    act(() => r.current.guardei!.onGuardar(50));
+    expect(m.guardar.mutate).toHaveBeenCalledWith({ id: 'm1', valor: 50 }, expect.anything());
+    const cb = m.guardar.mutate.mock.calls[0]![1] as Callbacks;
+    act(() => cb.onSuccess());
+    expect(m.toast.success).toHaveBeenCalledWith('Guardado!');
+    expect(r.current.guardei?.meta).toBeNull();
+  });
+
+  it('corrigir grava o total pelo useAtualizarMeta; erro avisa e mantém o formulário aberto', () => {
+    preparar();
+    m.metas = [META];
+    const r = montar();
+    act(() => r.current.guardei!.onAbrir('m1'));
+    act(() => r.current.guardei!.onCorrigir(300));
+    expect(m.atualizarMeta.mutate).toHaveBeenCalledWith({ id: 'm1', data: { valor_guardado: 300 } }, expect.anything());
+    const cb = m.atualizarMeta.mutate.mock.calls[0]![1] as Callbacks;
+    act(() => cb.onError());
+    expect(m.toast.error).toHaveBeenCalledWith('Não foi possível salvar. Tente de novo.');
+    expect(r.current.guardei?.meta).toEqual(META);
   });
 });

@@ -1,10 +1,10 @@
 'use client';
 
-import { Suspense, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { clsx } from 'clsx';
-import { ChevronDown, Plus } from 'lucide-react';
+import { ChevronDown, Plus, Search, X } from 'lucide-react';
 import { hojeSP, ultimasDespesas, type OcorrenciaConta, type Transacao } from '@meudia/shared';
 import { useContasMes, useHistoricoSaldoMes, usePainelSaldo, useResumoFinanceiroMes, useTransacoesMes } from '../../../../hooks';
 import { Button, SkeletonList } from '../../../../components/ui';
@@ -21,7 +21,7 @@ import { contasFixasDoMes } from '../../../../components/financas/gastos/contasF
 import { usePagamentoAcoes } from '../../../../components/financas/usePagamentoAcoes';
 import { montarDashboard } from '../../../../components/financas/home/montarDashboard';
 import { lerEsconderValores } from '../../../../lib/carteiras-ui';
-import { deslocarCompetencia, formatBRL, formatDiaMes, partesCompetencia } from '../../../../lib/financas-ui';
+import { deslocarCompetencia, formatBRL, formatDiaMes, nomeMes, partesCompetencia } from '../../../../lib/financas-ui';
 import { filtrosGastos, hrefGastos, type AbaGastos } from '../../../../lib/gastos-url';
 
 export default function GastosPage() {
@@ -44,6 +44,13 @@ function Gastos() {
   const hojeISO = useMemo(() => hojeSP(), []);
   const filtros = filtrosGastos(params, hojeISO);
   const ir = (mudanca: Parameters<typeof hrefGastos>[1]) => router.replace(hrefGastos(filtros, mudanca, hojeISO), { scroll: false });
+  // Ação de fora do campo de busca (mês, categoria, Só WhatsApp, Limpar filtros): descarta a busca ainda no atraso,
+  // mesmo quando o `q` da URL não muda (ver `CampoBusca`).
+  const [acoesExternas, setAcoesExternas] = useState(0);
+  const irPorFora = (mudanca: Parameters<typeof hrefGastos>[1]) => {
+    setAcoesExternas((n) => n + 1);
+    ir(mudanca);
+  };
   const { ano, mes } = partesCompetencia(filtros.mes);
   const transacoes = useTransacoesMes(ano, mes);
   const ocorrencias = useContasMes(filtros.mes);
@@ -57,7 +64,7 @@ function Gastos() {
     <div className="animate-fadeSlide space-y-4">
       <div className="flex items-center justify-between gap-2">
         <h1 className="font-syne text-2xl font-bold text-text md:text-3xl">Gastos</h1>
-        <SeletorMes competencia={filtros.mes} onMudar={(d) => ir({ mes: deslocarCompetencia(filtros.mes, d) })} />
+        <SeletorMes competencia={filtros.mes} onMudar={(d) => irPorFora({ mes: deslocarCompetencia(filtros.mes, d) })} />
       </div>
 
       <div role="tablist" aria-label="Seções de Gastos" className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-card p-1">
@@ -89,7 +96,13 @@ function Gastos() {
           erro={transacoes.isError}
           mes={filtros.mes}
           categoria={filtros.categoria}
-          onCategoria={(categoria) => ir({ categoria })}
+          onCategoria={(categoria) => irPorFora({ categoria })}
+          busca={filtros.busca}
+          onBusca={(busca) => ir({ busca })}
+          soWhatsapp={filtros.soWhatsapp}
+          onSoWhatsapp={(soWhatsapp) => irPorFora({ soWhatsapp })}
+          onLimparFiltros={() => irPorFora({ busca: '', soWhatsapp: false, categoria: null })}
+          acoesExternas={acoesExternas}
           onGastei={() => setGastei(true)}
           onNovo={lancamento.abrirNovo}
           vinculos={exclusao.vinculos}
@@ -106,6 +119,7 @@ function Gastos() {
         titulo="Excluir lançamento"
         detalhe={exclusao.exclusao?.detalhe}
         isLoading={exclusao.exclusao?.carregando}
+        parcela={exclusao.exclusao?.parcela}
       />
     </div>
   );
@@ -121,20 +135,31 @@ interface UltimasDespesasProps {
   mes: string;
   categoria: string | null;
   onCategoria: (categoria: string | null) => void;
+  /** Busca e "Só WhatsApp" (na URL); filtram a lista do mês já carregada, sem consulta nova. */
+  busca: string;
+  onBusca: (busca: string) => void;
+  soWhatsapp: boolean;
+  onSoWhatsapp: (ligado: boolean) => void;
+  onLimparFiltros: () => void;
+  /** Muda a cada ação de fora do campo de busca: remonta o campo e cancela o atraso pendente. */
+  acoesExternas: number;
   onGastei: () => void;
   onNovo: () => void;
   vinculos: Record<string, 'recebimento' | 'pagamento'>;
   acoes: Acoes;
 }
 
-function UltimasDespesas({ transacoes, ocorrencias, carregando, erro, mes, categoria, onCategoria, onGastei, onNovo, vinculos, acoes }: UltimasDespesasProps) {
+function UltimasDespesas({ transacoes, ocorrencias, carregando, erro, mes, categoria, onCategoria, busca, onBusca, soWhatsapp, onSoWhatsapp, onLimparFiltros, acoesExternas, onGastei, onNovo, vinculos, acoes }: UltimasDespesasProps) {
   // "Paguei" é a conta fixa (vai no card de contas), não gasto do dia a dia: assim o total bate com a Início.
   const extras = useMemo(() => transacoes.filter((t) => vinculos[t.id] !== 'pagamento'), [transacoes, vinculos]);
-  const r = useMemo(() => ultimasDespesas(extras, { mes, categoria }), [extras, mes, categoria]);
+  const r = useMemo(() => ultimasDespesas(extras, { mes, categoria, busca, soWhatsapp }), [extras, mes, categoria, busca, soWhatsapp]);
+  // Categorias do select: as do mês inteiro (a busca não pode esvaziar a lista de onde se escolhe).
+  const categoriasDoMes = useMemo(() => ultimasDespesas(extras, { mes }).categorias, [extras, mes]);
+  const buscando = !!busca.trim() || soWhatsapp;
   const contas = useMemo(() => contasFixasDoMes(ocorrencias, transacoes, categoria), [ocorrencias, transacoes, categoria]);
   const { desfazerPagamento, contaOcupada } = usePagamentoAcoes();
   // Categoria da URL sem despesa no mês continua no select (senão o filtro some da tela).
-  const categorias = categoria && !r.categorias.includes(categoria) ? [...r.categorias, categoria] : r.categorias;
+  const categorias = categoria && !categoriasDoMes.includes(categoria) ? [...categoriasDoMes, categoria] : categoriasDoMes;
   return (
     <section aria-label="Últimas despesas" className="space-y-3">
       <div className="flex items-center gap-2">
@@ -159,6 +184,31 @@ function UltimasDespesas({ transacoes, ocorrencias, carregando, erro, mes, categ
         </Button>
       </div>
 
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-2">
+          {/* A chave junta o resto dos filtros (inclusive voltar/avançar do navegador) e as ações de fora: qualquer
+              mudança remonta o campo, o que limpa o atraso pendente e devolve o texto ao `q` da URL. */}
+          <CampoBusca key={`${mes}|${categoria ?? ''}|${soWhatsapp}|${acoesExternas}`} valor={busca} onMudar={onBusca} />
+          <button
+            type="button"
+            aria-pressed={soWhatsapp}
+            onClick={() => onSoWhatsapp(!soWhatsapp)}
+            data-testid="gastos-so-whatsapp"
+            className={clsx(
+              'min-h-[44px] shrink-0 whitespace-nowrap rounded-full border px-3 text-[14px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent',
+              soWhatsapp ? 'border-accent bg-accent/[0.18] text-accent' : 'border-border bg-card2 text-muted hover:text-text',
+            )}
+          >
+            Só WhatsApp
+          </button>
+        </div>
+        {buscando && (
+          <p className="px-1 text-[12px] text-muted" data-testid="gastos-busca-escopo">
+            Buscando só em <span className="capitalize">{nomeMes(mes)}</span>.
+          </p>
+        )}
+      </div>
+
       <ContasFixasMes
         mes={mes}
         contas={contas}
@@ -167,7 +217,9 @@ function UltimasDespesas({ transacoes, ocorrencias, carregando, erro, mes, categ
       />
 
       <p className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-[15px]">
-        <span className="text-muted">Gastos do mês{categoria ? ` em ${categoria}` : ''} <span className="text-[12px]">(fora as contas fixas)</span></span>
+        <span className="text-muted">
+          {buscando ? 'Gastos encontrados' : 'Gastos do mês'}{categoria ? ` em ${categoria}` : ''} <span className="text-[12px]">(fora as contas fixas)</span>
+        </span>
         <span data-testid="total-gastos" className="font-semibold tabular-nums text-red">{formatBRL(r.total)}</span>
       </p>
 
@@ -175,6 +227,17 @@ function UltimasDespesas({ transacoes, ocorrencias, carregando, erro, mes, categ
         <SkeletonList count={3} />
       ) : erro ? (
         <p role="alert" className="rounded-card border border-red/40 bg-card p-4 text-[15px] text-text">Não foi possível carregar os gastos.</p>
+      ) : r.dias.length === 0 && buscando ? (
+        <div className="space-y-3 rounded-card border border-border bg-card p-4 text-center" data-testid="gastos-busca-vazia">
+          <p className="text-[15px] text-text">
+            {busca.trim() ? <>Nada com &ldquo;{busca.trim()}&rdquo;</> : 'Nenhum gasto pelo WhatsApp'}
+            {busca.trim() && soWhatsapp ? ' pelo WhatsApp' : ''} em <span className="capitalize">{nomeMes(mes)}</span>.
+          </p>
+          <p className="text-[13px] text-muted">Tente outra palavra ou troque o mês.</p>
+          <Button variant="ghost" onClick={onLimparFiltros} className="min-h-[44px]">
+            Limpar filtros
+          </Button>
+        </div>
       ) : r.dias.length === 0 ? (
         <p className="rounded-card border border-border bg-card p-4 text-[15px] text-muted">Nenhum gasto fora das contas fixas neste filtro.</p>
       ) : (
@@ -197,6 +260,71 @@ function UltimasDespesas({ transacoes, ocorrencias, carregando, erro, mes, categ
         <Plus size={16} aria-hidden="true" /> Novo lançamento
       </Button>
     </section>
+  );
+}
+
+/** Atraso da busca: digita sem trocar a URL a cada letra. */
+const ESPERA_BUSCA_MS = 200;
+
+/**
+ * Campo "Buscar gasto": o texto vive aqui e vai para a URL 200 ms depois da última tecla (o X limpa na hora). Se a
+ * URL mudar por fora (Limpar filtros, voltar), o campo acompanha.
+ *
+ * Regra do atraso: qualquer ação fora do campo antes dos 200 ms (trocar o mês, a categoria, "Só WhatsApp", "Limpar
+ * filtros", voltar/avançar) descarta o texto ainda não enviado; o campo volta ao `q` da URL e nada é reaplicado
+ * depois. Quem remonta o campo é a `key` dada por `UltimasDespesas`.
+ */
+function CampoBusca({ valor, onMudar }: { valor: string; onMudar: (v: string) => void }) {
+  const [texto, setTexto] = useState(valor);
+  const [valorAntes, setValorAntes] = useState(valor);
+  const enviadoRef = useRef(valor);
+  const onMudarRef = useRef(onMudar);
+  onMudarRef.current = onMudar;
+  if (valor !== valorAntes) {
+    setValorAntes(valor);
+    if (valor !== enviadoRef.current) {
+      enviadoRef.current = valor;
+      setTexto(valor);
+    }
+  }
+  useEffect(() => {
+    if (texto === enviadoRef.current) return;
+    const t = setTimeout(() => {
+      enviadoRef.current = texto;
+      onMudarRef.current(texto);
+    }, ESPERA_BUSCA_MS);
+    return () => clearTimeout(t);
+  }, [texto]);
+  const limpar = () => {
+    setTexto('');
+    enviadoRef.current = '';
+    onMudarRef.current('');
+  };
+  return (
+    <div className="relative min-w-0 flex-1">
+      <label htmlFor="busca-gasto" className="sr-only">Buscar gasto</label>
+      <Search size={16} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+      <input
+        id="busca-gasto"
+        type="search"
+        enterKeyHint="search"
+        autoComplete="off"
+        placeholder="Buscar gasto"
+        value={texto}
+        onChange={(e) => setTexto(e.target.value)}
+        className="min-h-[44px] w-full appearance-none rounded-lg border border-border bg-card2 pl-9 pr-11 text-[16px] text-text placeholder:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-search-cancel-button]:hidden"
+      />
+      {texto && (
+        <button
+          type="button"
+          onClick={limpar}
+          aria-label="Limpar busca"
+          className="absolute right-0 top-0 flex h-11 w-11 items-center justify-center rounded-lg text-muted hover:text-text"
+        >
+          <X size={16} aria-hidden="true" />
+        </button>
+      )}
+    </div>
   );
 }
 

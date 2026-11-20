@@ -230,9 +230,9 @@ describe('montarHome (Início resumida)', () => {
 describe('FinancasHomeView (Início, design v2)', () => {
   const regioes = () => screen.getAllByRole('region').map((r) => (r.getAttribute('aria-labelledby') ? document.getElementById(r.getAttribute('aria-labelledby')!)?.textContent : r.getAttribute('aria-label')));
 
-  it('maço de cartões (Resumo → A conta de outubro) → Contas a vencer → Para onde foi → Últimos lançamentos; Cofrinho no rodapé do cartão', () => {
+  it('maço de cartões (Resumo → Ritmo de outubro) → Contas a vencer → Para onde foi → Últimos lançamentos; Cofrinho no rodapé do cartão', () => {
     render(<FinancasHomeView {...viewProps()} />);
-    expect(regioes()).toEqual(['Resumo do mês', 'A conta de outubro', 'Contas a vencer', 'Para onde foi', 'Últimos lançamentos']);
+    expect(regioes()).toEqual(['Resumo do mês', 'Ritmo de outubro', 'Contas a vencer', 'Para onde foi', 'Últimos lançamentos']);
     const linha = screen.getByTestId('linha-cofrinho');
     expect(linha.getAttribute('href')).toBe('/financas/carteiras');
     expect(texto(linha)).toContain('Cofrinho');
@@ -342,13 +342,13 @@ describe('FinancasHomeView (Início, design v2)', () => {
   it('renda cadastrada sem contas: card no passo 2 acima do resumo', () => {
     render(<FinancasHomeView {...viewProps({ boasVindas: { rendaCadastrada: true, onCadastrarRenda: vi.fn() } })} />);
     expect(texto()).toContain('Passo 2 de 2');
-    expect(texto()).toContain('A conta de outubro');
+    expect(texto()).toContain('Ritmo de outubro');
   });
 
   it('usuária nova com banco e sem gasto: faixa do passo 1 → maço → Últimos lançamentos com "Gastei" (sem "Para onde foi" vazio)', () => {
     const onGastei = vi.fn();
     render(<FinancasHomeView {...viewProps({ onGastei, boasVindas: { rendaCadastrada: false, onCadastrarRenda: vi.fn() }, resumo: montarResumoMes('2026-10', [], sobra) }, { ocorrencias: [], transacoes: [] })} />);
-    expect(regioes()).toEqual(['Vamos montar seu mês', 'Resumo do mês', 'A conta de outubro', 'Contas a vencer', 'Últimos lançamentos']);
+    expect(regioes()).toEqual(['Vamos montar seu mês', 'Resumo do mês', 'Ritmo de outubro', 'Contas a vencer', 'Últimos lançamentos']);
     expect(screen.queryByRole('region', { name: 'Para onde foi' })).toBeNull();
     // Vazio: "Gastei" no cabeçalho do card (ao lado do título) e sem a linha de rodapé, para caber acima da barra.
     const titulo = screen.getByRole('heading', { name: 'Últimos lançamentos' });

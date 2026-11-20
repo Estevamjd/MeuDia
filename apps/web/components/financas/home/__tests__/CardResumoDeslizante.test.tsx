@@ -26,15 +26,15 @@ const meta: MetaDoCartao = {
 const base = { sobra, cofrinho: 150, hojeISO: '2026-11-19' };
 
 describe('CardResumoDeslizante (Início v5, maço)', () => {
-  it('páginas: Resumo e A conta; Meta só quando existe meta', () => {
-    expect(paginasDoCartao(false).map((p) => p.titulo)).toEqual(['Resumo', 'A conta']);
-    expect(paginasDoCartao(true).map((p) => p.titulo)).toEqual(['Resumo', 'A conta', 'Meta']);
+  it('páginas: Resumo e Ritmo; Meta só quando existe meta', () => {
+    expect(paginasDoCartao(false).map((p) => p.titulo)).toEqual(['Resumo', 'Ritmo']);
+    expect(paginasDoCartao(true).map((p) => p.titulo)).toEqual(['Resumo', 'Ritmo', 'Meta']);
   });
 
   it('sem meta: 2 páginas, sem linha nem página de meta', () => {
     render(<CardResumoDeslizante {...base} />);
     expect((screen.getByTestId('cartao-resumo')).getAttribute('data-paginas')).toBe('2');
-    expect(screen.getAllByRole('group').map((g) => g.getAttribute('aria-label'))).toEqual(['1 de 2: Resumo', '2 de 2: A conta']);
+    expect(screen.getAllByRole('group').map((g) => g.getAttribute('aria-label'))).toEqual(['1 de 2: Resumo', '2 de 2: Ritmo']);
     expect(screen.queryByTestId('cartao-meta-mini')).toBeNull();
     expect(screen.queryByTestId('cartao-pagina-meta')).toBeNull();
   });
@@ -50,7 +50,7 @@ describe('CardResumoDeslizante (Início v5, maço)', () => {
     expect(t(within(conta).getByTestId('previsao-fim-mes-valor'))).toBe('R$ 139,10');
     expect(t(within(conta).getByTestId('resumo-contas-fixas'))).toBe('− R$ 744,00');
     expect(t(within(conta).getByTestId('resumo-gastos'))).toBe('− R$ 59,90');
-    expect(within(conta).getByRole('heading', { level: 2 }).textContent).toBe('A conta de novembro');
+    expect(within(conta).getByRole('heading', { level: 2 }).textContent).toBe('Ritmo de novembro');
   });
 
   it('com meta: 3 páginas, linha da meta na página 1 e a página Meta com %, valores, falta, hoje, ritmo e por mês', () => {
@@ -82,11 +82,11 @@ describe('CardResumoDeslizante (Início v5, maço)', () => {
     render(<CardResumoDeslizante {...base} metas={[meta]} />);
     const anterior = screen.getByRole('button', { name: 'Cartão anterior' });
     expect((anterior as HTMLButtonElement).disabled).toBe(true);
-    const proximo = screen.getByRole('button', { name: 'Próximo cartão: A conta' });
+    const proximo = screen.getByRole('button', { name: 'Próximo cartão: Ritmo' });
     expect(proximo.hasAttribute('aria-controls')).toBe(true);
     fireEvent.click(proximo);
-    expect(screen.getByText('Cartão 2 de 3: A conta')).toBeTruthy();
-    expect(t(screen.getByTestId('cartao-posicao'))).toBe('2 de 3 · A conta');
+    expect(screen.getByText('Cartão 2 de 3: Ritmo')).toBeTruthy();
+    expect(t(screen.getByTestId('cartao-posicao'))).toBe('2 de 3 · Ritmo');
     expect(screen.getByRole('button', { name: 'Cartão anterior: Resumo' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: Meta' }));
     expect(screen.getByText('Cartão 3 de 3: Meta')).toBeTruthy();
@@ -98,7 +98,7 @@ describe('CardResumoDeslizante (Início v5, maço)', () => {
     const inert = (id: string) => (screen.getByTestId(id) as HTMLElement & { inert: boolean }).inert;
     expect([inert('cartao-pagina-resumo'), inert('cartao-pagina-conta'), inert('cartao-pagina-meta')]).toEqual([false, true, true]);
     expect(screen.getByTestId('cartao-pagina-resumo').className).toContain('cartao-frente');
-    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: A conta' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: Ritmo' }));
     expect([inert('cartao-pagina-resumo'), inert('cartao-pagina-conta'), inert('cartao-pagina-meta')]).toEqual([true, false, true]);
   });
 
@@ -114,7 +114,7 @@ describe('CardResumoDeslizante (Início v5, maço)', () => {
       expect((screen.getByTestId(id) as HTMLElement).getAttribute('style')).toBeNull();
     }
     expect([lado('cartao-pagina-resumo'), lado('cartao-pagina-conta'), lado('cartao-pagina-meta')]).toEqual(['atual', 'dir', 'dir']);
-    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: A conta' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: Ritmo' }));
     expect([lado('cartao-pagina-resumo'), lado('cartao-pagina-conta'), lado('cartao-pagina-meta')]).toEqual(['esq', 'atual', 'dir']);
   });
 
@@ -135,7 +135,7 @@ describe('CardResumoDeslizante (Início v5, maço)', () => {
     render(<CardResumoDeslizante {...base} metas={[meta]} />);
     const trilho = screen.getByLabelText(/Cartões do resumo do mês/);
     fireEvent.keyDown(trilho, { key: 'ArrowRight' });
-    expect(screen.getByText('Cartão 2 de 3: A conta')).toBeTruthy();
+    expect(screen.getByText('Cartão 2 de 3: Ritmo')).toBeTruthy();
     fireEvent.keyDown(trilho, { key: 'ArrowLeft' });
     expect(screen.getByText('Cartão 1 de 3: Resumo')).toBeTruthy();
   });
@@ -161,8 +161,8 @@ describe('CardResumoDeslizante (Início v5, maço)', () => {
       fireEvent.touchEnd(trilho);
       expect(secao.className).not.toContain('maco-segurando');
       act(() => { vi.advanceTimersByTime(700); });
-      expect(t(screen.getByTestId('cartao-posicao'))).toBe('2 de 3 · A conta');
-      expect(screen.getByText('Cartão 2 de 3: A conta')).toBeTruthy();
+      expect(t(screen.getByTestId('cartao-posicao'))).toBe('2 de 3 · Ritmo');
+      expect(screen.getByText('Cartão 2 de 3: Ritmo')).toBeTruthy();
     } finally {
       vi.useRealTimers();
       vi.unstubAllGlobals();
@@ -190,8 +190,8 @@ describe('CardResumoDeslizante (Início v5, maço)', () => {
       expect(t(screen.getByTestId('cartao-posicao'))).toBe('1 de 3 · Resumo');
       fireEvent.touchEnd(trilho);
       act(() => { vi.advanceTimersByTime(200); });
-      expect(t(screen.getByTestId('cartao-posicao'))).toBe('2 de 3 · A conta');
-      expect(screen.getByText('Cartão 2 de 3: A conta')).toBeTruthy();
+      expect(t(screen.getByTestId('cartao-posicao'))).toBe('2 de 3 · Ritmo');
+      expect(screen.getByText('Cartão 2 de 3: Ritmo')).toBeTruthy();
     } finally {
       vi.useRealTimers();
       vi.unstubAllGlobals();
@@ -266,8 +266,8 @@ describe('caminho do maço (data-maco): rolagem × reserva', () => {
     cruzar([[0, 0.55], [1, 0.45]]);
     expect(t(screen.getByTestId('cartao-posicao'))).toBe('1 de 3 · Resumo');
     cruzar([[1, 0.72], [0, 0.28]]);
-    expect(t(screen.getByTestId('cartao-posicao'))).toBe('2 de 3 · A conta');
-    expect(screen.getByText('Cartão 2 de 3: A conta')).toBeTruthy();
+    expect(t(screen.getByTestId('cartao-posicao'))).toBe('2 de 3 · Ritmo');
+    expect(screen.getByText('Cartão 2 de 3: Ritmo')).toBeTruthy();
     expect(screen.getByTestId('cartao-pagina-conta').className).toContain('cartao-frente');
     expect(screen.getByTestId('cartao-pagina-resumo').getAttribute('data-lado')).toBe('esq');
   });
@@ -276,9 +276,9 @@ describe('caminho do maço (data-maco): rolagem × reserva', () => {
     vi.stubGlobal('CSS', { supports: () => false });
     const { cruzar } = stubObservador();
     render(<CardResumoDeslizante {...base} metas={[meta]} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: A conta' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: Ritmo' }));
     cruzar([[0, 0.9]]); // ainda saindo do 1º
-    expect(t(screen.getByTestId('cartao-posicao'))).toBe('2 de 3 · A conta');
+    expect(t(screen.getByTestId('cartao-posicao'))).toBe('2 de 3 · Ritmo');
     // Como o IntersectionObserver de verdade: quem cruza o limiar (para cima ou para baixo) vem na entrega.
     cruzar([[1, 1], [0, 0]]); // chegou
     cruzar([[2, 0.8], [1, 0.2]]); // depois de chegar, o dedo volta a mandar
@@ -373,8 +373,8 @@ describe('reserva: destino dos botões interrompido, scrollTo, "reduzir moviment
     render(<CardResumoDeslizante {...base} metas={[meta]} />);
     const { trilho } = trilhoMedido();
     cruzar([[0, 1], [1, 0], [2, 0]]); // estado inicial que o observador entrega
-    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: A conta' }));
-    expect(posicao()).toBe('2 de 3 · A conta');
+    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: Ritmo' }));
+    expect(posicao()).toBe('2 de 3 · Ritmo');
     cruzar([[1, 0.65], [0, 0.35]]); // a rolagem suave começa e a pessoa a interrompe…
     interromper(trilho);
     cruzar([[0, 0.9], [1, 0.1]]); // …e volta ao 1º antes de o destino chegar
@@ -389,15 +389,15 @@ describe('reserva: destino dos botões interrompido, scrollTo, "reduzir moviment
     render(<CardResumoDeslizante {...base} metas={[meta]} />);
     const { trilho } = trilhoMedido();
     cruzar([[0, 1], [1, 0], [2, 0]]);
-    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: A conta' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: Ritmo' }));
     cruzar([[0, 0.9]]); // ainda no 1º (filtrado pelo destino)
-    expect(posicao()).toBe('2 de 3 · A conta');
+    expect(posicao()).toBe('2 de 3 · Ritmo');
     fireEvent.pointerDown(trilho);
     expect(posicao()).toBe('1 de 3 · Resumo');
     expect(inertes()).toEqual([false, true, true]);
     // Depois de largar, o observador volta a mandar.
     cruzar([[1, 0.7], [0, 0.3]]);
-    expect(posicao()).toBe('2 de 3 · A conta');
+    expect(posicao()).toBe('2 de 3 · Ritmo');
   });
 
   it('destino expira (900 ms) sem chegar: posição, anúncio e inert voltam ao cartão que está à vista', () => {
@@ -407,10 +407,10 @@ describe('reserva: destino dos botões interrompido, scrollTo, "reduzir moviment
     render(<CardResumoDeslizante {...base} metas={[meta]} />);
     trilhoMedido();
     cruzar([[0, 1], [1, 0], [2, 0]]);
-    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: A conta' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: Ritmo' }));
     cruzar([[0, 0.9]]);
     act(() => { vi.advanceTimersByTime(899); });
-    expect(posicao()).toBe('2 de 3 · A conta');
+    expect(posicao()).toBe('2 de 3 · Ritmo');
     expect(inertes()).toEqual([true, false, true]);
     act(() => { vi.advanceTimersByTime(1); });
     expect(posicao()).toBe('1 de 3 · Resumo');
@@ -426,7 +426,7 @@ describe('reserva: destino dos botões interrompido, scrollTo, "reduzir moviment
     const { trilho } = trilhoMedido();
     const leitura = vi.fn(() => 780);
     Object.defineProperty(trilho, 'scrollLeft', { configurable: true, get: leitura });
-    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: A conta' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: Ritmo' }));
     act(() => { vi.advanceTimersByTime(900); });
     expect(posicao()).toBe('3 de 3 · Meta');
     expect(anuncio()).toBe('Cartão 3 de 3: Meta');
@@ -442,7 +442,7 @@ describe('reserva: destino dos botões interrompido, scrollTo, "reduzir moviment
     const { trilho } = trilhoMedido();
     cruzar([[0, 1], [1, 0], [2, 0]]);
     const antes = vi.getTimerCount();
-    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: A conta' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: Ritmo' }));
     expect(vi.getTimerCount()).toBe(antes + 1);
     cruzar([[1, 1], [0, 0]]);
     expect(vi.getTimerCount()).toBe(antes);
@@ -460,11 +460,11 @@ describe('reserva: destino dos botões interrompido, scrollTo, "reduzir moviment
     stubObservador();
     render(<CardResumoDeslizante {...base} metas={[meta]} />);
     const { scrollTo } = trilhoMedido();
-    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: A conta' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: Ritmo' }));
     expect(scrollTo).toHaveBeenLastCalledWith({ left: 390, behavior: comportamento });
     fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: Meta' }));
     expect(scrollTo).toHaveBeenLastCalledWith({ left: 780, behavior: comportamento });
-    fireEvent.click(screen.getByRole('button', { name: 'Cartão anterior: A conta' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cartão anterior: Ritmo' }));
     expect(scrollTo).toHaveBeenLastCalledWith({ left: 390, behavior: comportamento });
   });
 
@@ -479,13 +479,13 @@ describe('reserva: destino dos botões interrompido, scrollTo, "reduzir moviment
     expect(obs.cb).toBeUndefined();
 
     // 2º cartão: rolagem → reserva.
-    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: A conta' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: Ritmo' }));
     expect(scrollTo).toHaveBeenLastCalledWith({ left: 390, behavior: 'smooth' });
     mudar(true);
     expect(palco.getAttribute('data-maco')).toBe('reserva');
     expect(scrollTo).toHaveBeenLastCalledWith({ left: 390, behavior: 'auto' });
     expect(obs.cb).toBeDefined();
-    expect(posicao()).toBe('2 de 3 · A conta');
+    expect(posicao()).toBe('2 de 3 · Ritmo');
     expect(inertes()).toEqual([true, false, true]);
 
     // 3º cartão (já com reduzir: sem suavidade): reserva → rolagem.
@@ -518,7 +518,7 @@ describe('reserva: destino dos botões interrompido, scrollTo, "reduzir moviment
     const { trilho } = trilhoMedido();
     const tirar = vi.spyOn(trilho, 'removeEventListener');
     const antes = vi.getTimerCount();
-    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: A conta' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Próximo cartão: Ritmo' }));
     expect(vi.getTimerCount()).toBe(antes + 1);
     unmount();
     expect(obs.desligado).toBe(true);

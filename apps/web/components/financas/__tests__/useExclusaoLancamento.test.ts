@@ -7,6 +7,7 @@ const m = vi.hoisted(() => ({
   toast: { error: vi.fn(), success: vi.fn() },
   vinculos: { recebimentos: [] as unknown[], pagamentos: [] as unknown[] },
   excluir: { mutate: vi.fn(), isPending: false },
+  excluirParcelas: { mutate: vi.fn(), isPending: false },
   desfazerPagamento: { mutate: vi.fn(), isPending: false },
   desfazerRecebimento: { mutate: vi.fn(), isPending: false },
 }));
@@ -15,6 +16,7 @@ vi.mock('../../../hooks', () => ({
   useDesfazerRecebimento: () => m.desfazerRecebimento,
   useDesfazerPagamento: () => m.desfazerPagamento,
   useExcluirTransacao: () => m.excluir,
+  useExcluirParcelasDesde: () => m.excluirParcelas,
 }));
 vi.mock('../../ui', async (original) => ({ ...await original<object>(), useToast: () => m.toast }));
 

@@ -366,3 +366,28 @@ export function evolucaoMesComBase(
   return evolucaoMes(competencia, hojeISO, transacoesMes, rebased,
     transacoesMes.filter((t): t is TransacaoMes & TransacaoSaldo => !!t.carteira_id), transferenciasMes);
 }
+
+export interface RitmoDiario {
+  /** Dias até o fim da competência contando hoje (SP); zero se encerrada. */
+  diasRestantes: number;
+  /** Folga por dia, arredondada para baixo em centavos. */
+  disponivelPorDia: number;
+  estado: 'folga' | 'sem_folga' | 'encerrado';
+  /** Quanto passou do que entra, em reais com precisão de centavos. */
+  excedente: number;
+}
+
+/** Divide o Deve sobrar pelos dias inclusivos restantes, sem consultar saldo ou relógio. */
+export function ritmoDiarioDoMes(competencia: Competencia, sobraValor: number, hojeISO: string): RitmoDiario {
+  const ultimo = fimDoMes(competencia);
+  const encerrado = hojeISO > ultimo;
+  const inicio = hojeISO < `${competencia}-01` ? `${competencia}-01` : hojeISO;
+  const diasRestantes = encerrado ? 0 : Number(ultimo.slice(8, 10)) - Number(inicio.slice(8, 10)) + 1;
+  const sobraCentavos = Math.round(sobraValor * 100);
+  return {
+    diasRestantes,
+    disponivelPorDia: diasRestantes ? Math.floor(Math.max(0, sobraCentavos) / diasRestantes) / 100 : 0,
+    estado: encerrado ? 'encerrado' : sobraCentavos > 0 ? 'folga' : 'sem_folga',
+    excedente: Math.max(0, -sobraCentavos) / 100,
+  };
+}

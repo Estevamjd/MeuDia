@@ -1,4 +1,4 @@
-# Exclusão de conta (000_baseline + 001–016)
+# Exclusão de conta (000_baseline + 001–017)
 
 Inventário do SQL versionado; não inspeciona o banco de produção. `C` = ON DELETE CASCADE;
 `N(coluna)` = ON DELETE SET NULL apenas nessa coluna. Todas as tabelas abaixo são `public`, salvo indicação.
@@ -59,7 +59,7 @@ As FKs fazem a limpeza na mesma transação do DELETE de `auth.users`, inclusive
 
 001 repete o schema do baseline, 002 repete agente, 003 repete notas; 004 só policies.
 008 acrescenta campos/restrições e notificações; 009 só origem; 012 só fatos/funções;
-013 acrescenta preferências e envios. Nenhuma outra FK RESTRICT/NO ACTION permanece nas tabelas inventariadas após 016. A 015 só acrescenta RPCs; a 016 acrescenta perfil_saude, ia_uso_diario e o log privado whatsapp_acoes, todos removidos pela cascata do perfil.
+013 acrescenta preferências e envios. Nenhuma outra FK RESTRICT/NO ACTION permanece nas tabelas inventariadas após 016. A 015 só acrescenta RPCs; a 016 acrescenta perfil_saude, ia_uso_diario e o log privado whatsapp_acoes, todos removidos pela cascata do perfil. A 017 só acrescenta três colunas de parcela, um CHECK e um índice em transacoes; não cria tabelas/FKs nem altera a cascata.
 
 ## Triggers e atomicidade
 

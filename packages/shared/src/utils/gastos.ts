@@ -63,6 +63,8 @@ export function pagasEmDia(ocorrencias: readonly OcorrenciaPrazo[], hojeISO: str
 export interface FiltroDespesas {
   mes: Competencia;
   categoria?: string | null;
+  busca?: string;
+  soWhatsapp?: boolean;
 }
 
 export interface DiaDeDespesas<T> {
@@ -79,13 +81,23 @@ export interface UltimasDespesas<T> {
   categorias: string[];
 }
 
-type Despesa = Pick<Transacao, 'tipo' | 'valor' | 'data' | 'categoria' | 'ajuste' | 'created_at'>;
+type Despesa = Pick<Transacao, 'tipo' | 'valor' | 'data' | 'categoria' | 'ajuste' | 'created_at'> & Partial<Pick<Transacao, 'descricao' | 'origem'>>;
+
+export function normalizarBusca(s: string): string {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
 
 /** Despesas do mês (sem ajustes), mais recentes primeiro (data e depois criação), agrupadas por dia. */
-export function ultimasDespesas<T extends Despesa>(transacoes: readonly T[], { mes, categoria }: FiltroDespesas): UltimasDespesas<T> {
+export function ultimasDespesas<T extends Despesa>(transacoes: readonly T[], { mes, categoria, busca = '', soWhatsapp = false }: FiltroDespesas): UltimasDespesas<T> {
   const doMes = transacoes.filter((t) => t.tipo === 'despesa' && !t.ajuste && competenciaDe(t.data) === mes);
-  const filtradas = doMes
+  const termos = normalizarBusca(busca).split(' ').filter(Boolean);
+  const candidatas = doMes
     .filter((t) => !categoria || t.categoria === categoria)
+    .filter((t) => !soWhatsapp || t.origem === 'whatsapp');
+  const filtradas = (termos.length ? candidatas.filter((t) => {
+      const texto = normalizarBusca(`${t.descricao ?? ''} ${t.categoria}`);
+      return termos.every((termo) => texto.includes(termo));
+    }) : candidatas)
     .sort((a, b) => b.data.localeCompare(a.data) || (b.created_at ?? '').localeCompare(a.created_at ?? ''));
   const dias: DiaDeDespesas<T>[] = [];
   for (const t of filtradas) {

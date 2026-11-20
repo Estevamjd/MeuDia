@@ -197,3 +197,41 @@ Antes de qualquer down, com autorização, fazer backup protegido de `public.per
 O down apaga essas duas tabelas e o log privado de ações/manutenções, perde o perfil de saúde da conta e
 reinicia a cota diária. Guardar também esses logs em backup se forem necessários para recuperação operacional.
 Só então executar `016_whatsapp_v2_saude_down.sql`; ele restaura a função de registro da 012.
+
+
+## Wave 3A (017)
+
+Com autorização do dono, aplicar a 017 antes do código: todos os SELECTs novos de
+transações pedem `parcela_*`. A migração é aditiva; o código anterior ignora essas colunas.
+
+1. Conferir previamente que `public.uq_transacoes_parcela` não existe, ou que pertence
+   a `public.transacoes` e tem a definição esperada. O up aborta se o nome existir sem ser índice único dessa tabela;
+   `IF NOT EXISTS` não corrige a definição.
+2. Aplicar `packages/database/migrations/017_parcelamento.sql` com `psql -1 -v ON_ERROR_STOP=1`
+   na conexão aprovada, ou pelo Supabase MCP `apply_migration` (detalhes abaixo).
+   O arquivo exige transação única: `SET LOCAL lock_timeout = '5s'`
+   não vaza para a sessão. Up e down verificam esse timeout antes do DDL e emitem
+   "017: execute em transação única" se ele não estiver ativo. Essa guarda só aborta a execução
+   do arquivo se o runner parar no primeiro erro, como em `psql -1 -v ON_ERROR_STOP=1`;
+   `psql -f` sem essas opções continua após o erro e pode aplicar DDL em autocommit.
+   Se expirar esperando lock, investigar a sessão bloqueadora e
+   repetir a transação inteira. O CHECK nasce `NOT VALID` e depois é validado; os locks
+   dos ALTERs permanecem até o commit, portanto manter a transação curta.
+3. No PostgREST self-hosted, após o commit executar `NOTIFY pgrst, 'reload schema';`
+   (necessário somente no self-hosted). No Supabase hospedado, o PostgREST recarrega
+   o schema automaticamente após DDL. Em ambos, confirmar a leitura de `parcela_grupo`,
+   `parcela_num` e `parcela_total` antes de publicar o código. Confirmar em `pg_index`
+   que o índice pertence a `public.transacoes`.
+4. Publicar o código somente após essas verificações.
+
+Rollback: reverter o código primeiro, confirmar que os leitores novos saíram e só então
+executar `017_parcelamento_down.sql` com `psql -1 -v ON_ERROR_STOP=1`. Recarregar o schema
+novamente após o commit (NOTIFY somente no self-hosted; automático no hospedado).
+O down preserva linhas, valores e datas, mas perde o agrupamento.
+
+O `verify.sh db` inclui o arquivo dentro de `BEGIN`/`ROLLBACK`. O Supabase MCP
+`apply_migration` é um caminho aceito: envia o arquivo inteiro como uma única query,
+executada em uma transação implícita. Nesse formato foi medido que o `lock_timeout`
+de 5 s é respeitado com rollback total, a reaplicação é idempotente e um índice
+`uq_transacoes_parcela` de outra tabela aborta sem criar colunas. Não inserir
+`BEGIN`/`COMMIT` no arquivo para não encerrar uma transação do executor.

@@ -3,7 +3,7 @@ import { paginasPorChave } from './cron-pagination';
 import { erroDb } from './erros-db';
 import { getSupabase } from './supabase';
 
-const COLUMNS = 'id, user_id, tipo, categoria, descricao, valor, data, banco, automatico, created_at, carteira_id, ajuste, origem';
+export const COLUMNS = 'id, user_id, tipo, categoria, descricao, valor, data, banco, automatico, created_at, carteira_id, ajuste, origem, parcela_grupo, parcela_num, parcela_total';
 
 export async function findByUserId(userId: string): Promise<Transacao[]> {
   const { data, error } = await getSupabase()
@@ -103,4 +103,20 @@ export async function findComCarteiraDesde(userId: string, desde: string): Promi
     erroDb,
   );
   return rows as unknown as Transacao[];
+}
+
+/** Um statement PostgREST: ou todas as parcelas entram, ou nenhuma. */
+export async function createMany(userId: string, rows: TransacaoInsert[]): Promise<Transacao[]> {
+  const { data, error } = await getSupabase().from('transacoes')
+    .insert(rows.map((row) => ({ ...row, user_id: userId })))
+    .select(COLUMNS);
+  if (error) erroDb(error);
+  return [...(data ?? []) as unknown as Transacao[]].sort((a, b) => (a.parcela_num ?? 0) - (b.parcela_num ?? 0));
+}
+
+export async function removeParcelasDesde(userId: string, grupo: string, aPartirDe: number): Promise<number> {
+  const { count, error } = await getSupabase().from('transacoes').delete({ count: 'exact' })
+    .eq('user_id', userId).eq('parcela_grupo', grupo).gte('parcela_num', aPartirDe);
+  if (error) erroDb(error);
+  return count ?? 0;
 }

@@ -61,7 +61,8 @@ db() {
     "${q[@]}" -f tests/014_cofrinho.sql >/dev/null
     "${q[@]}" -f tests/015_rpc_saldo_painel.sql >/dev/null
     "${q[@]}" -f tests/016_whatsapp_v2_saude.sql >/dev/null
-    echo "ok: tests/005..016 (financas, carteiras, excluir_metas, saude_treino, origem_lancamento, treino_dieta_whatsapp, whatsapp_onboarding, whatsapp_amigo, whatsapp_lembretes, cofrinho, rpc_saldo_painel, whatsapp_v2_saude)"
+    "${q[@]}" -f tests/017_parcelamento.sql >/dev/null
+    echo "ok: tests/005..017 (financas, carteiras, excluir_metas, saude_treino, origem_lancamento, treino_dieta_whatsapp, whatsapp_onboarding, whatsapp_amigo, whatsapp_lembretes, cofrinho, rpc_saldo_painel, whatsapp_v2_saude, parcelamento)"
     bash tests/006_corrigir_saldo_concorrencia.sh
     bash tests/016_cota_concorrencia.sh
   )

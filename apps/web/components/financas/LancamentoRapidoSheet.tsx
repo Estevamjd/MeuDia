@@ -1,12 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeftRight, HandCoins, ShoppingBag } from 'lucide-react';
 import { CATEGORIA_OUTROS, hojeSP } from '@meudia/shared';
-import { useCarteiras, useEntrouDinheiro, useGastei, usePainelSaldo, useTransferir } from '../../hooks';
+import { useCarteiras, useCriarDespesaParcelada, useEntrouDinheiro, useGastei, usePainelSaldo, useTransferir } from '../../hooks';
 import { Button, Input, Modal, useToast } from '../ui';
-import { mascaraBRL } from '../../lib/financas-ui';
+import { formatBRL, mascaraBRL } from '../../lib/financas-ui';
+import { CampoParcelado, MENSAGEM_TOTAL_VAZIO, PARCELAS_PADRAO, avaliarParcelas } from './CampoParcelado';
 import { SeletorCategoria } from './SeletorCategoria';
 import { SeletorCarteira } from './SeletorCarteira';
 
@@ -115,12 +116,12 @@ interface FormProps {
   onVoltar: () => void;
 }
 
-function CampoValor({ id, digitos, setDigitos, erro }: { id: string; digitos: string; setDigitos: (d: string) => void; erro?: string }) {
+function CampoValor({ id, digitos, setDigitos, erro, label = 'Valor' }: { id: string; digitos: string; setDigitos: (d: string) => void; erro?: string; label?: string }) {
   const { exibicao } = mascaraBRL(digitos);
   return (
     <Input
       id={id}
-      label="Valor"
+      label={label}
       type="text"
       inputMode="decimal"
       autoComplete="off"
@@ -162,12 +163,18 @@ function validar(valor: number, data: string, hojeISO: string): { valor?: string
 function FormGastei({ hojeISO, carteiras, padrao, onFeito, onVoltar }: FormProps) {
   const toast = useToast();
   const gastei = useGastei(hojeISO);
+  const parcelado = useCriarDespesaParcelada();
   const [digitos, setDigitos] = useState('');
+  const [parcelar, setParcelar] = useState(false);
+  const [parcelas, setParcelas] = useState(PARCELAS_PADRAO);
   const [categoria, setCategoria] = useState(CATEGORIA_OUTROS);
   const [carteira, setCarteira] = useState<string | null>(padrao);
   const [descricao, setDescricao] = useState('');
   const [data, setData] = useState(hojeISO);
   const [erros, setErros] = useState<{ valor?: string; data?: string; carteira?: string }>({});
+  // Trava síncrona do parcelado: o `isPending` só desabilita o botão no próximo render, e cada envio cria outro grupo
+  // de parcelas. Liberada quando a gravação termina (sucesso ou erro).
+  const enviandoParceladoRef = useRef(false);
 
   const enviar = (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,6 +182,35 @@ function FormGastei({ hojeISO, carteiras, padrao, onFeito, onVoltar }: FormProps
     const novos = { ...validar(valor, data, hojeISO), ...(carteira ? {} : { carteira: 'Escolha de onde saiu.' }) };
     setErros(novos);
     if (Object.keys(novos).length || !carteira) return;
+    if (parcelar) {
+      // O valor digitado é o TOTAL: o service divide em centavos (sobra na 1ª) e grava as N parcelas de uma vez.
+      if (enviandoParceladoRef.current) return;
+      const { plano, erro } = avaliarParcelas(valor, parcelas, data);
+      if (!plano) return setErros({ valor: erro ?? MENSAGEM_TOTAL_VAZIO });
+      enviandoParceladoRef.current = true;
+      const nomeCarteira = carteiras.find((c) => c.id === carteira)?.nome;
+      parcelado.mutate(
+        {
+          base: {
+            tipo: 'despesa', categoria, descricao: descricao.trim() || categoria, valor, data,
+            carteira_id: carteira, banco: nomeCarteira ?? null, ajuste: false,
+          },
+          total: valor,
+          parcelas,
+        },
+        {
+          onSuccess: () => {
+            toast.success(`Compra salva em ${parcelas}× de ${formatBRL(plano[1]!.valor)}`);
+            onFeito();
+          },
+          onError: () => toast.error('Não foi possível salvar a compra parcelada. Tente de novo.'),
+          onSettled: () => {
+            enviandoParceladoRef.current = false;
+          },
+        },
+      );
+      return;
+    }
     gastei.mutate(
       { valor, categoria, descricao: descricao.trim() || undefined, carteira_id: carteira, data },
       {
@@ -189,14 +225,22 @@ function FormGastei({ hojeISO, carteiras, padrao, onFeito, onVoltar }: FormProps
 
   return (
     <form onSubmit={enviar} className="space-y-4" noValidate>
-      <CampoValor id="gastei-valor" digitos={digitos} setDigitos={setDigitos} erro={erros.valor} />
+      <CampoValor id="gastei-valor" digitos={digitos} setDigitos={setDigitos} erro={erros.valor} label={parcelar ? 'Valor total da compra' : 'Valor'} />
       <SeletorCategoria id="gastei-categoria" value={categoria} onChange={setCategoria} />
       <SeletorCarteira id="gastei-carteira" label="Saiu de" carteiras={carteiras} value={carteira} onChange={setCarteira} />
       {erros.carteira && <p role="alert" className="text-xs text-red">{erros.carteira}</p>}
       <Input id="gastei-descricao" label="Descrição (opcional)" placeholder={categoria} value={descricao} onChange={(e) => setDescricao(e.target.value)} />
       <CampoData id="gastei-data" value={data} onChange={setData} hojeISO={hojeISO} />
       {erros.data && <p role="alert" className="text-xs text-red">{erros.data}</p>}
-      <Rodape onVoltar={onVoltar} salvando={gastei.isPending} rotulo="Salvar gasto" />
+      <CampoParcelado
+        ligado={parcelar}
+        onLigado={setParcelar}
+        parcelas={parcelas}
+        onParcelas={setParcelas}
+        total={mascaraBRL(digitos).valor}
+        dataPrimeira={data}
+      />
+      <Rodape onVoltar={onVoltar} salvando={gastei.isPending || parcelado.isPending} rotulo={parcelar ? 'Salvar compra' : 'Salvar gasto'} />
     </form>
   );
 }

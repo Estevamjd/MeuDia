@@ -161,7 +161,7 @@ export {
   type TransferirInput,
 } from './useCarteiras';
 
-export { useVinculosTransacoes } from './useFinancas';
+export { useVinculosTransacoes, useCriarDespesaParcelada, useExcluirParcelasDesde, type DespesaParceladaInput } from './useFinancas';
 export { useMetas, useCriarMeta, useAtualizarMeta, useGuardarNaMeta, useExcluirMeta, useSobraDoMesCorrente } from './useMetas';
 export { usePesoRecente, useRegistrarPesoDoDia, usePerfilSaude, hojeLocal } from './useSaude';
 export {

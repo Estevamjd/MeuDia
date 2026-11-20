@@ -19,6 +19,10 @@ export function schemaDesatualizado(error: { code?: string } | null | undefined)
  * 55000: lançamento vinculado a Recebi/Paguei (trigger da 006); só muda pelas RPCs desfazer_*.
  */
 export function erroDb(error: { message: string; code?: string }): never {
+  if (error.code === '23514') {
+    logger.warn('[db] check violado', { code: error.code });
+    throw new AppError('Os dados informados não são válidos.', 'VALIDATION_ERROR', 400);
+  }
   if (error.code === '55000') {
     throw new AppError(error.message, 'TRANSACAO_VINCULADA', 409, 'Use Desfazer recebimento/pagamento para alterar este lançamento.');
   }

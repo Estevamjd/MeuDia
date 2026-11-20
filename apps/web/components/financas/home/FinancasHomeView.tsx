@@ -1,4 +1,6 @@
-import { Button, SkeletonCard, SkeletonList } from '../../ui';
+import type { Meta } from '@meudia/shared';
+import { Button, Modal, SkeletonCard, SkeletonList } from '../../ui';
+import { FormGuardei } from '../metas/FormGuardei';
 import { BoasVindasFinancas, type BoasVindasFinancasProps } from './BoasVindasFinancas';
 import type { SecoesHome } from './montarHome';
 import { ProximasContas, type ContaProxima } from './ProximasContas';
@@ -24,6 +26,17 @@ export interface DashboardHome extends DadosDashboard {
   fechamentoSheet: FechamentoMesSheetProps;
 }
 
+/** "+ Guardei" do cartão Meta: o mesmo FormGuardei da tela de Metas, no Modal, para a meta do cartão. */
+export interface GuardeiHome {
+  /** Meta aberta no Modal; `null` = fechado. */
+  meta: Meta | null;
+  salvando: boolean;
+  onAbrir: (metaId: string) => void;
+  onClose: () => void;
+  onGuardar: (valor: number) => void;
+  onCorrigir: (total: number) => void;
+}
+
 export interface FinancasHomeViewProps {
   estado: 'carregando' | 'erro' | 'pronto';
   onTentarDeNovo?: () => void;
@@ -47,6 +60,7 @@ export interface FinancasHomeViewProps {
   onAlternarOlho?: () => void;
   /** Metas de compra; com alguma, o cartão ganha a página "Meta". */
   metas?: readonly MetaDoCartao[];
+  guardei?: GuardeiHome | null;
 }
 
 /**
@@ -69,6 +83,7 @@ export function FinancasHomeView({
   resumo = null,
   escondido = false,
   metas = [],
+  guardei = null,
 }: FinancasHomeViewProps) {
   if (estado === 'carregando') {
     return (
@@ -115,6 +130,7 @@ export function FinancasHomeView({
           metas={metas}
           hojeISO={hojeISO}
           escondido={escondido}
+          onGuardei={guardei?.onAbrir}
         />
       ) : (
         // Painel indisponível ou outro mês: o resumo pelos lançamentos, como antes.
@@ -141,6 +157,13 @@ export function FinancasHomeView({
       <RendaSheet {...rendaSheet} />
       {d && <RecebiSheet {...d.recebiSheet} />}
       {d && <FechamentoMesSheet {...d.fechamentoSheet} />}
+      {guardei && (
+        <Modal isOpen={!!guardei.meta} onClose={guardei.onClose} title="Guardei">
+          {guardei.meta && (
+            <FormGuardei meta={guardei.meta} salvando={guardei.salvando} onGuardar={guardei.onGuardar} onCorrigir={guardei.onCorrigir} />
+          )}
+        </Modal>
+      )}
     </div>
   );
 }

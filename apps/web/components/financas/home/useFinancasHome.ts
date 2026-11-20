@@ -7,6 +7,8 @@ import {
   useContasMes,
   useCriarRenda,
   useMetas,
+  useAtualizarMeta,
+  useGuardarNaMeta,
   useFecharMesCofrinho,
   usePainelSaldo,
   useReceberRenda,
@@ -36,6 +38,10 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, onGas
   const rendas = useRendas();
   // Metas de compra: com alguma, o cartão da Início ganha a página "Meta" (falha = cartão sem a página).
   const metas = useMetas();
+  const guardarNaMeta = useGuardarNaMeta();
+  const atualizarMeta = useAtualizarMeta();
+  // "+ Guardei" do cartão Meta: id da meta com o Modal aberto (a meta em si vem sempre da lista atual).
+  const [guardandoId, setGuardandoId] = useState<string | null>(null);
   const contasCadastradas = useContas();
   const criarRenda = useCriarRenda();
   const { pagarConta, contaOcupada } = usePagamentoAcoes();
@@ -79,6 +85,14 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, onGas
   const consultas = [resumo, contas, transacoes, rendas, contasCadastradas];
   const comErro = consultas.filter((q) => q.isError);
   const carregando = resumo.isLoading || contas.isLoading || rendas.isLoading || contasCadastradas.isLoading;
+
+  const aoGuardar = {
+    onSuccess: () => {
+      toast.success('Guardado!');
+      setGuardandoId(null);
+    },
+    onError: () => toast.error('Não foi possível salvar. Tente de novo.'),
+  };
 
   const rendaCadastrada = (rendas.data ?? []).some((r) => r.ativo);
   // Definições cadastradas (não as ocorrências do mês): conta anual/avulsa de outro mês também conta.
@@ -193,6 +207,25 @@ export function useFinancasHome(competencia: Competencia, hojeISO: string, onGas
       : null,
     onGastei,
     metas: metas.data ?? [],
+    guardei: {
+      meta: (guardandoId && metas.data?.find((m) => m.id === guardandoId)) || null,
+      salvando: guardarNaMeta.isPending || atualizarMeta.isPending,
+      onAbrir: (id) => {
+        guardarNaMeta.reset();
+        atualizarMeta.reset();
+        setGuardandoId(id);
+      },
+      onClose: () => setGuardandoId(null),
+      // Os dois hooks invalidam `metasKeys.todas`: o cartão e a tela de Metas mostram o novo guardado.
+      onGuardar: (valor) => {
+        if (!guardandoId) return;
+        guardarNaMeta.mutate({ id: guardandoId, valor }, aoGuardar);
+      },
+      onCorrigir: (total) => {
+        if (!guardandoId) return;
+        atualizarMeta.mutate({ id: guardandoId, data: { valor_guardado: total } }, aoGuardar);
+      },
+    },
     resumo: resumoMes,
     escondido,
     onAlternarOlho: () =>

@@ -1,9 +1,10 @@
 import { clsx } from 'clsx';
 import { Pencil, Trash2 } from 'lucide-react';
-import type { Transacao } from '@meudia/shared';
+import { rotuloParcela, type Transacao } from '@meudia/shared';
 import { formatBRL, formatDiaMes } from '../../lib/financas-ui';
 import { CategoriaIcone } from './CategoriaIcone';
 import { OrigemSelo } from './OrigemSelo';
+import { SeloParcela } from './SeloParcela';
 
 export type VinculoLancamento = 'recebimento' | 'pagamento';
 
@@ -45,6 +46,11 @@ export function LinhaLancamento({ t, vinculo, comCategoria = false, acoes }: Lin
           <span className="ml-1.5 inline-flex align-middle">
             <OrigemSelo t={t} />
           </span>
+          {rotuloParcela(t) && (
+            <span className="ml-1.5 inline-flex align-middle">
+              <SeloParcela t={t} />
+            </span>
+          )}
           {vinculo && (
             <span className="ml-1.5 whitespace-nowrap rounded-full bg-card2 px-2 py-0.5 text-[11px]">{vinculo === 'pagamento' ? 'Paguei' : 'Recebi'}</span>
           )}

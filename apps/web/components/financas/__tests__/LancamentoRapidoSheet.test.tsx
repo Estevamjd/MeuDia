@@ -10,6 +10,7 @@ vi.mock('../../../hooks', () => ({
   useCarteiras: () => ({ data: [NUBANK, CAIXA], isLoading: false }),
   usePainelSaldo: () => ({ data: { carteiraPadraoId: 'nu' } }),
   useGastei: () => ({ mutate: vi.fn(), isPending: false }),
+  useCriarDespesaParcelada: () => ({ mutate: vi.fn(), isPending: false }),
   useEntrouDinheiro: () => ({ mutate: vi.fn(), isPending: false }),
   useTransferir: m.transferir,
 }));

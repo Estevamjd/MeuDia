@@ -146,7 +146,7 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await expect(cofrinho).toHaveText(brl('700,00'));
   // Deve sobrar = renda 100 (entrada extra; sem renda fixa) − contas fixas 220 − gastos 0 = −120. Sem o card "Em 7 dias".
   await expect(page.getByText('Em 7 dias você terá')).toHaveCount(0);
-  await expect(page.getByRole('region', { name: 'A conta de outubro' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Ritmo de outubro' })).toBeVisible();
   await expect(linhaResumo('resumo-renda')).toHaveText(brl('100,00'));
   await expect(linhaResumo('resumo-contas-fixas')).toHaveText(/^− R\$\s220,00$/);
   await expect(linhaResumo('resumo-gastos')).toHaveText(/^− R\$\s0,00$/);
@@ -208,8 +208,8 @@ test('contas e saldo: 2 bancos, entrada extra, contas, transferência, Gastei, r
   await page.evaluate(() => window.scrollTo(0, 0));
   await shot('02-home-dashboard-viewport.png', false);
 
-  // Contas fixas (no cartão "A conta" do maço): a lista mostra cada conta com "a pagar" (pagas ou não, já contam na sobra).
-  await tocar(page.getByRole('button', { name: 'Próximo cartão: A conta' }));
+  // Contas fixas (no cartão "Ritmo" do maço): a lista mostra cada conta com "a pagar" (pagas ou não, já contam na sobra).
+  await tocar(page.getByRole('button', { name: 'Próximo cartão: Ritmo' }));
   await expect(page.getByTestId('cartao-pagina-conta')).toHaveClass(/cartao-frente/);
   await tocar(page.getByRole('button', { name: /Contas fixas/ }));
   const listaContas = page.getByRole('list', { name: 'Contas fixas de outubro' });
@@ -451,8 +451,8 @@ test('previsão B/C: fim do mês 2.090 continua igual depois de Recebi e de Pagu
   await expect(fimMes).toHaveText(brl('2.090,00'));
   await expect(page.getByTestId('resumo-gastos')).toHaveText(/^− R\$\s0,00$/);
   await expect(page.getByTestId('resumo-contas-fixas')).toHaveText(/^− R\$\s110,00$/);
-  // O status das contas fixas fica na lista, aberta pelo cartão "A conta" do maço.
-  await tocar(page.getByRole('button', { name: 'Próximo cartão: A conta' }));
+  // O status das contas fixas fica na lista, aberta pelo cartão "Ritmo" do maço.
+  await tocar(page.getByRole('button', { name: 'Próximo cartão: Ritmo' }));
   await expect(page.getByTestId('cartao-pagina-conta')).toHaveClass(/cartao-frente/);
   await tocar(page.getByRole('button', { name: /Contas fixas/ }));
   await expect(page.getByText('1 paga · 0 a pagar', { exact: false })).toBeVisible();
